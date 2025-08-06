@@ -1,58 +1,36 @@
-# TalentChainPro Frontend
-
-This is the frontend application for TalentChainPro, a blockchain-based talent management platform built on Hedera Hashgraph.
-
-## Project Structure
-
-```
-frontend/
-├── src/
-│   ├── components/     # Reusable React components
-│   ├── pages/         # Page components
-│   ├── services/      # API and blockchain services
-│   ├── utils/         # Utility functions
-│   ├── styles/        # CSS and styling files
-│   └── index.js       # Application entry point
-├── public/            # Static assets
-└── package.json       # Dependencies and scripts
-```
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+First, run the development server:
 
-2. Start the development server:
-   ```bash
-   npm start
-   ```
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-3. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-## Available Scripts
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-- `npm start` - Runs the app in development mode
-- `npm build` - Builds the app for production
-- `npm test` - Launches the test runner
-- `npm run eject` - Ejects from Create React App (one-way operation)
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Backend Integration
+## Learn More
 
-The frontend communicates with the backend API running on `http://localhost:8000`. Make sure the backend server is running before starting the frontend development.
+To learn more about Next.js, take a look at the following resources:
 
-## Blockchain Integration
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-This application integrates with Hedera Hashgraph for:
-- Skill token management
-- Talent pool operations
-- Smart contract interactions
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Development Notes
+## Deploy on Vercel
 
-- The application uses React 18 with functional components and hooks
-- Web3 integration for blockchain interactions
-- Axios for API calls to the backend
-- React Router for navigation
-- MetaMask integration for wallet connectivity
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
