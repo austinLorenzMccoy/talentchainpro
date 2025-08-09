@@ -8,9 +8,9 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import "./interfaces/IGovernance.sol";
-import "./interfaces/ISkillToken.sol";
-import "./libraries/GovernanceLibrary.sol";
+import "../interfaces/IGovernance.sol";
+import "../interfaces/ISkillToken.sol";
+import "../libraries/GovernanceLibrary.sol";
 
 /**
  * @title Governance
@@ -130,37 +130,44 @@ contract Governance is
     }
 
     /**
-     * @dev Create a new proposal
+     * @dev Internal function to create proposals
      */
-    function createProposal(
+    function _createProposalInternal(
         string calldata title,
         string calldata description,
         address[] calldata targets,
         uint256[] calldata values,
         bytes[] calldata calldatas,
-        string calldata ipfsHash
-    ) 
-        external 
-        override 
-        whenNotPaused
-        returns (uint256 proposalId)
-    {
-        require(bytes(title).length > 0, "Governance: empty title");
-        require(bytes(description).length > 0, "Governance: empty description");
-        require(targets.length > 0, "Governance: empty targets");
-        require(
-            targets.length == values.length && targets.length == calldatas.length,
-            "Governance: array length mismatch"
-        );
-
+        string calldata ipfsHash,
+        bool isEmergency
+    ) internal returns (uint256 proposalId) {
         uint256 votingPower = _getCurrentVotingPower(_msgSender());
-        require(votingPower >= settings.proposalThreshold, "Governance: below proposal threshold");
+        
+        // Use library for validation
+        GovernanceLibrary.validateProposalCreation(
+            title,
+            description,
+            targets,
+            values,
+            calldatas,
+            votingPower,
+            settings.proposalThreshold
+        );
 
         proposalId = _proposalIdCounter.current();
         _proposalIdCounter.increment();
 
-        uint256 startTime = block.timestamp + settings.votingDelay;
-        uint256 endTime = startTime + settings.votingPeriod;
+        uint256 startTime;
+        uint256 endTime;
+        
+        if (isEmergency) {
+            startTime = block.timestamp + 1 hours; // Shorter delay for emergency
+            endTime = startTime + settings.emergencyVotingPeriod;
+            _emergencyProposals[proposalId] = true;
+        } else {
+            startTime = block.timestamp + settings.votingDelay;
+            endTime = startTime + settings.votingPeriod;
+        }
 
         _proposals[proposalId] = Proposal({
             id: proposalId,
@@ -191,6 +198,25 @@ contract Governance is
     }
 
     /**
+     * @dev Create a new proposal
+     */
+    function createProposal(
+        string calldata title,
+        string calldata description,
+        address[] calldata targets,
+        uint256[] calldata values,
+        bytes[] calldata calldatas,
+        string calldata ipfsHash
+    ) 
+        external 
+        override 
+        whenNotPaused
+        returns (uint256 proposalId)
+    {
+        return _createProposalInternal(title, description, targets, values, calldatas, ipfsHash, false);
+    }
+
+    /**
      * @dev Create emergency proposal
      */
     function createEmergencyProposal(
@@ -209,15 +235,8 @@ contract Governance is
     {
         require(bytes(justification).length > 0, "Governance: empty justification");
 
-        proposalId = createProposal(title, description, targets, values, calldatas, ipfsHash);
-
-        // Override timing for emergency proposal
-        uint256 emergencyStartTime = block.timestamp + 1 hours; // Shorter delay
-        uint256 emergencyEndTime = emergencyStartTime + settings.emergencyVotingPeriod;
-
-        _proposals[proposalId].startTime = emergencyStartTime;
-        _proposals[proposalId].endTime = emergencyEndTime;
-        _emergencyProposals[proposalId] = true;
+        // Use internal function to create proposal
+        proposalId = _createProposalInternal(title, description, targets, values, calldatas, ipfsHash, true);
 
         emit EmergencyProposalCreated(proposalId);
     }
@@ -237,15 +256,17 @@ contract Governance is
         whenNotPaused
     {
         Proposal storage proposal = _proposals[proposalId];
-        require(proposal.status == ProposalStatus.Active, "Governance: proposal not active");
-        require(block.timestamp >= proposal.startTime, "Governance: voting not started");
-        require(block.timestamp <= proposal.endTime, "Governance: voting ended");
-
         VoteReceipt storage receipt = _proposalVotes[proposalId][_msgSender()];
-        require(!receipt.hasVoted, "Governance: already voted");
-
         uint256 weight = _getVotingPower(_msgSender(), proposalId);
-        require(weight > 0, "Governance: no voting power");
+
+        // Use library for validation
+        GovernanceLibrary.validateVoting(
+            proposal.status,
+            proposal.startTime,
+            proposal.endTime,
+            receipt.hasVoted,
+            weight
+        );
 
         receipt.hasVoted = true;
         receipt.vote = vote;
@@ -335,9 +356,13 @@ contract Governance is
         nonReentrant
     {
         Proposal storage proposal = _proposals[proposalId];
-        require(proposal.status == ProposalStatus.Queued, "Governance: proposal not queued");
-        require(block.timestamp >= _executionTime[proposalId], "Governance: execution delay not met");
-        require(!_proposalExecuted[proposalId], "Governance: already executed");
+        
+        // Use library for validation
+        GovernanceLibrary.validateExecution(
+            proposal.status,
+            _executionTime[proposalId],
+            _proposalExecuted[proposalId]
+        );
 
         _proposalExecuted[proposalId] = true;
         proposal.executed = true;
@@ -578,15 +603,20 @@ contract Governance is
         Proposal storage proposal = _proposals[proposalId];
         
         if (block.timestamp > proposal.endTime) {
+            // Use library for outcome calculation
+            // Calculate total eligible voting power (simplified approach)
             uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
-            uint256 requiredQuorum = _emergencyProposals[proposalId] ? 
-                settings.emergencyQuorum : settings.quorum;
+            uint256 totalEligiblePower = totalVotes > 0 ? totalVotes * 10 : 1000; // Estimate based on participation
             
-            if (totalVotes >= requiredQuorum && proposal.forVotes > proposal.againstVotes) {
-                proposal.status = ProposalStatus.Succeeded;
-            } else {
-                proposal.status = ProposalStatus.Defeated;
-            }
+            ProposalStatus newStatus = GovernanceLibrary.calculateProposalOutcome(
+                proposal.forVotes,
+                proposal.againstVotes,
+                proposal.abstainVotes,
+                settings.quorum,
+                totalEligiblePower,
+                _emergencyProposals[proposalId]
+            );
+            proposal.status = newStatus;
         } else if (block.timestamp >= proposal.startTime) {
             proposal.status = ProposalStatus.Active;
         }
@@ -602,9 +632,14 @@ contract Governance is
         external 
         onlyRole(DEFAULT_ADMIN_ROLE) 
     {
-        require(newSettings.votingDelay > 0, "Governance: invalid voting delay");
-        require(newSettings.votingPeriod > 0, "Governance: invalid voting period");
-        require(newSettings.quorum > 0, "Governance: invalid quorum");
+        // Use library for validation
+        GovernanceLibrary.validateGovernanceSettings(
+            newSettings.votingDelay,
+            newSettings.votingPeriod,
+            newSettings.proposalThreshold,
+            newSettings.quorum,
+            newSettings.executionDelay
+        );
         
         settings = newSettings;
         

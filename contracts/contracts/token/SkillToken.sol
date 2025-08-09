@@ -11,8 +11,8 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import "./interfaces/ISkillToken.sol";
-import "./libraries/SkillLibrary.sol";
+import "../interfaces/ISkillToken.sol";
+import "../libraries/SkillLibrary.sol";
 
 /**
  * @title SkillToken
@@ -140,21 +140,18 @@ contract SkillToken is
     }
 
     /**
-     * @dev Mint a new skill token
+     * @dev Internal function to mint a skill token
      */
-    function mintSkillToken(
+    function _mintSkillTokenInternal(
         address recipient,
-        string calldata category,
-        string calldata subcategory,
+        string memory category,
+        string memory subcategory,
         uint8 level,
         uint64 expiryDate,
-        string calldata metadata,
-        string calldata tokenURI
+        string memory metadata,
+        string memory tokenURIData
     ) 
-        external 
-        override 
-        onlyRole(MINTER_ROLE) 
-        whenNotPaused
+        internal
         validSkillLevel(level)
         returns (uint256 tokenId)
     {
@@ -172,7 +169,7 @@ contract SkillToken is
 
         // Mint token
         _safeMint(recipient, tokenId);
-        _setTokenURI(tokenId, tokenURI);
+        _setTokenURI(tokenId, tokenURIData);
 
         // Store skill data
         string memory normalizedCategory = category.normalizeCategory();
@@ -193,6 +190,37 @@ contract SkillToken is
         _totalByCategory[normalizedCategory]++;
 
         emit SkillTokenMinted(tokenId, recipient, normalizedCategory, level, _msgSender());
+        
+        return tokenId;
+    }
+
+    /**
+     * @dev Mint a new skill token
+     */
+    function mintSkillToken(
+        address recipient,
+        string calldata category,
+        string calldata subcategory,
+        uint8 level,
+        uint64 expiryDate,
+        string calldata metadata,
+        string calldata tokenURIData
+    ) 
+        external 
+        override 
+        onlyRole(MINTER_ROLE) 
+        whenNotPaused
+        returns (uint256 tokenId)
+    {
+        return _mintSkillTokenInternal(
+            recipient,
+            category,
+            subcategory,
+            level,
+            expiryDate,
+            metadata,
+            tokenURIData
+        );
     }
 
     /**
@@ -226,7 +254,7 @@ contract SkillToken is
         tokenIds = new uint256[](length);
 
         for (uint256 i = 0; i < length; i++) {
-            tokenIds[i] = mintSkillToken(
+            tokenIds[i] = _mintSkillTokenInternal(
                 recipient,
                 categories[i],
                 subcategories[i],
@@ -525,7 +553,7 @@ contract SkillToken is
     function tokenURI(uint256 tokenId) 
         public 
         view 
-        override(ERC721, ERC721URIStorage, IERC721Metadata) 
+        override(ERC721, ERC721URIStorage) 
         returns (string memory) 
     {
         return super.tokenURI(tokenId);

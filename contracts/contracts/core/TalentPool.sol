@@ -8,9 +8,9 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import "./interfaces/ITalentPool.sol";
-import "./interfaces/ISkillToken.sol";
-import "./libraries/PoolLibrary.sol";
+import "../interfaces/ITalentPool.sol";
+import "../interfaces/ISkillToken.sol";
+import "../libraries/PoolLibrary.sol";
 
 /**
  * @title TalentPool
@@ -722,9 +722,58 @@ contract TalentPool is
         bool isRemote,
         uint256 stakeAmount
     ) internal returns (uint256) {
-        // This would be similar to createPool but without msg.value validation
-        // Implementation would need to be adjusted for batch processing
-        revert("TalentPool: batch creation internal function not implemented");
+        // Use library for validation
+        PoolLibrary.validatePoolCreation(
+            stakeAmount,
+            salaryMin,
+            salaryMax,
+            deadline,
+            requiredSkills,
+            minimumLevels
+        );
+
+        uint256 poolId = _poolIdCounter.current();
+        _poolIdCounter.increment();
+
+        // Store pool data
+        _pools[poolId] = JobPool({
+            id: poolId,
+            company: _msgSender(),
+            title: title,
+            description: description,
+            jobType: jobType,
+            requiredSkills: requiredSkills,
+            minimumLevels: minimumLevels,
+            salaryMin: salaryMin,
+            salaryMax: salaryMax,
+            stakeAmount: stakeAmount,
+            deadline: deadline,
+            createdAt: uint64(block.timestamp),
+            status: PoolStatus.Active,
+            selectedCandidate: address(0),
+            totalApplications: 0,
+            location: location,
+            isRemote: isRemote
+        });
+
+        // Store in indexes  
+        _poolsByCompany[_msgSender()].push(poolId);
+
+        // Initialize pool metrics
+        _poolMetrics[poolId] = PoolMetrics({
+            totalStaked: stakeAmount,
+            averageMatchScore: 0,
+            completionRate: 0,
+            averageTimeToFill: 0
+        });
+
+        // Update global statistics
+        _totalPoolsCreated++;
+        _totalStakedAmount += stakeAmount;
+
+        emit PoolCreated(poolId, _msgSender(), jobType, stakeAmount, salaryMax - salaryMin);
+        
+        return poolId;
     }
 
     function _calculateApplicationMatchScore(
