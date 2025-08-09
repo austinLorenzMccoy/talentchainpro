@@ -36,10 +36,9 @@ interface IReputationOracle {
         string reason
     );
 
-    // Structs
+    // Structs (mappings removed for interface compatibility)
     struct ReputationScore {
         uint256 overallScore;
-        mapping(string => uint256) categoryScores;
         uint256 totalEvaluations;
         uint64 lastUpdated;
         bool isActive;
@@ -52,7 +51,6 @@ interface IReputationOracle {
         string workDescription;
         string workContent;
         uint256 overallScore;
-        mapping(string => uint256) skillScores;
         string feedback;
         address evaluatedBy;
         uint64 timestamp;

@@ -10,6 +10,7 @@ import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import "./interfaces/IReputationOracle.sol";
 import "./interfaces/ISkillToken.sol";
+import "./libraries/OracleLibrary.sol";
 
 /**
  * @title ReputationOracle
@@ -36,6 +37,8 @@ contract ReputationOracle is
 {
     using Counters for Counters.Counter;
     using ECDSA for bytes32;
+    using OracleLibrary for uint256;
+    using OracleLibrary for string;
 
     // Role definitions
     bytes32 public constant ORACLE_ADMIN_ROLE = keccak256("ORACLE_ADMIN_ROLE");
@@ -53,6 +56,27 @@ contract ReputationOracle is
     uint256 public constant CHALLENGE_PERIOD = 7 days;
     uint256 public constant RESOLUTION_PERIOD = 3 days;
 
+    // Internal struct definitions with mappings
+    struct InternalReputationScore {
+        uint256 overallScore;
+        uint256 totalEvaluations;
+        uint64 lastUpdated;
+        bool isActive;
+    }
+
+    struct InternalWorkEvaluation {
+        uint256 id;
+        address user;
+        uint256[] skillTokenIds;
+        string workDescription;
+        string workContent;
+        uint256 overallScore;
+        string feedback;
+        address evaluatedBy;
+        uint64 timestamp;
+        string ipfsHash;
+    }
+
     // State variables
     Counters.Counter private _evaluationIdCounter;
     Counters.Counter private _challengeIdCounter;
@@ -64,11 +88,11 @@ contract ReputationOracle is
     mapping(address => bool) private _isActiveOracle;
     
     // Reputation scores
-    mapping(address => ReputationScore) private _reputationScores;
+    mapping(address => InternalReputationScore) private _reputationScores;
     mapping(address => mapping(string => uint256)) private _categoryScores;
     
     // Work evaluations
-    mapping(uint256 => WorkEvaluation) private _evaluations;
+    mapping(uint256 => InternalWorkEvaluation) private _evaluations;
     mapping(uint256 => mapping(string => uint256)) private _evaluationSkillScores;
     mapping(address => uint256[]) private _userEvaluations;
     
@@ -243,18 +267,17 @@ contract ReputationOracle is
         _evaluationIdCounter.increment();
 
         // Store evaluation
-        _evaluations[evaluationId] = WorkEvaluation({
-            id: evaluationId,
-            user: user,
-            skillTokenIds: skillTokenIds,
-            workDescription: workDescription,
-            workContent: workContent,
-            overallScore: overallScore,
-            feedback: feedback,
-            evaluatedBy: _msgSender(),
-            timestamp: uint64(block.timestamp),
-            ipfsHash: ipfsHash
-        });
+        InternalWorkEvaluation storage evaluation = _evaluations[evaluationId];
+        evaluation.id = evaluationId;
+        evaluation.user = user;
+        evaluation.skillTokenIds = skillTokenIds;
+        evaluation.workDescription = workDescription;
+        evaluation.workContent = workContent;
+        evaluation.overallScore = overallScore;
+        evaluation.feedback = feedback;
+        evaluation.evaluatedBy = _msgSender();
+        evaluation.timestamp = uint64(block.timestamp);
+        evaluation.ipfsHash = ipfsHash;
 
         // Store skill scores
         for (uint256 i = 0; i < skillTokenIds.length; i++) {
@@ -327,7 +350,7 @@ contract ReputationOracle is
         require(bytes(reason).length > 0, "ReputationOracle: empty reason");
         require(!_evaluationChallenged[evaluationId], "ReputationOracle: already challenged");
 
-        WorkEvaluation memory evaluation = _evaluations[evaluationId];
+        InternalWorkEvaluation memory evaluation = _evaluations[evaluationId];
         require(
             block.timestamp <= evaluation.timestamp + CHALLENGE_PERIOD,
             "ReputationOracle: challenge period expired"
@@ -427,7 +450,7 @@ contract ReputationOracle is
             bool isActive
         ) 
     {
-        ReputationScore storage score = _reputationScores[user];
+        InternalReputationScore storage score = _reputationScores[user];
         return (
             score.overallScore,
             score.totalEvaluations,
@@ -460,7 +483,7 @@ contract ReputationOracle is
             string memory ipfsHash
         ) 
     {
-        WorkEvaluation memory evaluation = _evaluations[evaluationId];
+        InternalWorkEvaluation memory evaluation = _evaluations[evaluationId];
         return (
             evaluation.user,
             evaluation.skillTokenIds,
@@ -597,7 +620,7 @@ contract ReputationOracle is
         uint256 overallScore,
         uint256[] calldata skillScores
     ) internal {
-        ReputationScore storage userScore = _reputationScores[user];
+        InternalReputationScore storage userScore = _reputationScores[user];
         
         // Initialize if first evaluation
         if (!userScore.isActive) {
@@ -641,14 +664,14 @@ contract ReputationOracle is
     function _recalculateOverallScore(address user) internal {
         // This would recalculate based on all category scores
         // Implementation would depend on specific business logic
-        ReputationScore storage userScore = _reputationScores[user];
+        InternalReputationScore storage userScore = _reputationScores[user];
         userScore.lastUpdated = uint64(block.timestamp);
     }
 
     function _revertEvaluationReputationChanges(uint256 evaluationId) internal {
         // This would revert the reputation changes made by a specific evaluation
         // Implementation would require tracking evaluation-specific changes
-        WorkEvaluation memory evaluation = _evaluations[evaluationId];
+        InternalWorkEvaluation memory evaluation = _evaluations[evaluationId];
         
         // Mark evaluation as disputed
         // In a full implementation, this would involve complex logic to revert scores
