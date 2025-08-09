@@ -368,6 +368,7 @@ contract TalentPool is
         bytes calldata signature
     ) 
         external 
+        payable
         whenNotPaused
         poolExists(poolId)
         nonReentrant
@@ -388,9 +389,39 @@ contract TalentPool is
         address signer = hash.recover(signature);
         require(signer == _msgSender(), "TalentPool: invalid signature");
 
-        // Note: For gasless transactions, stake handling would need to be implemented
-        // This would require a separate staking mechanism or pre-approved allowances
-        revert("TalentPool: gasless staking not yet implemented");
+        // For gasless transactions, the relayer (msg.sender) provides the stake
+        // This allows for sponsored transactions where companies pay for candidate applications
+        require(msg.value == stakeAmount, "TalentPool: incorrect stake amount provided by relayer");
+        
+        // Create the application
+        Application memory newApplication = Application({
+            candidate: signer,
+            skillTokenIds: skillTokenIds,
+            stakeAmount: stakeAmount,
+            appliedAt: uint64(block.timestamp),
+            status: ApplicationStatus.Pending,
+            matchScore: 0,
+            coverLetter: coverLetter,
+            portfolio: portfolio
+        });
+
+        // Store application (one application per candidate per pool)
+        _applications[poolId][signer] = newApplication;
+        _poolApplicants[poolId].push(signer);
+        _applicationsByCandidate[signer].push(poolId);
+
+        // Calculate match score
+        uint256 matchScore = _calculateApplicationMatchScore(poolId, skillTokenIds);
+        _applications[poolId][signer].matchScore = matchScore;
+        
+        // Update pool metrics
+        JobPool storage pool = _pools[poolId];
+        pool.totalApplications++;
+        
+        // Update global statistics
+        _totalApplicationsSubmitted++;
+
+        emit ApplicationSubmitted(poolId, signer, skillTokenIds, stakeAmount);
     }
 
     /**

@@ -253,7 +253,7 @@ library PoolLibrary {
      */
     function generatePoolMetrics(
         uint256 totalStaked,
-        uint256 applicationCount,
+        uint256 /* applicationCount */,
         uint256[] memory matchScores,
         uint64 createdAt,
         bool isCompleted
