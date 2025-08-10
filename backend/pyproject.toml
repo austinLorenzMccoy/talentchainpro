@@ -21,13 +21,23 @@ dependencies = [
     "fastapi>=0.100.0",
     "uvicorn>=0.22.0",
     "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
     "python-dotenv>=1.0.0",
     "aiohttp>=3.8.5",
+    "httpx>=0.24.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "alembic>=1.11.0",
+    "redis>=4.6.0",
     "hedera-sdk-py>=2.24.0",
     "langchain>=0.0.267",
     "groq>=0.4.0",
+    "openai>=1.0.0",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.1",
+    "pytest-mock>=3.11.0",
+    "python-multipart>=0.0.6",
+    "cryptography>=41.0.0",
 ]
 
 [project.optional-dependencies]

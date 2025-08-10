@@ -12,12 +12,19 @@ import os
 import json
 import asyncio
 import logging
-from typing import Optional, Dict, Any, List, Union, Tuple
+from typing import Optional, Dict, Any, List, Union, Tuple, TYPE_CHECKING
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from enum import Enum
 
 from dotenv import load_dotenv
+
+if TYPE_CHECKING:
+    from hedera import (
+        Client, ContractFunctionParameters, Hbar, PrivateKey
+    )
+
+import hedera
 from hedera import (
     # Core
     Client, AccountId, PrivateKey, PublicKey, Hbar,
@@ -26,7 +33,7 @@ from hedera import (
     ContractCallQuery, ContractFunctionParameters, ContractFunctionResult,
     # Tokens (HTS)
     TokenId, TokenCreateTransaction, TokenType, TokenSupplyType,
-    TokenMintTransaction, TokenTransferTransaction, TokenBurnTransaction,
+    TokenMintTransaction, TransferTransaction, TokenBurnTransaction,
     TokenAssociateTransaction, TokenFreezeTransaction, TokenWipeTransaction,
     # Consensus Service (HCS)
     TopicId, TopicCreateTransaction, TopicMessageSubmitTransaction,
@@ -38,7 +45,7 @@ from hedera import (
     # Query
     AccountBalanceQuery, AccountInfoQuery,
     # Status and Exceptions
-    Status, PrecheckStatusError, ReceiptStatusError
+    Status, PrecheckStatusException, ReceiptStatusException
 )
 
 # Configure logging
@@ -170,7 +177,7 @@ class HederaManager:
     def __init__(self, config: Optional[HederaConfig] = None):
         """Initialize the Hedera manager."""
         self.config = config or self._load_config_from_env()
-        self._client: Optional[Client] = None
+        self._client = None
         self.contracts: Dict[str, ContractInfo] = {}
         self._initialize_client()
         self._load_contracts()
@@ -262,7 +269,7 @@ class HederaManager:
         self,
         contract_name: str,
         bytecode: str,
-        constructor_params: Optional[ContractFunctionParameters] = None,
+        constructor_params=None,
         gas_limit: int = 100000
     ) -> ContractCallResult:
         """Deploy a smart contract to Hedera."""
@@ -300,6 +307,20 @@ class HederaManager:
                     error=f"Contract deployment failed: {receipt.status}"
                 )
                 
+        except PrecheckStatusException as e:
+            logger.error(f"Contract deployment precheck failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Transaction precheck failed: {e.status}"
+            )
+        except ReceiptStatusException as e:
+            logger.error(f"Contract deployment receipt failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Transaction failed with status: {e.status}"
+            )
         except Exception as e:
             logger.error(f"Contract deployment error: {str(e)}")
             return ContractCallResult(
@@ -312,9 +333,9 @@ class HederaManager:
         self,
         contract_name: str,
         function_name: str,
-        parameters: Optional[ContractFunctionParameters] = None,
+        parameters=None,
         gas_limit: int = 100000,
-        payable_amount: Optional[Hbar] = None
+        payable_amount=None
     ) -> ContractCallResult:
         """Execute a contract function that modifies state."""
         try:
@@ -357,6 +378,20 @@ class HederaManager:
                     error=f"Transaction failed: {receipt.status}"
                 )
                 
+        except PrecheckStatusException as e:
+            logger.error(f"Contract call precheck failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Transaction precheck failed: {e.status}"
+            )
+        except ReceiptStatusException as e:
+            logger.error(f"Contract call receipt failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Transaction failed with status: {e.status}"
+            )
         except Exception as e:
             logger.error(f"Contract call error: {str(e)}")
             return ContractCallResult(
@@ -369,7 +404,7 @@ class HederaManager:
         self,
         contract_name: str,
         function_name: str,
-        parameters: Optional[ContractFunctionParameters] = None,
+        parameters=None,
         gas_limit: int = 100000
     ) -> ContractCallResult:
         """Query a contract function (read-only)."""
@@ -395,6 +430,20 @@ class HederaManager:
                 gas_used=result.gasUsed if hasattr(result, 'gasUsed') else None
             )
             
+        except PrecheckStatusException as e:
+            logger.error(f"Contract query precheck failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Query precheck failed: {e.status}"
+            )
+        except ReceiptStatusException as e:
+            logger.error(f"Contract query receipt failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Query failed with status: {e.status}"
+            )
         except Exception as e:
             logger.error(f"Contract query error: {str(e)}")
             return ContractCallResult(
@@ -452,6 +501,20 @@ class HederaManager:
                 parameters=params
             )
             
+        except PrecheckStatusException as e:
+            logger.error(f"Skill level update precheck failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Update precheck failed: {e.status}"
+            )
+        except ReceiptStatusException as e:
+            logger.error(f"Skill level update receipt failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Update failed with status: {e.status}"
+            )
         except Exception as e:
             logger.error(f"Skill level update error: {str(e)}")
             return ContractCallResult(
@@ -474,6 +537,20 @@ class HederaManager:
                 parameters=params
             )
             
+        except PrecheckStatusException as e:
+            logger.error(f"Skill metadata query precheck failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Metadata query precheck failed: {e.status}"
+            )
+        except ReceiptStatusException as e:
+            logger.error(f"Skill metadata query receipt failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Metadata query failed with status: {e.status}"
+            )
         except Exception as e:
             logger.error(f"Skill metadata query error: {str(e)}")
             return ContractCallResult(
@@ -538,6 +615,20 @@ class HederaManager:
                 parameters=params
             )
             
+        except PrecheckStatusException as e:
+            logger.error(f"Pool application precheck failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Application precheck failed: {e.status}"
+            )
+        except ReceiptStatusException as e:
+            logger.error(f"Pool application receipt failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Application failed with status: {e.status}"
+            )
         except Exception as e:
             logger.error(f"Pool application error: {str(e)}")
             return ContractCallResult(
@@ -553,8 +644,8 @@ class HederaManager:
     async def create_topic(
         self,
         memo: str = "",
-        admin_key: Optional[PrivateKey] = None,
-        submit_key: Optional[PrivateKey] = None
+        admin_key=None,
+        submit_key=None
     ) -> ContractCallResult:
         """Create a new HCS topic."""
         try:
@@ -583,6 +674,20 @@ class HederaManager:
                     error=f"Topic creation failed: {receipt.status}"
                 )
                 
+        except PrecheckStatusException as e:
+            logger.error(f"Topic creation precheck failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Topic creation precheck failed: {e.status}"
+            )
+        except ReceiptStatusException as e:
+            logger.error(f"Topic creation receipt failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Topic creation failed with status: {e.status}"
+            )
         except Exception as e:
             logger.error(f"Topic creation error: {str(e)}")
             return ContractCallResult(
@@ -618,6 +723,20 @@ class HederaManager:
                     error=f"Message submission failed: {receipt.status}"
                 )
                 
+        except PrecheckStatusException as e:
+            logger.error(f"HCS message submission precheck failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Message submission precheck failed: {e.status}"
+            )
+        except ReceiptStatusException as e:
+            logger.error(f"HCS message submission receipt failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Message submission failed with status: {e.status}"
+            )
         except Exception as e:
             logger.error(f"HCS message submission error: {str(e)}")
             return ContractCallResult(
@@ -721,6 +840,20 @@ class HederaManager:
                     error=f"NFT minting failed: {receipt.status}"
                 )
                 
+        except PrecheckStatusException as e:
+            logger.error(f"NFT minting precheck failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"NFT minting precheck failed: {e.status}"
+            )
+        except ReceiptStatusException as e:
+            logger.error(f"NFT minting receipt failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"NFT minting failed with status: {e.status}"
+            )
         except Exception as e:
             logger.error(f"NFT minting error: {str(e)}")
             return ContractCallResult(

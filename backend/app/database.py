@@ -28,9 +28,9 @@ redis_client = None
 
 
 def get_database_url() -> str:
-    """Get the database URL from settings."""
+    """Get the database URL from settings with automatic fallback."""
     settings = get_settings()
-    return settings.database_url
+    return settings.get_effective_database_url()
 
 
 def create_database_engine():
@@ -41,22 +41,27 @@ def create_database_engine():
         return engine
     
     settings = get_settings()
-    database_url = settings.database_url
+    database_url = get_database_url()  # This will get the effective URL with fallback
     
-    # Engine configuration
+    # Base engine configuration
     engine_kwargs = {
-        "pool_pre_ping": True,
-        "pool_recycle": 3600,  # Recycle connections every hour
-        "pool_size": 10,
-        "max_overflow": 20,
         "echo": settings.debug,  # Log SQL queries in debug mode
     }
     
-    # Special handling for SQLite (testing)
+    # Database-specific configuration
     if database_url.startswith("sqlite"):
+        # SQLite configuration
         engine_kwargs.update({
             "poolclass": StaticPool,
             "connect_args": {"check_same_thread": False}
+        })
+    else:
+        # PostgreSQL configuration
+        engine_kwargs.update({
+            "pool_pre_ping": True,
+            "pool_recycle": 3600,  # Recycle connections every hour
+            "pool_size": 10,
+            "max_overflow": 20,
         })
     
     try:
@@ -204,7 +209,8 @@ def init_database():
         # Test database connection
         with get_db_session() as db:
             # Simple query to test connection
-            result = db.execute("SELECT 1").fetchone()
+            from sqlalchemy import text
+            result = db.execute(text("SELECT 1")).fetchone()
             if result:
                 logger.info("Database connection test successful")
         
@@ -256,7 +262,8 @@ def check_database_health() -> dict:
     # Check database
     try:
         with get_db_session() as db:
-            db.execute("SELECT 1").fetchone()
+            from sqlalchemy import text
+            db.execute(text("SELECT 1")).fetchone()
         health_status["database"]["status"] = "healthy"
     except Exception as e:
         health_status["database"]["status"] = "unhealthy"
@@ -284,8 +291,17 @@ class CacheManager:
     """Redis cache manager with fallback."""
     
     def __init__(self):
-        self.redis_client = get_redis_client()
+        self._redis_client = None
+        self._initialized = False
         self.settings = get_settings()
+    
+    @property
+    def redis_client(self):
+        """Lazy initialization of Redis client."""
+        if not self._initialized:
+            self._redis_client = get_redis_client()
+            self._initialized = True
+        return self._redis_client
     
     def get(self, key: str) -> Optional[str]:
         """Get value from cache."""

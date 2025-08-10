@@ -19,7 +19,7 @@ from app.models.schemas import (
     MatchResponse,
     ErrorResponse
 )
-from app.services.pool import get_pool_service
+from app.services.pool import get_talent_pool_service
 from app.services.reputation import get_reputation_service
 from app.utils.hedera import validate_hedera_address
 
@@ -144,7 +144,7 @@ async def create_job_pool(
         Detailed job pool information
     """
     try:
-        pool_service = get_pool_service()
+        pool_service = get_talent_pool_service()
         
         # Create job pool using enhanced service
         result = await pool_service.create_job_pool(
@@ -221,7 +221,7 @@ async def get_job_pool(
         Detailed job pool information
     """
     try:
-        pool_service = get_pool_service()
+        pool_service = get_talent_pool_service()
         
         # Get pool details
         result = await pool_service.get_job_pool(pool_id)
@@ -289,7 +289,7 @@ async def apply_to_pool(
         Application confirmation
     """
     try:
-        pool_service = get_pool_service()
+        pool_service = get_talent_pool_service()
         
         # Apply to pool using enhanced service
         result = await pool_service.apply_to_pool(
@@ -366,7 +366,7 @@ async def search_job_pools(
         Search results with matching pools
     """
     try:
-        pool_service = get_pool_service()
+        pool_service = get_talent_pool_service()
         
         # Build search criteria
         search_criteria = {}

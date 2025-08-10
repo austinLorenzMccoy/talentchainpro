@@ -1,14 +1,41 @@
+# Core FastAPI and server dependencies
 fastapi>=0.100.0
 uvicorn>=0.22.0
 pydantic>=2.0.0
 python-dotenv>=1.0.0
+
+# HTTP client for async requests
 aiohttp>=3.8.5
+httpx>=0.24.0
+
+# Database dependencies
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.11.0
+
+# Redis for caching
+redis>=4.6.0
+
+# Blockchain/Hedera dependencies
 hedera-sdk-py>=2.24.0
+
+# AI/ML dependencies
 langchain>=0.0.267
 groq>=0.4.0
+openai>=1.0.0
+
+# Testing dependencies
 pytest>=7.4.0
 pytest-asyncio>=0.21.1
+pytest-mock>=3.11.0
+
+# Development and code quality
 black>=23.7.0
 isort>=5.12.0
 flake8>=6.1.0
 mypy>=1.4.1
+
+# Additional utilities
+python-multipart>=0.0.6
+pydantic-settings>=2.0.0
+cryptography>=41.0.0

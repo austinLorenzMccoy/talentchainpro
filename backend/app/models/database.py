@@ -3,6 +3,7 @@ Database Models for TalentChain Pro
 
 This module defines SQLAlchemy ORM models for caching blockchain data
 and managing application state with proper relationships and indexing.
+Cross-database compatible (PostgreSQL and SQLite).
 """
 
 from datetime import datetime, timezone
@@ -13,11 +14,78 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, Session
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
+from sqlalchemy.types import TypeDecorator, CHAR
 from enum import Enum
 import uuid
+import json
 
 Base = declarative_base()
+
+
+# Cross-database UUID type
+class UUID(TypeDecorator):
+    """Cross-database UUID type that works with both PostgreSQL and SQLite."""
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_UUID())
+        else:
+            return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return value
+        else:
+            if not isinstance(value, uuid.UUID):
+                if isinstance(value, str):
+                    return value
+                return str(uuid.UUID(value))
+            return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        else:
+            if not isinstance(value, uuid.UUID):
+                return uuid.UUID(value)
+            return value
+
+
+# Cross-database JSON type
+class JSONType(TypeDecorator):
+    """Cross-database JSON type that works with both PostgreSQL and SQLite."""
+    impl = Text
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(JSONB())
+        else:
+            return dialect.type_descriptor(Text())
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == 'postgresql':
+            return value
+        else:
+            return json.dumps(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == 'postgresql':
+            return value
+        else:
+            try:
+                return json.loads(value)
+            except (ValueError, TypeError):
+                return value
 
 
 # Enums for consistent data types
@@ -69,7 +137,7 @@ class SkillToken(Base):
     __tablename__ = "skill_tokens"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
     token_id = Column(String(50), unique=True, nullable=False, index=True)
     owner_address = Column(String(50), nullable=False, index=True)
     
@@ -81,7 +149,7 @@ class SkillToken(Base):
     
     # Metadata
     description = Column(Text)
-    metadata = Column(JSONB)
+    token_metadata = Column(JSONType)
     token_uri = Column(String(500))
     evidence_uri = Column(String(500))
     
@@ -113,7 +181,7 @@ class JobPool(Base):
     __tablename__ = "job_pools"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
     pool_id = Column(String(50), unique=True, nullable=False, index=True)
     creator_address = Column(String(50), nullable=False, index=True)
     
@@ -125,7 +193,7 @@ class JobPool(Base):
     is_remote = Column(Boolean, default=False)
     
     # Requirements
-    required_skills = Column(JSONB)  # [{"name": "React", "level": 4, "category": "frontend"}]
+    required_skills = Column(JSONType)  # [{"name": "React", "level": 4, "category": "frontend"}]
     min_reputation = Column(Integer, default=0)
     experience_required = Column(Integer)  # in months
     
@@ -169,13 +237,13 @@ class PoolApplication(Base):
     __tablename__ = "pool_applications"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    pool_id = Column(UUID(as_uuid=True), ForeignKey('job_pools.id'), nullable=False)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
+    pool_id = Column(UUID(), ForeignKey('job_pools.id'), nullable=False)
     applicant_address = Column(String(50), nullable=False, index=True)
     
     # Application data
     cover_letter = Column(Text)
-    skill_token_ids = Column(JSONB)  # List of skill token IDs submitted
+    skill_token_ids = Column(JSONType)  # List of skill token IDs submitted
     match_score = Column(DECIMAL(5, 2))  # AI-calculated match score (0-100)
     
     # Status tracking
@@ -205,14 +273,14 @@ class PoolMatch(Base):
     __tablename__ = "pool_matches"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    pool_id = Column(UUID(as_uuid=True), ForeignKey('job_pools.id'), nullable=False)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
+    pool_id = Column(UUID(), ForeignKey('job_pools.id'), nullable=False)
     candidate_address = Column(String(50), nullable=False, index=True)
     
     # Match details
     match_score = Column(DECIMAL(5, 2), nullable=False)
     ai_reasoning = Column(Text)
-    match_metadata = Column(JSONB)
+    match_metadata = Column(JSONType)
     
     # Status tracking
     status = Column(String(20), default="pending", index=True)  # pending, accepted, rejected, finalized
@@ -221,7 +289,7 @@ class PoolMatch(Base):
     
     # Financial terms
     agreed_salary = Column(DECIMAL(15, 2))
-    bonus_terms = Column(JSONB)
+    bonus_terms = Column(JSONType)
     
     # Blockchain data
     transaction_id = Column(String(100), nullable=False)
@@ -246,8 +314,8 @@ class PoolStake(Base):
     __tablename__ = "pool_stakes"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    pool_id = Column(UUID(as_uuid=True), ForeignKey('job_pools.id'), nullable=False)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
+    pool_id = Column(UUID(), ForeignKey('job_pools.id'), nullable=False)
     staker_address = Column(String(50), nullable=False, index=True)
     
     # Stake details
@@ -283,7 +351,7 @@ class GovernanceProposal(Base):
     __tablename__ = "governance_proposals"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
     proposal_id = Column(String(50), unique=True, nullable=False, index=True)
     proposer_address = Column(String(50), nullable=False, index=True)
     
@@ -333,8 +401,8 @@ class GovernanceVote(Base):
     __tablename__ = "governance_votes"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    proposal_id = Column(UUID(as_uuid=True), ForeignKey('governance_proposals.id'), nullable=False)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
+    proposal_id = Column(UUID(), ForeignKey('governance_proposals.id'), nullable=False)
     voter_address = Column(String(50), nullable=False, index=True)
     
     # Vote details
@@ -365,24 +433,24 @@ class WorkEvaluation(Base):
     __tablename__ = "work_evaluations"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
     evaluation_id = Column(String(50), unique=True, nullable=False, index=True)
-    skill_token_id = Column(UUID(as_uuid=True), ForeignKey('skill_tokens.id'), nullable=False)
+    skill_token_id = Column(UUID(), ForeignKey('skill_tokens.id'), nullable=False)
     evaluator_address = Column(String(50), nullable=False, index=True)
     
     # Work details
     work_description = Column(Text, nullable=False)
-    work_artifacts = Column(JSONB)  # URLs to work samples, repos, etc.
-    submission_metadata = Column(JSONB)
+    work_artifacts = Column(JSONType)  # URLs to work samples, repos, etc.
+    submission_metadata = Column(JSONType)
     
     # Evaluation results
     overall_score = Column(DECIMAL(5, 2))  # 0-100
-    skill_scores = Column(JSONB)  # {"frontend": 85, "react": 90, "typescript": 80}
+    skill_scores = Column(JSONType)  # {"frontend": 85, "react": 90, "typescript": 80}
     feedback = Column(Text)
-    evaluation_criteria = Column(JSONB)
+    evaluation_criteria = Column(JSONType)
     
     # Oracle consensus
-    oracle_votes = Column(JSONB)  # {"oracle1": 85, "oracle2": 87, "oracle3": 86}
+    oracle_votes = Column(JSONType)  # {"oracle1": 85, "oracle2": 87, "oracle3": 86}
     consensus_score = Column(DECIMAL(5, 2))
     consensus_reached = Column(Boolean, default=False)
     
@@ -414,14 +482,14 @@ class EvaluationChallenge(Base):
     __tablename__ = "evaluation_challenges"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
     challenge_id = Column(String(50), unique=True, nullable=False, index=True)
-    evaluation_id = Column(UUID(as_uuid=True), ForeignKey('work_evaluations.id'), nullable=False)
+    evaluation_id = Column(UUID(), ForeignKey('work_evaluations.id'), nullable=False)
     challenger_address = Column(String(50), nullable=False, index=True)
     
     # Challenge details
     challenge_reason = Column(Text, nullable=False)
-    evidence = Column(JSONB)  # Supporting evidence for the challenge
+    evidence = Column(JSONType)  # Supporting evidence for the challenge
     stake_amount = Column(DECIMAL(15, 8), nullable=False)  # Stake required for challenge
     
     # Resolution
@@ -457,7 +525,7 @@ class ReputationScore(Base):
     __tablename__ = "reputation_scores"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
     user_address = Column(String(50), unique=True, nullable=False, index=True)
     
     # Overall reputation
@@ -466,16 +534,16 @@ class ReputationScore(Base):
     successful_evaluations = Column(Integer, default=0)
     
     # Category scores
-    category_scores = Column(JSONB)  # {"frontend": 85, "backend": 75, "blockchain": 90}
-    skill_scores = Column(JSONB)  # Individual skill scores
+    category_scores = Column(JSONType)  # {"frontend": 85, "backend": 75, "blockchain": 90}
+    skill_scores = Column(JSONType)  # Individual skill scores
     
     # Reputation history
-    score_history = Column(JSONB)  # Historical score changes
+    score_history = Column(JSONType)  # Historical score changes
     last_evaluation_date = Column(DateTime(timezone=True))
     
     # Oracle status
     is_oracle = Column(Boolean, default=False, index=True)
-    oracle_specializations = Column(JSONB)  # ["frontend", "blockchain"]
+    oracle_specializations = Column(JSONType)  # ["frontend", "blockchain"]
     oracle_accuracy = Column(DECIMAL(5, 2))  # Oracle evaluation accuracy
     
     # Timestamps
@@ -495,15 +563,15 @@ class SkillUpdateProposal(Base):
     __tablename__ = "skill_update_proposals"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
     proposal_id = Column(String(50), unique=True, nullable=False, index=True)
-    skill_token_id = Column(UUID(as_uuid=True), ForeignKey('skill_tokens.id'), nullable=False)
+    skill_token_id = Column(UUID(), ForeignKey('skill_tokens.id'), nullable=False)
     proposer_address = Column(String(50), nullable=False, index=True)
     
     # Proposal details
     current_level = Column(Integer, nullable=False)
     proposed_level = Column(Integer, nullable=False)
-    evidence = Column(JSONB)  # Evidence supporting the level increase
+    evidence = Column(JSONType)  # Evidence supporting the level increase
     reasoning = Column(Text)
     
     # Oracle voting
@@ -539,8 +607,8 @@ class SkillUpdateVote(Base):
     __tablename__ = "skill_update_votes"
     
     # Primary identifiers
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    proposal_id = Column(UUID(as_uuid=True), ForeignKey('skill_update_proposals.id'), nullable=False)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
+    proposal_id = Column(UUID(), ForeignKey('skill_update_proposals.id'), nullable=False)
     oracle_address = Column(String(50), nullable=False, index=True)
     
     # Vote details
@@ -570,14 +638,14 @@ class AuditLog(Base):
     """Audit log for all significant actions."""
     __tablename__ = "audit_logs"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
     user_address = Column(String(50), index=True)
     action = Column(String(100), nullable=False, index=True)
     resource_type = Column(String(50), nullable=False)
     resource_id = Column(String(100))
     
     # Action details
-    details = Column(JSONB)
+    details = Column(JSONType)
     ip_address = Column(String(45))
     user_agent = Column(String(500))
     
@@ -599,13 +667,13 @@ class SystemMetrics(Base):
     """System-wide metrics and statistics."""
     __tablename__ = "system_metrics"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(), primary_key=True, default=uuid.uuid4)
     metric_name = Column(String(100), nullable=False, index=True)
     metric_value = Column(DECIMAL(20, 8), nullable=False)
     metric_type = Column(String(20), default="counter")  # counter, gauge, histogram
     
     # Metadata
-    labels = Column(JSONB)  # Additional metric labels
+    labels = Column(JSONType)  # Additional metric labels
     description = Column(Text)
     
     # Timestamps
