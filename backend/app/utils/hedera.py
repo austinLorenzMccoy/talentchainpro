@@ -19,119 +19,34 @@ from enum import Enum
 
 from dotenv import load_dotenv
 
-# PyJNIus imports for Java interop
-try:
-    from jnius import autoclass
-    BigInteger = autoclass('java.math.BigInteger')
-    JNIUS_AVAILABLE = True
-except ImportError:
-    JNIUS_AVAILABLE = False
-    BigInteger = None
-
-# Configure logging
-logger = logging.getLogger(__name__)
-
 if TYPE_CHECKING:
     from hedera import (
         Client, ContractFunctionParameters, Hbar, PrivateKey
     )
 
-# Try to import Hedera SDK with graceful failure handling
-try:
-    import hedera
-    from hedera import (
-        # Core
-        Client, AccountId, PrivateKey, PublicKey, Hbar,
-        # Smart Contracts
-        ContractId, ContractCreateFlow, ContractExecuteTransaction, 
-        ContractCallQuery, ContractFunctionParameters, ContractFunctionResult,
-        # Tokens (HTS)
-        TokenId, TokenCreateTransaction, TokenType, TokenSupplyType,
-        TokenMintTransaction, TransferTransaction, TokenBurnTransaction,
-        TokenAssociateTransaction, TokenFreezeTransaction, TokenWipeTransaction,
-        # Consensus Service (HCS)
-        TopicId, TopicCreateTransaction, TopicMessageSubmitTransaction,
-        TopicInfoQuery, TopicUpdateTransaction,
-        # Transactions
-        Transaction, TransactionResponse, TransactionReceipt, TransactionRecord,
-        TransferTransaction, AccountCreateTransaction, AccountUpdateTransaction,
-        TransactionId,
-        # Query
-        AccountBalanceQuery, AccountInfoQuery,
-        # Status and Exceptions
-        Status, PrecheckStatusException, ReceiptStatusException
-    )
-    HEDERA_SDK_AVAILABLE = True
-except Exception as e:
-    # Hedera SDK not available - provide mock objects for testing
-    HEDERA_SDK_AVAILABLE = False
-    logger.warning(f"Hedera SDK not available: {e}")
-    
-    # Create mock classes for development/testing
-    class MockClass:
-        def __init__(self, *args, **kwargs):
-            pass
-        def __call__(self, *args, **kwargs):
-            return self
-        def __getattr__(self, name):
-            return MockClass()
-        
-        @classmethod
-        def forTestnet(cls):
-            return cls()
-        
-        @classmethod
-        def forMainnet(cls):
-            return cls()
-        
-        @classmethod
-        def forPreviewnet(cls):
-            return cls()
-        
-        @classmethod
-        def fromString(cls, value):
-            return cls()
-        
-        def setOperator(self, *args, **kwargs):
-            return self
-        
-        def setDefaultMaxTransactionFee(self, *args, **kwargs):
-            return self
-        
-        def setDefaultMaxQueryPayment(self, *args, **kwargs):
-            return self
-    
-    # Mock TokenType enum
-    class MockTokenType:
-        NON_FUNGIBLE_UNIQUE = "NON_FUNGIBLE_UNIQUE"
-        FUNGIBLE_COMMON = "FUNGIBLE_COMMON"
-    
-    # Mock TokenSupplyType enum
-    class MockTokenSupplyType:
-        FINITE = "FINITE"
-        INFINITE = "INFINITE"
-    
-    # Mock Status
-    class MockStatus:
-        Success = "SUCCESS"
-    
-    # Assign mock classes
-    Client = MockClass
-    AccountId = PrivateKey = PublicKey = Hbar = MockClass
-    ContractId = ContractCreateFlow = ContractExecuteTransaction = MockClass
-    ContractCallQuery = ContractFunctionParameters = ContractFunctionResult = MockClass
-    TokenId = TokenCreateTransaction = MockClass
-    TokenType = MockTokenType
-    TokenSupplyType = MockTokenSupplyType
-    TokenMintTransaction = TransferTransaction = TokenBurnTransaction = MockClass
-    TokenAssociateTransaction = TokenFreezeTransaction = TokenWipeTransaction = MockClass
-    TopicId = TopicCreateTransaction = TopicMessageSubmitTransaction = MockClass
-    TopicInfoQuery = TopicUpdateTransaction = MockClass
-    Transaction = TransactionResponse = TransactionReceipt = TransactionRecord = MockClass
-    AccountCreateTransaction = AccountUpdateTransaction = TransactionId = MockClass
-    AccountBalanceQuery = AccountInfoQuery = MockClass
-    Status = MockStatus
-    PrecheckStatusException = ReceiptStatusException = MockClass
+import hedera
+from hedera import (
+    # Core
+    Client, AccountId, PrivateKey, PublicKey, Hbar,
+    # Smart Contracts
+    ContractId, ContractCreateFlow, ContractExecuteTransaction, 
+    ContractCallQuery, ContractFunctionParameters, ContractFunctionResult,
+    # Tokens (HTS)
+    TokenId, TokenCreateTransaction, TokenType, TokenSupplyType,
+    TokenMintTransaction, TransferTransaction, TokenBurnTransaction,
+    TokenAssociateTransaction, TokenFreezeTransaction, TokenWipeTransaction,
+    # Consensus Service (HCS)
+    TopicId, TopicCreateTransaction, TopicMessageSubmitTransaction,
+    TopicInfoQuery, TopicUpdateTransaction,
+    # Transactions
+    Transaction, TransactionResponse, TransactionReceipt, TransactionRecord,
+    TransferTransaction, AccountCreateTransaction, AccountUpdateTransaction,
+    TransactionId,
+    # Query
+    AccountBalanceQuery, AccountInfoQuery,
+    # Status and Exceptions
+    Status, PrecheckStatusException, ReceiptStatusException
+)
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -248,26 +163,6 @@ class HCSMessage:
 
 
 # =============================================================================
-# UTILITY FUNCTIONS
-# =============================================================================
-
-def to_big_integer(value: int) -> Any:
-    """
-    Convert Python int to Java BigInteger for Hedera contract parameters.
-    
-    Args:
-        value: Python integer to convert
-        
-    Returns:
-        Java BigInteger instance
-    """
-    if JNIUS_AVAILABLE and BigInteger is not None:
-        return BigInteger(str(value))
-    else:
-        # Fallback: return the int as-is and hope it works
-        return value
-
-
 # HEDERA MANAGER CLASS
 # =============================================================================
 
@@ -360,7 +255,7 @@ class HederaManager:
             logger.error(f"Failed to load contracts: {str(e)}")
     
     @property
-    def client(self) -> Any:
+    def client(self) -> Client:
         """Get the Hedera client instance."""
         if not self._client:
             raise RuntimeError("Hedera client not initialized")
@@ -574,7 +469,7 @@ class HederaManager:
             recipient = recipient_address or self.config.operator_id
             
             # Prepare parameters
-            params = ContractFunctionParameters().addString(skill_name).addString(skill_category.value).addUint256(to_big_integer(initial_level)).addString(recipient)
+            params = ContractFunctionParameters().addString(skill_name).addString(skill_category.value).addUint256(initial_level).addString(recipient)
             
             return await self.call_contract_function(
                 contract_name="SkillToken",
@@ -712,7 +607,7 @@ class HederaManager:
             # Convert skill token IDs to contract format
             skill_ids_bytes = b"".join(id.to_bytes(32, byteorder='big') for id in skill_token_ids)
             
-            params = ContractFunctionParameters().addUint256(to_big_integer(pool_id)).addBytes(skill_ids_bytes).addString(cover_letter)
+            params = ContractFunctionParameters().addUint256(pool_id).addBytes(skill_ids_bytes).addString(cover_letter)
             
             return await self.call_contract_function(
                 contract_name="TalentPool", 
@@ -720,25 +615,14 @@ class HederaManager:
                 parameters=params
             )
             
-        except Exception as e:
-            # Handle various types of Hedera exceptions
-            if 'PrecheckStatusException' in str(type(e)) or 'precheck' in str(e).lower():
-                logger.error(f"Pool application precheck failed: {e}")
-                return ContractCallResult(
-                    success=False,
-                    transaction_id="",
-                    error=f"Application precheck failed: {str(e)}"
-                )
-            elif 'ReceiptStatusException' in str(type(e)) or 'receipt' in str(e).lower():
-                logger.error(f"Pool application receipt error: {e}")
-                return ContractCallResult(
-                    success=False,
-                    transaction_id="",
-                    error=f"Application transaction failed: {str(e)}"
-                )
-            else:
-                # Re-raise other exceptions
-                raise
+        except PrecheckStatusException as e:
+            logger.error(f"Pool application precheck failed: {e.status}")
+            return ContractCallResult(
+                success=False,
+                transaction_id="",
+                error=f"Application precheck failed: {e.status}"
+            )
+        except ReceiptStatusException as e:
             logger.error(f"Pool application receipt failed: {e.status}")
             return ContractCallResult(
                 success=False,
@@ -1024,11 +908,6 @@ class HederaManager:
     
     def validate_hedera_address(self, address: str) -> bool:
         """Validate Hedera account address format."""
-        if not HEDERA_SDK_AVAILABLE:
-            # Fallback validation for testing: simple pattern check
-            import re
-            return bool(re.match(r'^\d+\.\d+\.\d+$', address))
-        
         try:
             AccountId.fromString(address)
             return True
@@ -1055,7 +934,7 @@ def initialize_hedera_client() -> None:
         raise
 
 
-def get_client() -> Any:
+def get_client() -> Client:
     """Get the Hedera client instance."""
     if not _hedera_manager:
         initialize_hedera_client()
@@ -1213,12 +1092,6 @@ async def create_nft_token(
     metadata: Dict[str, Any]
 ) -> str:
     """Create NFT token (convenience function)."""
-    if not HEDERA_SDK_AVAILABLE:
-        # Return mock token ID for testing
-        import hashlib
-        token_hash = hashlib.md5(f"{name}{symbol}".encode()).hexdigest()[:8]
-        return f"0.0.{100000 + int(token_hash, 16) % 900000}"
-    
     manager = get_hedera_manager()
     result = await manager.create_nft_token(name, symbol, metadata)
     
@@ -1234,12 +1107,6 @@ async def mint_nft(
     recipient_id: str
 ) -> str:
     """Mint NFT (convenience function)."""
-    if not HEDERA_SDK_AVAILABLE:
-        # Return mock transaction ID for testing
-        import hashlib
-        tx_hash = hashlib.md5(f"{token_id}{recipient_id}".encode()).hexdigest()[:8]
-        return f"0.0.{int(tx_hash, 16) % 1000000}@1234567890.123456789"
-    
     manager = get_hedera_manager()
     result = await manager.mint_nft(token_id, metadata_uri, recipient_id)
     
@@ -1262,11 +1129,6 @@ async def submit_hcs_message(topic_id: str, message: str) -> str:
 
 def validate_hedera_address(address: str) -> bool:
     """Validate Hedera address (convenience function)."""
-    if not HEDERA_SDK_AVAILABLE:
-        # Fallback validation for testing: simple pattern check
-        import re
-        return bool(re.match(r'^\d+\.\d+\.\d+$', address))
-    
     try:
         manager = get_hedera_manager()
         return manager.validate_hedera_address(address)
