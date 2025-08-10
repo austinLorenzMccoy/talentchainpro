@@ -1,14 +1,15 @@
 """
-Skills API Router
+Enhanced Skills API Router
 
-This module provides API endpoints for managing skill tokens,
-including creation, updating, and retrieval.
+This module provides comprehensive API endpoints for managing skill tokens,
+including creation, updating, querying, and integration with reputation system.
 """
 
 import logging
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from pydantic import BaseModel
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, BackgroundTasks
+from pydantic import BaseModel, Field, validator
 
 from app.models.schemas import (
     SkillTokenRequest,
@@ -19,6 +20,7 @@ from app.models.schemas import (
 )
 from app.services.skill import get_skill_service
 from app.services.reputation import get_reputation_service
+from app.utils.hedera import validate_hedera_address
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -26,29 +28,684 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter()
 
+# Enhanced Request/Response Models
+
+class SkillTokenCreateRequest(BaseModel):
+    """Enhanced request model for skill token creation."""
+    recipient_address: str = Field(..., description="Recipient's Hedera account address")
+    skill_name: str = Field(..., min_length=2, max_length=100, description="Name of the skill")
+    skill_category: str = Field(..., description="Category of the skill")
+    level: int = Field(..., ge=1, le=10, description="Initial skill level (1-10)")
+    description: Optional[str] = Field(None, max_length=500, description="Skill description")
+    metadata_uri: Optional[str] = Field(None, description="URI to additional metadata")
+    
+    @validator('recipient_address')
+    def validate_address(cls, v):
+        if not validate_hedera_address(v):
+            raise ValueError('Invalid Hedera address format')
+        return v
+
+
+class SkillTokenUpdateRequest(BaseModel):
+    """Request model for skill token updates."""
+    new_level: Optional[int] = Field(None, ge=1, le=10, description="New skill level")
+    experience_points: Optional[int] = Field(None, ge=0, description="Experience points to add")
+    evidence_uri: Optional[str] = Field(None, description="Evidence supporting the update")
+
+
+class BatchSkillTokenRequest(BaseModel):
+    """Request model for batch skill token creation."""
+    recipient_address: str = Field(..., description="Recipient's Hedera account address")
+    skills: List[Dict[str, Any]] = Field(..., min_items=1, max_items=50, description="List of skills to create")
+    
+    @validator('recipient_address')
+    def validate_address(cls, v):
+        if not validate_hedera_address(v):
+            raise ValueError('Invalid Hedera address format')
+        return v
+
+
+class SkillSearchRequest(BaseModel):
+    """Request model for skill search."""
+    skill_name: Optional[str] = Field(None, description="Skill name to search")
+    skill_category: Optional[str] = Field(None, description="Skill category filter")
+    min_level: Optional[int] = Field(None, ge=1, le=10, description="Minimum skill level")
+    max_level: Optional[int] = Field(None, ge=1, le=10, description="Maximum skill level")
+    owner_address: Optional[str] = Field(None, description="Owner address filter")
+
+
+class SkillTokenDetailResponse(BaseModel):
+    """Detailed response model for skill tokens."""
+    token_id: str
+    owner_address: str
+    skill_name: str
+    skill_category: str
+    level: int
+    experience_points: int
+    description: Optional[str]
+    metadata_uri: Optional[str]
+    is_active: bool
+    created_at: datetime
+    last_updated: datetime
+    reputation_impact: Optional[Dict[str, Any]] = None
+
+
+class BatchOperationResponse(BaseModel):
+    """Response model for batch operations."""
+    success: bool
+    total_requested: int
+    successful: int
+    failed: int
+    results: List[Dict[str, Any]]
+    errors: List[str]
+
+
+# Enhanced API Endpoints
+
 @router.post(
     "/",
-    response_model=SkillTokenResponse,
+    response_model=SkillTokenDetailResponse,
     status_code=status.HTTP_201_CREATED,
     responses={
         400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
 async def create_skill_token(
-    request: SkillTokenRequest
-) -> Dict[str, Any]:
+    request: SkillTokenCreateRequest,
+    background_tasks: BackgroundTasks
+) -> SkillTokenDetailResponse:
     """
     Create a new skill token for a user.
     
     Args:
         request: Skill token creation request
+        background_tasks: Background task queue
         
     Returns:
-        Skill token details
+        Detailed skill token information
     """
     try:
         skill_service = get_skill_service()
+        
+        # Create skill token using enhanced service
+        result = await skill_service.create_skill_token(
+            recipient_address=request.recipient_address,
+            skill_name=request.skill_name,
+            skill_category=request.skill_category,
+            level=request.level,
+            description=request.description or "",
+            metadata_uri=request.metadata_uri or ""
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to create skill token")
+            )
+        
+        # Add background task for reputation update
+        background_tasks.add_task(
+            update_reputation_for_skill_creation,
+            request.recipient_address,
+            request.skill_name,
+            request.level
+        )
+        
+        logger.info(f"Created skill token {result['token_id']} for {request.recipient_address}")
+        
+        return SkillTokenDetailResponse(
+            token_id=result["token_id"],
+            owner_address=request.recipient_address,
+            skill_name=request.skill_name,
+            skill_category=request.skill_category,
+            level=request.level,
+            experience_points=0,
+            description=request.description,
+            metadata_uri=request.metadata_uri,
+            is_active=True,
+            created_at=datetime.now(timezone.utc),
+            last_updated=datetime.now(timezone.utc)
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating skill token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create skill token"
+        )
+
+
+@router.post(
+    "/batch",
+    response_model=BatchOperationResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def batch_create_skill_tokens(
+    request: BatchSkillTokenRequest,
+    background_tasks: BackgroundTasks
+) -> BatchOperationResponse:
+    """
+    Create multiple skill tokens in a batch operation.
+    
+    Args:
+        request: Batch skill token creation request
+        background_tasks: Background task queue
+        
+    Returns:
+        Batch operation results
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Batch create skill tokens
+        result = await skill_service.batch_create_skill_tokens(
+            recipient_address=request.recipient_address,
+            skills=request.skills
+        )
+        
+        # Add background task for reputation updates
+        background_tasks.add_task(
+            update_reputation_for_batch_creation,
+            request.recipient_address,
+            len(request.skills),
+            result.get("successful", 0)
+        )
+        
+        logger.info(f"Batch created {result.get('successful', 0)} skill tokens for {request.recipient_address}")
+        
+        return BatchOperationResponse(
+            success=result["success"],
+            total_requested=len(request.skills),
+            successful=result.get("successful", 0),
+            failed=result.get("failed", 0),
+            results=result.get("results", []),
+            errors=result.get("errors", [])
+        )
+    
+    except Exception as e:
+        logger.error(f"Error in batch skill token creation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to batch create skill tokens"
+        )
+
+
+@router.get(
+    "/{token_id}",
+    response_model=SkillTokenDetailResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Skill token not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def get_skill_token(
+    token_id: str = Path(..., description="Skill token ID")
+) -> SkillTokenDetailResponse:
+    """
+    Get detailed information about a specific skill token.
+    
+    Args:
+        token_id: Skill token ID
+        
+    Returns:
+        Detailed skill token information
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Get skill token details
+        result = await skill_service.get_skill_token(token_id)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Skill token not found"
+            )
+        
+        token_data = result["data"]
+        
+        return SkillTokenDetailResponse(
+            token_id=token_id,
+            owner_address=token_data["owner_address"],
+            skill_name=token_data["skill_name"],
+            skill_category=token_data["skill_category"],
+            level=token_data["level"],
+            experience_points=token_data.get("experience_points", 0),
+            description=token_data.get("description"),
+            metadata_uri=token_data.get("metadata_uri"),
+            is_active=token_data.get("is_active", True),
+            created_at=datetime.fromisoformat(token_data.get("created_at", datetime.now(timezone.utc).isoformat())),
+            last_updated=datetime.fromisoformat(token_data.get("last_updated", datetime.now(timezone.utc).isoformat()))
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting skill token {token_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve skill token"
+        )
+
+
+@router.put(
+    "/{token_id}",
+    response_model=SkillTokenDetailResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        404: {"model": ErrorResponse, "description": "Skill token not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def update_skill_token(
+    token_id: str = Path(..., description="Skill token ID"),
+    request: SkillTokenUpdateRequest = ...,
+    background_tasks: BackgroundTasks = ...
+) -> SkillTokenDetailResponse:
+    """
+    Update a skill token's level or experience points.
+    
+    Args:
+        token_id: Skill token ID
+        request: Update request
+        background_tasks: Background task queue
+        
+    Returns:
+        Updated skill token information
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Get current token data
+        current_result = await skill_service.get_skill_token(token_id)
+        if not current_result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Skill token not found"
+            )
+        
+        current_data = current_result["data"]
+        update_result = None
+        
+        # Update level if requested
+        if request.new_level is not None:
+            update_result = await skill_service.update_skill_level(
+                token_id=int(token_id),
+                new_level=request.new_level,
+                evidence_uri=request.evidence_uri or ""
+            )
+            
+            # Add background task for reputation update
+            background_tasks.add_task(
+                update_reputation_for_level_change,
+                current_data["owner_address"],
+                token_id,
+                current_data["level"],
+                request.new_level
+            )
+        
+        # Add experience points if requested
+        if request.experience_points is not None:
+            exp_result = await skill_service.add_skill_experience(
+                token_id=int(token_id),
+                experience_points=request.experience_points
+            )
+            
+            if update_result is None:
+                update_result = exp_result
+        
+        if update_result and not update_result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=update_result.get("error", "Failed to update skill token")
+            )
+        
+        # Get updated token data
+        updated_result = await skill_service.get_skill_token(token_id)
+        updated_data = updated_result["data"]
+        
+        logger.info(f"Updated skill token {token_id}")
+        
+        return SkillTokenDetailResponse(
+            token_id=token_id,
+            owner_address=updated_data["owner_address"],
+            skill_name=updated_data["skill_name"],
+            skill_category=updated_data["skill_category"],
+            level=updated_data["level"],
+            experience_points=updated_data.get("experience_points", 0),
+            description=updated_data.get("description"),
+            metadata_uri=updated_data.get("metadata_uri"),
+            is_active=updated_data.get("is_active", True),
+            created_at=datetime.fromisoformat(updated_data.get("created_at", datetime.now(timezone.utc).isoformat())),
+            last_updated=datetime.now(timezone.utc)
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating skill token {token_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update skill token"
+        )
+
+
+@router.get(
+    "/user/{user_address}",
+    response_model=List[SkillTokenDetailResponse],
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def get_user_skills(
+    user_address: str = Path(..., description="User's Hedera account address"),
+    category: Optional[str] = Query(None, description="Filter by skill category"),
+    min_level: Optional[int] = Query(None, ge=1, le=10, description="Minimum skill level"),
+    active_only: bool = Query(True, description="Only return active skills")
+) -> List[SkillTokenDetailResponse]:
+    """
+    Get all skill tokens owned by a user.
+    
+    Args:
+        user_address: User's Hedera account address
+        category: Optional category filter
+        min_level: Optional minimum level filter
+        active_only: Whether to return only active skills
+        
+    Returns:
+        List of user's skill tokens
+    """
+    try:
+        if not validate_hedera_address(user_address):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid Hedera address format"
+            )
+        
+        skill_service = get_skill_service()
+        
+        # Get user's skills
+        result = await skill_service.get_user_skills(user_address)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to retrieve user skills"
+            )
+        
+        skills_data = result["skills"]
+        
+        # Apply filters
+        filtered_skills = []
+        for skill in skills_data:
+            # Category filter
+            if category and skill.get("skill_category") != category:
+                continue
+            
+            # Level filter
+            if min_level and skill.get("level", 0) < min_level:
+                continue
+            
+            # Active filter
+            if active_only and not skill.get("is_active", True):
+                continue
+            
+            filtered_skills.append(SkillTokenDetailResponse(
+                token_id=skill["token_id"],
+                owner_address=user_address,
+                skill_name=skill["skill_name"],
+                skill_category=skill["skill_category"],
+                level=skill["level"],
+                experience_points=skill.get("experience_points", 0),
+                description=skill.get("description"),
+                metadata_uri=skill.get("metadata_uri"),
+                is_active=skill.get("is_active", True),
+                created_at=datetime.fromisoformat(skill.get("created_at", datetime.now(timezone.utc).isoformat())),
+                last_updated=datetime.fromisoformat(skill.get("last_updated", datetime.now(timezone.utc).isoformat()))
+            ))
+        
+        logger.info(f"Retrieved {len(filtered_skills)} skills for user {user_address}")
+        
+        return filtered_skills
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user skills: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve user skills"
+        )
+
+
+@router.get(
+    "/search",
+    response_model=List[SkillTokenDetailResponse],
+    responses={
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def search_skills(
+    skill_name: Optional[str] = Query(None, description="Skill name to search"),
+    skill_category: Optional[str] = Query(None, description="Skill category filter"),
+    min_level: Optional[int] = Query(None, ge=1, le=10, description="Minimum skill level"),
+    max_level: Optional[int] = Query(None, ge=1, le=10, description="Maximum skill level"),
+    owner_address: Optional[str] = Query(None, description="Owner address filter"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum results to return")
+) -> List[SkillTokenDetailResponse]:
+    """
+    Search for skill tokens based on various criteria.
+    
+    Args:
+        skill_name: Skill name to search (partial match)
+        skill_category: Skill category filter
+        min_level: Minimum skill level
+        max_level: Maximum skill level
+        owner_address: Owner address filter
+        limit: Maximum results to return
+        
+    Returns:
+        List of matching skill tokens
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Build search criteria
+        search_criteria = {}
+        if skill_name:
+            search_criteria["skill_name"] = skill_name
+        if skill_category:
+            search_criteria["skill_category"] = skill_category
+        if min_level:
+            search_criteria["min_level"] = min_level
+        if max_level:
+            search_criteria["max_level"] = max_level
+        if owner_address:
+            if not validate_hedera_address(owner_address):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid owner address format"
+                )
+            search_criteria["owner_address"] = owner_address
+        
+        # Search for skills
+        result = await skill_service.search_skills(search_criteria, limit=limit)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to search skills"
+            )
+        
+        skills_data = result["skills"]
+        
+        # Convert to response models
+        skills = []
+        for skill in skills_data[:limit]:
+            skills.append(SkillTokenDetailResponse(
+                token_id=skill["token_id"],
+                owner_address=skill["owner_address"],
+                skill_name=skill["skill_name"],
+                skill_category=skill["skill_category"],
+                level=skill["level"],
+                experience_points=skill.get("experience_points", 0),
+                description=skill.get("description"),
+                metadata_uri=skill.get("metadata_uri"),
+                is_active=skill.get("is_active", True),
+                created_at=datetime.fromisoformat(skill.get("created_at", datetime.now(timezone.utc).isoformat())),
+                last_updated=datetime.fromisoformat(skill.get("last_updated", datetime.now(timezone.utc).isoformat()))
+            ))
+        
+        logger.info(f"Found {len(skills)} skills matching search criteria")
+        
+        return skills
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error searching skills: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to search skills"
+        )
+
+
+@router.get(
+    "/categories",
+    response_model=Dict[str, Any],
+    responses={
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def get_skill_categories() -> Dict[str, Any]:
+    """
+    Get available skill categories and their statistics.
+    
+    Returns:
+        List of skill categories with counts and descriptions
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Get categories from service
+        result = await skill_service.get_skill_categories()
+        
+        if not result["success"]:
+            return {
+                "categories": [
+                    {"id": "frontend", "name": "Frontend Development", "count": 0},
+                    {"id": "backend", "name": "Backend Development", "count": 0},
+                    {"id": "blockchain", "name": "Blockchain Development", "count": 0},
+                    {"id": "design", "name": "UI/UX Design", "count": 0},
+                    {"id": "data_science", "name": "Data Science", "count": 0},
+                    {"id": "devops", "name": "DevOps", "count": 0},
+                    {"id": "mobile", "name": "Mobile Development", "count": 0},
+                    {"id": "other", "name": "Other", "count": 0}
+                ]
+            }
+        
+        return result["categories"]
+    
+    except Exception as e:
+        logger.error(f"Error getting skill categories: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve skill categories"
+        )
+
+
+# Background Task Functions
+
+async def update_reputation_for_skill_creation(user_address: str, skill_name: str, level: int):
+    """Background task to update reputation when skill is created."""
+    try:
+        reputation_service = get_reputation_service()
+        
+        from app.services.reputation import ReputationEventType
+        
+        await reputation_service.update_reputation(
+            user_address=user_address,
+            event_type=ReputationEventType.SKILL_VALIDATION,
+            impact_score=level * 2.0,  # Higher level = more impact
+            context={
+                "skill_name": skill_name,
+                "level": level,
+                "event": "skill_creation"
+            }
+        )
+        
+        logger.info(f"Updated reputation for skill creation: {user_address}")
+    
+    except Exception as e:
+        logger.error(f"Error updating reputation for skill creation: {str(e)}")
+
+
+async def update_reputation_for_batch_creation(user_address: str, total_requested: int, successful: int):
+    """Background task to update reputation for batch skill creation."""
+    try:
+        reputation_service = get_reputation_service()
+        
+        from app.services.reputation import ReputationEventType
+        
+        # Calculate impact based on success rate
+        success_rate = successful / total_requested if total_requested > 0 else 0
+        impact_score = min(20.0, successful * 2.0 * success_rate)
+        
+        await reputation_service.update_reputation(
+            user_address=user_address,
+            event_type=ReputationEventType.PLATFORM_CONTRIBUTION,
+            impact_score=impact_score,
+            context={
+                "total_requested": total_requested,
+                "successful": successful,
+                "success_rate": success_rate,
+                "event": "batch_skill_creation"
+            }
+        )
+        
+        logger.info(f"Updated reputation for batch skill creation: {user_address}")
+    
+    except Exception as e:
+        logger.error(f"Error updating reputation for batch creation: {str(e)}")
+
+
+async def update_reputation_for_level_change(user_address: str, token_id: str, old_level: int, new_level: int):
+    """Background task to update reputation when skill level changes."""
+    try:
+        reputation_service = get_reputation_service()
+        
+        from app.services.reputation import ReputationEventType
+        
+        level_change = new_level - old_level
+        impact_score = level_change * 3.0  # Can be positive or negative
+        
+        await reputation_service.update_reputation(
+            user_address=user_address,
+            event_type=ReputationEventType.SKILL_VALIDATION,
+            impact_score=impact_score,
+            context={
+                "token_id": token_id,
+                "old_level": old_level,
+                "new_level": new_level,
+                "level_change": level_change,
+                "event": "skill_level_update"
+            }
+        )
+        
+        logger.info(f"Updated reputation for level change: {user_address}")
+    
+    except Exception as e:
+        logger.error(f"Error updating reputation for level change: {str(e)}")
         result = skill_service.mint_skill_token(
             recipient_id=request.recipient_id,
             skill_name=request.skill_name,

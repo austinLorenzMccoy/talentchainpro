@@ -18,7 +18,7 @@ from app.models.database import (
     ReputationScore, AuditLog, SkillCategoryEnum
 )
 from app.database import get_db_session, cache_manager
-from app.utils.hedera_enhanced import (
+from app.utils.hedera import (
     get_contract_manager, create_skill_token, update_skill_level,
     add_skill_experience, get_skill_token_info, get_user_skills,
     SkillTokenData, SkillCategory
