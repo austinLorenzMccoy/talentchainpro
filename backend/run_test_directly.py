@@ -19,8 +19,12 @@ if __name__ == "__main__":
     # Run the Skills tests with verbose output
     skills_result = pytest.main(["-xvs", "tests/test_skills.py"])
     
+    print("\nRunning Reputation Tests...")
+    # Run the Reputation tests with verbose output
+    reputation_result = pytest.main(["-xvs", "tests/test_reputation.py"])
+    
     # Check if all tests passed
-    if mcp_result == 0 and pools_result == 0 and skills_result == 0:
+    if mcp_result == 0 and pools_result == 0 and skills_result == 0 and reputation_result == 0:
         print("\n✅ All tests passed. The fixes have successfully resolved the connection errors.")
         sys.exit(0)
     else:

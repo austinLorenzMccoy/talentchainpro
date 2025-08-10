@@ -31,7 +31,8 @@ try:
     from app.models.database import (
         ReputationScore, ReputationTransaction, ReputationValidation,
         SkillToken, JobPool, PoolApplication, PoolMatch, AuditLog,
-        User, ReputationMetric
+        User, ReputationMetric, ReputationOracle, WorkEvaluation, 
+        EvaluationChallenge
     )
     from app.database import get_db_session, cache_manager
     DATABASE_MODELS_AVAILABLE = True
@@ -300,6 +301,429 @@ class ReputationService:
         except Exception as e:
             logger.error(f"Error updating reputation: {str(e)}")
             raise
+    
+    # ============ ORACLE MANAGEMENT FUNCTIONS ============
+    
+    async def register_oracle(
+        self,
+        oracle_address: str,
+        name: str,
+        specializations: List[str],
+        stake_amount: float = 100.0
+    ) -> Dict[str, Any]:
+        """
+        Register a new reputation oracle.
+        
+        Args:
+            oracle_address: Oracle's Hedera account address
+            name: Oracle display name
+            specializations: List of skill categories the oracle specializes in
+            stake_amount: Stake amount required for oracle registration
+            
+        Returns:
+            Dict containing oracle registration result
+        """
+        try:
+            if not validate_hedera_address(oracle_address):
+                raise ValueError("Invalid oracle address format")
+            
+            if stake_amount < self.min_validation_stake:
+                raise ValueError(f"Minimum stake amount is {self.min_validation_stake} HBAR")
+            
+            if not specializations:
+                raise ValueError("At least one specialization is required")
+            
+            # Create oracle registration data
+            oracle_id = f"oracle_{hash(oracle_address + name) % 100000}"
+            registration_data = {
+                "oracle_id": oracle_id,
+                "oracle_address": oracle_address,
+                "name": name,
+                "specializations": specializations,
+                "stake_amount": stake_amount,
+                "is_active": True,
+                "total_evaluations": 0,
+                "successful_evaluations": 0,
+                "reputation_score": 100.0,
+                "registered_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # Store in database if available
+            if DATABASE_MODELS_AVAILABLE:
+                try:
+                    with self._get_db_session() as db:
+                        # Check if oracle already exists
+                        existing_oracle = db.query(ReputationOracle).filter(
+                            ReputationOracle.oracle_address == oracle_address
+                        ).first()
+                        
+                        if existing_oracle:
+                            raise ValueError("Oracle already registered for this address")
+                        
+                        oracle = ReputationOracle(
+                            oracle_id=oracle_id,
+                            oracle_address=oracle_address,
+                            name=name,
+                            specializations=specializations,
+                            stake_amount=stake_amount,
+                            is_active=True,
+                            total_evaluations=0,
+                            successful_evaluations=0,
+                            reputation_score=100.0
+                        )
+                        
+                        db.add(oracle)
+                        
+                        # Add audit log
+                        audit_log = AuditLog(
+                            user_address=oracle_address,
+                            action="register_oracle",
+                            resource_type="reputation_oracle",
+                            resource_id=oracle_id,
+                            details={
+                                "name": name,
+                                "specializations": specializations,
+                                "stake_amount": stake_amount
+                            },
+                            success=True
+                        )
+                        db.add(audit_log)
+                        
+                        # Invalidate caches
+                        self._invalidate_cache([
+                            "reputation_oracles:*",
+                            f"oracle:{oracle_address}:*"
+                        ])
+                except Exception as db_error:
+                    logger.warning(f"Database oracle registration failed: {str(db_error)}")
+                    DATABASE_MODELS_AVAILABLE = False
+            
+            # Fallback storage
+            if not DATABASE_MODELS_AVAILABLE:
+                if "oracles" not in _fallback_reputation:
+                    _fallback_reputation["oracles"] = {}
+                _fallback_reputation["oracles"][oracle_address] = registration_data
+            
+            logger.info(f"Registered oracle {oracle_id} for {oracle_address}")
+            
+            return {
+                "success": True,
+                "oracle_id": oracle_id,
+                "oracle_address": oracle_address,
+                "name": name,
+                "specializations": specializations,
+                "stake_amount": stake_amount,
+                "status": "active",
+                "registered_at": registration_data["registered_at"]
+            }
+        
+        except Exception as e:
+            logger.error(f"Error registering oracle: {str(e)}")
+            raise
+    
+    async def submit_work_evaluation(
+        self,
+        oracle_address: str,
+        user_address: str,
+        skill_token_ids: List[str],
+        work_description: str,
+        artifacts: List[str],
+        overall_score: int,
+        skill_scores: Dict[str, int],
+        feedback: str,
+        ipfs_hash: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Submit a work evaluation as an oracle.
+        
+        Args:
+            oracle_address: Oracle submitting the evaluation
+            user_address: User being evaluated
+            skill_token_ids: Skill tokens being evaluated
+            work_description: Description of the work
+            artifacts: List of work artifacts (URLs, IPFS hashes)
+            overall_score: Overall evaluation score (0-100)
+            skill_scores: Individual skill scores
+            feedback: Detailed feedback
+            ipfs_hash: IPFS hash for additional evaluation data
+            
+        Returns:
+            Dict containing evaluation submission result
+        """
+        try:
+            if not validate_hedera_address(oracle_address):
+                raise ValueError("Invalid oracle address format")
+            
+            if not validate_hedera_address(user_address):
+                raise ValueError("Invalid user address format")
+            
+            if not (0 <= overall_score <= 100):
+                raise ValueError("Overall score must be between 0 and 100")
+            
+            # Verify oracle is registered and active
+            oracle_info = await self._get_oracle_info(oracle_address)
+            if not oracle_info or not oracle_info.get("is_active"):
+                raise ValueError("Oracle not registered or inactive")
+            
+            # Create evaluation record
+            evaluation_id = f"eval_{hash(user_address + work_description + str(datetime.now().timestamp())) % 100000}"
+            evaluation_data = {
+                "evaluation_id": evaluation_id,
+                "oracle_address": oracle_address,
+                "user_address": user_address,
+                "skill_token_ids": skill_token_ids,
+                "work_description": work_description,
+                "artifacts": artifacts,
+                "overall_score": overall_score,
+                "skill_scores": skill_scores,
+                "feedback": feedback,
+                "ipfs_hash": ipfs_hash,
+                "status": "completed",
+                "submitted_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # Store evaluation in database if available
+            if DATABASE_MODELS_AVAILABLE:
+                try:
+                    with self._get_db_session() as db:
+                        evaluation = WorkEvaluation(
+                            evaluation_id=evaluation_id,
+                            oracle_address=oracle_address,
+                            user_address=user_address,
+                            skill_token_ids=skill_token_ids,
+                            work_description=work_description,
+                            artifacts=artifacts,
+                            overall_score=overall_score,
+                            skill_scores=skill_scores,
+                            feedback=feedback,
+                            ipfs_hash=ipfs_hash,
+                            status="completed"
+                        )
+                        
+                        db.add(evaluation)
+                        
+                        # Update oracle statistics
+                        oracle_record = db.query(ReputationOracle).filter(
+                            ReputationOracle.oracle_address == oracle_address
+                        ).first()
+                        
+                        if oracle_record:
+                            oracle_record.total_evaluations += 1
+                            oracle_record.successful_evaluations += 1
+                        
+                        # Add audit log
+                        audit_log = AuditLog(
+                            user_address=oracle_address,
+                            action="submit_work_evaluation",
+                            resource_type="work_evaluation",
+                            resource_id=evaluation_id,
+                            details={
+                                "user_address": user_address,
+                                "overall_score": overall_score,
+                                "skill_tokens": len(skill_token_ids)
+                            },
+                            success=True
+                        )
+                        db.add(audit_log)
+                        
+                        # Invalidate caches
+                        self._invalidate_cache([
+                            f"user_evaluations:{user_address}:*",
+                            f"oracle_evaluations:{oracle_address}:*"
+                        ])
+                except Exception as db_error:
+                    logger.warning(f"Database evaluation storage failed: {str(db_error)}")
+                    DATABASE_MODELS_AVAILABLE = False
+            
+            # Fallback storage
+            if not DATABASE_MODELS_AVAILABLE:
+                if user_address not in _fallback_transactions:
+                    _fallback_transactions[user_address] = []
+                _fallback_transactions[user_address].append(evaluation_data)
+            
+            # Update user reputation based on evaluation
+            if overall_score > 70:
+                await self.update_reputation(
+                    user_address=user_address,
+                    event_type=ReputationEventType.SKILL_VALIDATION,
+                    impact_score=(overall_score - 50) * 0.5,  # Scale to -25 to +25
+                    context={
+                        "evaluation_id": evaluation_id,
+                        "oracle_address": oracle_address,
+                        "overall_score": overall_score,
+                        "skill_tokens": skill_token_ids
+                    },
+                    validator_address=oracle_address
+                )
+            
+            logger.info(f"Work evaluation {evaluation_id} submitted by oracle {oracle_address}")
+            
+            return {
+                "success": True,
+                "evaluation_id": evaluation_id,
+                "oracle_address": oracle_address,
+                "user_address": user_address,
+                "overall_score": overall_score,
+                "skill_scores": skill_scores,
+                "feedback": feedback,
+                "status": "completed",
+                "submitted_at": evaluation_data["submitted_at"]
+            }
+        
+        except Exception as e:
+            logger.error(f"Error submitting work evaluation: {str(e)}")
+            raise
+    
+    async def challenge_evaluation(
+        self,
+        challenger_address: str,
+        evaluation_id: str,
+        reason: str,
+        evidence: List[str],
+        stake_amount: float = 10.0
+    ) -> Dict[str, Any]:
+        """
+        Challenge a work evaluation.
+        
+        Args:
+            challenger_address: Address challenging the evaluation
+            evaluation_id: ID of the evaluation being challenged
+            reason: Reason for the challenge
+            evidence: List of evidence supporting the challenge
+            stake_amount: Stake required for challenge
+            
+        Returns:
+            Dict containing challenge result
+        """
+        try:
+            if not validate_hedera_address(challenger_address):
+                raise ValueError("Invalid challenger address format")
+            
+            if stake_amount < self.min_validation_stake:
+                raise ValueError(f"Minimum stake amount is {self.min_validation_stake} HBAR")
+            
+            # Get evaluation details
+            evaluation = await self._get_evaluation_details(evaluation_id)
+            if not evaluation:
+                raise ValueError(f"Evaluation {evaluation_id} not found")
+            
+            if evaluation.get("status") != "completed":
+                raise ValueError("Can only challenge completed evaluations")
+            
+            # Create challenge record
+            challenge_id = f"challenge_{hash(evaluation_id + challenger_address) % 100000}"
+            challenge_data = {
+                "challenge_id": challenge_id,
+                "evaluation_id": evaluation_id,
+                "challenger_address": challenger_address,
+                "reason": reason,
+                "evidence": evidence,
+                "stake_amount": stake_amount,
+                "status": "pending",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            
+            # Store challenge in database if available
+            if DATABASE_MODELS_AVAILABLE:
+                try:
+                    with self._get_db_session() as db:
+                        challenge = EvaluationChallenge(
+                            challenge_id=challenge_id,
+                            evaluation_id=evaluation_id,
+                            challenger_address=challenger_address,
+                            reason=reason,
+                            evidence=evidence,
+                            stake_amount=stake_amount,
+                            status="pending"
+                        )
+                        
+                        db.add(challenge)
+                        
+                        # Add audit log
+                        audit_log = AuditLog(
+                            user_address=challenger_address,
+                            action="challenge_evaluation",
+                            resource_type="evaluation_challenge",
+                            resource_id=challenge_id,
+                            details={
+                                "evaluation_id": evaluation_id,
+                                "reason": reason,
+                                "stake_amount": stake_amount
+                            },
+                            success=True
+                        )
+                        db.add(audit_log)
+                        
+                        # Invalidate caches
+                        self._invalidate_cache([
+                            f"evaluation:{evaluation_id}:*",
+                            f"challenges:*"
+                        ])
+                except Exception as db_error:
+                    logger.warning(f"Database challenge storage failed: {str(db_error)}")
+                    DATABASE_MODELS_AVAILABLE = False
+            
+            # Fallback storage
+            if not DATABASE_MODELS_AVAILABLE:
+                if "challenges" not in _fallback_validations:
+                    _fallback_validations["challenges"] = {}
+                _fallback_validations["challenges"][challenge_id] = challenge_data
+            
+            logger.info(f"Evaluation challenge {challenge_id} created by {challenger_address}")
+            
+            return {
+                "success": True,
+                "challenge_id": challenge_id,
+                "evaluation_id": evaluation_id,
+                "challenger_address": challenger_address,
+                "reason": reason,
+                "stake_amount": stake_amount,
+                "status": "pending",
+                "created_at": challenge_data["created_at"]
+            }
+        
+        except Exception as e:
+            logger.error(f"Error challenging evaluation: {str(e)}")
+            raise
+    
+    async def get_active_oracles(self) -> List[Dict[str, Any]]:
+        """Get list of active reputation oracles."""
+        try:
+            oracles = []
+            
+            if DATABASE_MODELS_AVAILABLE:
+                try:
+                    with self._get_db_session() as db:
+                        oracle_records = db.query(ReputationOracle).filter(
+                            ReputationOracle.is_active == True
+                        ).all()
+                        
+                        for oracle in oracle_records:
+                            oracles.append({
+                                "oracle_id": oracle.oracle_id,
+                                "oracle_address": oracle.oracle_address,
+                                "name": oracle.name,
+                                "specializations": oracle.specializations,
+                                "total_evaluations": oracle.total_evaluations,
+                                "successful_evaluations": oracle.successful_evaluations,
+                                "reputation_score": float(oracle.reputation_score),
+                                "is_active": oracle.is_active
+                            })
+                except Exception as db_error:
+                    logger.warning(f"Database oracle retrieval failed: {str(db_error)}")
+            else:
+                # Fallback to memory storage
+                oracle_data = _fallback_reputation.get("oracles", {})
+                oracles = [
+                    oracle for oracle in oracle_data.values()
+                    if oracle.get("is_active", False)
+                ]
+            
+            return oracles
+        
+        except Exception as e:
+            logger.error(f"Error getting active oracles: {str(e)}")
+            return []
     
     # ============ LEGACY COMPATIBILITY FUNCTIONS ============
     
@@ -786,6 +1210,63 @@ class ReputationService:
         
         except Exception as e:
             logger.error(f"Error updating category score: {str(e)}")
+    
+    async def _get_oracle_info(self, oracle_address: str) -> Optional[Dict[str, Any]]:
+        """Get oracle information."""
+        try:
+            if DATABASE_MODELS_AVAILABLE:
+                with self._get_db_session() as db:
+                    oracle = db.query(ReputationOracle).filter(
+                        ReputationOracle.oracle_address == oracle_address
+                    ).first()
+                    
+                    if oracle:
+                        return {
+                            "oracle_id": oracle.oracle_id,
+                            "oracle_address": oracle.oracle_address,
+                            "name": oracle.name,
+                            "specializations": oracle.specializations,
+                            "is_active": oracle.is_active,
+                            "total_evaluations": oracle.total_evaluations,
+                            "successful_evaluations": oracle.successful_evaluations
+                        }
+            else:
+                # Fallback check
+                oracle_data = _fallback_reputation.get("oracles", {})
+                return oracle_data.get(oracle_address)
+        
+        except Exception as e:
+            logger.error(f"Error getting oracle info: {str(e)}")
+            return None
+    
+    async def _get_evaluation_details(self, evaluation_id: str) -> Optional[Dict[str, Any]]:
+        """Get evaluation details."""
+        try:
+            if DATABASE_MODELS_AVAILABLE:
+                with self._get_db_session() as db:
+                    evaluation = db.query(WorkEvaluation).filter(
+                        WorkEvaluation.evaluation_id == evaluation_id
+                    ).first()
+                    
+                    if evaluation:
+                        return {
+                            "evaluation_id": evaluation.evaluation_id,
+                            "oracle_address": evaluation.oracle_address,
+                            "user_address": evaluation.user_address,
+                            "overall_score": evaluation.overall_score,
+                            "status": evaluation.status,
+                            "created_at": evaluation.created_at.isoformat()
+                        }
+            else:
+                # Fallback check
+                for user_transactions in _fallback_transactions.values():
+                    for transaction in user_transactions:
+                        if transaction.get("evaluation_id") == evaluation_id:
+                            return transaction
+        
+        except Exception as e:
+            logger.error(f"Error getting evaluation details: {str(e)}")
+            return None
     
     async def _submit_reputation_evidence(self, transaction_id: str, blockchain_evidence: str):
         """Submit reputation evidence to blockchain."""

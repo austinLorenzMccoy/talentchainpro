@@ -24,7 +24,8 @@ if __name__ == "__main__":
     test_files = [
         "tests/test_mcp.py",
         "tests/test_pools.py",
-        "tests/test_skills.py"
+        "tests/test_skills.py",
+        "tests/test_reputation.py"
     ]
     
     success = True

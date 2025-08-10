@@ -26,27 +26,27 @@ def run_tests():
     if pools_result.stderr:
         print(f"Errors: {pools_result.stderr}")
     
-    print("\nRunning Fixed Skills tests...")
-    skills_fixed_result = subprocess.run(
-        ["python", "-m", "pytest", "backend/tests/test_skills_fixed.py", "-v"], 
+    print("\nRunning Skills tests...")
+    skills_result = subprocess.run(
+        ["python", "-m", "pytest", "backend/tests/test_skills.py", "-v"], 
         capture_output=True, 
         text=True
     )
-    print(f"Fixed Skills tests exit code: {skills_fixed_result.returncode}")
-    print(skills_fixed_result.stdout)
-    if skills_fixed_result.stderr:
-        print(f"Errors: {skills_fixed_result.stderr}")
+    print(f"Skills tests exit code: {skills_result.returncode}")
+    print(skills_result.stdout)
+    if skills_result.stderr:
+        print(f"Errors: {skills_result.stderr}")
     
-    print("\nRunning Fixed Reputation tests...")
-    reputation_fixed_result = subprocess.run(
-        ["python", "-m", "pytest", "backend/tests/test_reputation_fixed.py", "-v"], 
+    print("\nRunning Reputation tests...")
+    reputation_result = subprocess.run(
+        ["python", "-m", "pytest", "backend/tests/test_reputation.py", "-v"], 
         capture_output=True, 
         text=True
     )
-    print(f"Fixed Reputation tests exit code: {reputation_fixed_result.returncode}")
-    print(reputation_fixed_result.stdout)
-    if reputation_fixed_result.stderr:
-        print(f"Errors: {reputation_fixed_result.stderr}")
+    print(f"Reputation tests exit code: {reputation_result.returncode}")
+    print(reputation_result.stdout)
+    if reputation_result.stderr:
+        print(f"Errors: {reputation_result.stderr}")
 
 if __name__ == "__main__":
     run_tests()

@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
-from app.api import skills, pools, mcp, reputation
+from app.api import skills, pools, mcp, reputation, governance
 from app.utils.hedera import initialize_hedera_client, check_hedera_connection, check_contract_deployments
 from app.utils.mcp_server import get_mcp_client
 
@@ -103,7 +103,8 @@ app.add_middleware(
 # Include routers with comprehensive API coverage
 app.include_router(skills.router, prefix="/api/v1/skills", tags=["Skills Management"])
 app.include_router(pools.router, prefix="/api/v1/pools", tags=["Talent Pools"])
-app.include_router(reputation.router, prefix="/api/v1/reputation", tags=["Reputation & Governance"])
+app.include_router(governance.router, prefix="/api/v1/governance", tags=["Governance & Voting"])
+app.include_router(reputation.router, prefix="/api/v1/reputation", tags=["Reputation & Oracles"])
 app.include_router(mcp.router, prefix="/api/v1/mcp", tags=["AI & Analytics"])
 
 # Exception handlers
@@ -144,6 +145,7 @@ async def root():
         "endpoints": {
             "skills": "/api/v1/skills",
             "pools": "/api/v1/pools", 
+            "governance": "/api/v1/governance",
             "reputation": "/api/v1/reputation",
             "mcp": "/api/v1/mcp",
             "docs": "/docs",
