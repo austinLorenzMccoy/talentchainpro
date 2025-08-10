@@ -5,12 +5,6 @@
 import { WalletConnection, TransactionResult } from '../types/wallet';
 import { APP_CONFIG, WALLET_CONFIG } from '../config/networks';
 
-declare global {
-  interface Window {
-    hashconnect?: any;
-  }
-}
-
 interface HashPackWallet {
   isAvailable(): boolean;
   getConnection(): WalletConnection | null;
@@ -28,7 +22,8 @@ class HashPackWalletImpl implements HashPackWallet {
    * Check if HashPack is available
    */
   isAvailable(): boolean {
-    return typeof window !== 'undefined' && !!window.hashconnect;
+    // For WalletConnect-based HashPack, we just need to check if we're in a browser environment
+    return typeof window !== 'undefined';
   }
 
   /**
@@ -38,20 +33,34 @@ class HashPackWalletImpl implements HashPackWallet {
     if (this.hashconnect) return this.hashconnect;
 
     try {
-      // Import HashConnect v3 and LedgerId from Hedera SDK
-      const { HashConnect } = await import('hashconnect');
+      // Import DAppConnector from official Hedera WalletConnect
+      const { 
+        DAppConnector,
+        HederaSessionEvent,
+        HederaJsonRpcMethod,
+        HederaChainId
+      } = await import('@hashgraph/hedera-wallet-connect');
+      
+      // Import LedgerId from Hedera SDK
       const { LedgerId } = await import('@hashgraph/sdk');
       
-      // Create HashConnect instance with required parameters
-      this.hashconnect = new HashConnect(
-        LedgerId.TESTNET, // Use testnet for development
-        'talentchain-pro', // Project ID
+      // Create DAppConnector instance with required parameters
+      this.hashconnect = new DAppConnector(
         {
-          ...this.appMetadata,
-          icons: [this.appMetadata.icon], // Convert single icon to icons array
+          name: "TalentChain Pro",
+          description: "Blockchain-based talent ecosystem on Hedera",
+          url: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
+          icons: [this.appMetadata.icon],
         },
-        true // Debug mode
+        APP_CONFIG.network === 'mainnet' ? LedgerId.MAINNET : LedgerId.TESTNET,
+        process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || 'demo-project-id',
+        Object.values(HederaJsonRpcMethod),
+        [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
+        [HederaChainId.Testnet]
       );
+
+      // Initialize the connector
+      await this.hashconnect.init({ logger: 'error' });
 
       return this.hashconnect;
     } catch (error) {
@@ -93,15 +102,19 @@ class HashPackWalletImpl implements HashPackWallet {
       
       const hashconnect = await this.initializeHashConnect();
 
-      // Connect to extension
-      const walletData = await hashconnect.connectToLocalWallet();
-      console.log('Connected to HashPack:', walletData);
+      // Open WalletConnect modal to connect
+      await hashconnect.openModal();
 
-      if (!walletData || !walletData.accountIds || walletData.accountIds.length === 0) {
+      // Wait for connection and get signers
+      const signers = hashconnect.signers;
+      if (!signers || signers.length === 0) {
         throw new Error('No accounts found in HashPack wallet');
       }
 
-      const accountId = walletData.accountIds[0];
+      const accountId = signers[0].getAccountId()?.toString();
+      if (!accountId) {
+        throw new Error('Failed to get account ID from HashPack wallet');
+      }
       
       // Get account balance
       const balance = await this.getAccountBalance(accountId);
@@ -110,10 +123,8 @@ class HashPackWalletImpl implements HashPackWallet {
         walletType: 'hashpack',
         isConnected: true,
         accountId: accountId,
-        evmAddress: walletData.evmAddress,
         balance: balance,
         network: APP_CONFIG.network,
-        publicKey: walletData.publicKey,
         metadata: {
           name: 'HashPack',
           icon: '/icons/hashpack.svg',
@@ -138,10 +149,15 @@ class HashPackWalletImpl implements HashPackWallet {
   async disconnect(): Promise<void> {
     try {
       if (this.hashconnect) {
-        await this.hashconnect.disconnect();
+        // Get the current session topic if available
+        const sessions = this.hashconnect.walletConnectClient?.session.getAll() || [];
+        if (sessions.length > 0) {
+          await this.hashconnect.disconnect(sessions[0].topic);
+        }
       }
       
       this.connection = null;
+      this.hashconnect = null;
       this.clearSavedConnection();
       
       console.log('✅ HashPack disconnected successfully');
@@ -149,6 +165,7 @@ class HashPackWalletImpl implements HashPackWallet {
       console.error('❌ HashPack disconnect failed:', error);
       // Clear local state even if disconnect fails
       this.connection = null;
+      this.hashconnect = null;
       this.clearSavedConnection();
     }
   }
@@ -164,22 +181,24 @@ class HashPackWalletImpl implements HashPackWallet {
 
       console.log('🔄 Executing transaction via HashPack...');
       
-      // Execute transaction through HashConnect
-      const response = await this.hashconnect.sendTransaction(
-        this.connection.accountId,
-        transaction
-      );
+      // Get the signer
+      const signer = this.hashconnect.signers[0];
+      if (!signer) {
+        throw new Error('No signer available');
+      }
 
-      if (response.success) {
+      // Execute transaction through DAppConnector
+      const response = await signer.call(transaction);
+
+      if (response) {
         return {
           success: true,
-          transactionId: response.response.transactionId,
-          receipt: response.response.receipt,
+          transactionId: response.toString(),
         };
       } else {
         return {
           success: false,
-          error: response.error || 'Transaction failed',
+          error: 'Transaction failed',
         };
       }
 

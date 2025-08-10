@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 TalentChain Pro is a blockchain-based talent ecosystem built on Hedera Hashgraph that combines:
+
 - **Skill Soulbound Tokens (SBTs)**: Non-transferable ERC-721 tokens representing verifiable skills
 - **AI Reputation Oracles**: On-chain AI agents that analyze work deliverables via HCS-10 protocol
 - **Autonomous Job Matching Pools**: HTS-based liquidity pools for talent discovery
@@ -15,6 +16,7 @@ TalentChain Pro is a blockchain-based talent ecosystem built on Hedera Hashgraph
 The system consists of three main components:
 
 ### Backend (Python/FastAPI)
+
 - **Entry Point**: `backend/app/main.py` - FastAPI application with CORS, middleware, and router setup
 - **API Routes**: Located in `backend/app/api/` (skills.py, pools.py, mcp.py)
 - **Business Logic**: Located in `backend/app/services/` (skill.py, pool.py, reputation.py, mcp.py)
@@ -23,10 +25,22 @@ The system consists of three main components:
 - **AI Integration**: `backend/app/utils/mcp_server.py` - MCP (Model Context Protocol) server client
 
 ### Smart Contracts (Solidity)
+
 - **SkillToken.sol**: Soulbound ERC-721 implementation with oracle-controlled metadata updates
 - **TalentPool.sol**: Staking pools for job matching with platform fee management
+- **ReputationOracle.sol**: On-chain reputation system with work evaluation and challenge mechanisms
+- **Governance.sol**: DAO governance for protocol parameters and upgrades
+
+**Recent Updates (August 2025)**:
+
+- ✅ **Complete Test Suite**: All 186 tests now passing across all contracts
+- ✅ **ReputationOracle Integration**: Full implementation with oracle registration, work evaluation, and challenge system
+- ✅ **Governance System**: DAO voting, proposal execution, and emergency procedures
+- ✅ **Cross-Contract Integration**: Skill tokens, talent pools, and reputation system working together
+- ✅ **Library Functions**: PoolLibrary and SkillLibrary with comprehensive utility functions
 
 ### Frontend (Next.js)
+
 - **Framework**: Next.js 15.4.5 with React 19.1.0 and TypeScript
 - **Styling**: Tailwind CSS v4 with PostCSS
 - **Build Tool**: Turbopack for development
@@ -34,6 +48,7 @@ The system consists of three main components:
 ## Development Commands
 
 ### Backend Development
+
 ```bash
 cd backend
 
@@ -63,6 +78,7 @@ mypy .
 ```
 
 ### Smart Contract Development
+
 ```bash
 cd contracts
 
@@ -72,14 +88,22 @@ npm install
 # Compile contracts
 npx hardhat compile
 
-# Run tests
+# Run all tests (186 tests passing)
 npx hardhat test
+
+# Run specific test suites
+npx hardhat test --grep "SkillToken"
+npx hardhat test --grep "TalentPool"
+npx hardhat test --grep "ReputationOracle"
+npx hardhat test --grep "Governance"
+npx hardhat test --grep "Integration"
 
 # Deploy to testnet (requires .env configuration)
 npx hardhat run scripts/deploy.ts --network testnet
 ```
 
 ### Frontend Development
+
 ```bash
 cd frontend
 
@@ -102,7 +126,9 @@ npm run lint
 ## Environment Configuration
 
 ### Backend Environment Variables
+
 Create `.env` file in `backend/` directory:
+
 ```
 HEDERA_NETWORK=testnet
 HEDERA_ACCOUNT_ID=0.0.YOUR_ACCOUNT
@@ -114,27 +140,32 @@ CONTRACT_TALENT_POOL=0.0.CONTRACT_ID
 ```
 
 ### Contract Environment Variables
+
 Create `.env` file in `contracts/` directory for deployment configuration.
 
 ## Key Development Patterns
 
 ### API Structure
+
 - All endpoints follow RESTful conventions under `/api/v1/`
 - Request/response models defined in `schemas.py` with Pydantic validation
 - Business logic separated into service layer modules
 - Async/await pattern used throughout for Hedera SDK integration
 
 ### Hedera Integration
+
 - Client initialization handled in application startup (`main.py:lifespan`)
 - All Hedera operations (token creation, HCS messaging) centralized in `utils/hedera.py`
 - Transaction IDs returned for all blockchain operations
 
 ### AI/MCP Integration
+
 - Natural language processing via GROQ API for talent matching
 - MCP server provides standardized interface for AI agent interactions
 - Work evaluation uses structured prompts for consistent skill assessment
 
 ### Error Handling
+
 - FastAPI exception handlers for validation errors
 - Hedera SDK errors wrapped with descriptive messages
 - Async context managers for resource cleanup
@@ -143,6 +174,13 @@ Create `.env` file in `contracts/` directory for deployment configuration.
 
 - **Unit Tests**: Individual service functions with mocked dependencies
 - **Integration Tests**: Full API endpoints with test Hedera network
+- **Smart Contract Tests**: Comprehensive test suite with 186 passing tests covering:
+  - ✅ SkillToken: Soulbound behavior, minting, endorsements, expiry management
+  - ✅ TalentPool: Pool creation, applications, matching, fee distribution
+  - ✅ ReputationOracle: Oracle registration, work evaluation, challenge system
+  - ✅ Governance: Proposal creation, voting, execution, delegation
+  - ✅ Integration: Cross-contract interactions and end-to-end workflows
+  - ✅ Libraries: PoolLibrary and SkillLibrary utility functions
 - **Async Testing**: All tests use `pytest-asyncio` for async/await support
 - **Test Data**: Fixtures in `tests/conftest.py` for reusable test accounts and tokens
 
@@ -156,11 +194,13 @@ Create `.env` file in `contracts/` directory for deployment configuration.
 ## Smart Contract Patterns
 
 ### Soulbound Tokens
+
 - Non-transferable via `_beforeTokenTransfer` override
 - Metadata updates controlled by authorized oracles only
 - HIP-412 compliance for Hedera compatibility
 
 ### Staking Pools
+
 - Reentrancy protection on all external calls
 - Skill token ID validation before pool joining
 - Automated fee distribution on successful matches

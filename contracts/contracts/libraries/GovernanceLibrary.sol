@@ -51,19 +51,24 @@ library GovernanceLibrary {
         if (votingDelay < MIN_VOTING_DELAY || votingDelay > MAX_VOTING_DELAY) {
             revert InvalidVotingDelay(votingDelay);
         }
-        
-        if (votingPeriod < MIN_VOTING_PERIOD || votingPeriod > MAX_VOTING_PERIOD) {
+
+        if (
+            votingPeriod < MIN_VOTING_PERIOD || votingPeriod > MAX_VOTING_PERIOD
+        ) {
             revert InvalidVotingPeriod(votingPeriod);
         }
-        
-        if (executionDelay < MIN_EXECUTION_DELAY || executionDelay > MAX_EXECUTION_DELAY) {
+
+        if (
+            executionDelay < MIN_EXECUTION_DELAY ||
+            executionDelay > MAX_EXECUTION_DELAY
+        ) {
             revert InvalidExecutionDelay(executionDelay);
         }
-        
+
         if (quorum < MIN_QUORUM || quorum > MAX_QUORUM) {
             revert InvalidQuorum(quorum);
         }
-        
+
         if (proposalThreshold < MIN_PROPOSAL_THRESHOLD) {
             revert InvalidProposalThreshold(proposalThreshold);
         }
@@ -84,15 +89,18 @@ library GovernanceLibrary {
         if (bytes(title).length == 0 || bytes(description).length == 0) {
             revert EmptyProposalData();
         }
-        
+
         if (targets.length == 0) {
             revert EmptyProposalData();
         }
-        
-        if (targets.length != values.length || targets.length != calldatas.length) {
+
+        if (
+            targets.length != values.length ||
+            targets.length != calldatas.length
+        ) {
             revert InvalidArrayLength();
         }
-        
+
         if (proposerVotingPower < proposalThreshold) {
             revert InsufficientVotingPower();
         }
@@ -111,19 +119,19 @@ library GovernanceLibrary {
         if (status != IGovernance.ProposalStatus.Active) {
             revert ProposalNotActive();
         }
-        
+
         if (block.timestamp < startTime) {
             revert VotingNotStarted();
         }
-        
+
         if (block.timestamp > endTime) {
             revert VotingEnded();
         }
-        
+
         if (hasVoted) {
             revert AlreadyVoted();
         }
-        
+
         if (votingPower == 0) {
             revert InsufficientVotingPower();
         }
@@ -138,16 +146,17 @@ library GovernanceLibrary {
         uint256 abstainVotes,
         uint256 quorum,
         uint256 totalSupply,
-        bool isEmergency
+        bool isEmergency,
+        uint256 emergencyQuorum
     ) internal pure returns (IGovernance.ProposalStatus) {
         uint256 totalVotes = forVotes + againstVotes + abstainVotes;
-        uint256 requiredQuorum = isEmergency ? EMERGENCY_QUORUM : quorum;
-        
+        uint256 requiredQuorum = isEmergency ? emergencyQuorum : quorum;
+
         // Check if quorum is met
         if (totalVotes * 10000 < totalSupply * requiredQuorum) {
             return IGovernance.ProposalStatus.Defeated;
         }
-        
+
         // Check if majority supports
         if (forVotes > againstVotes) {
             return IGovernance.ProposalStatus.Succeeded;
@@ -159,7 +168,9 @@ library GovernanceLibrary {
     /**
      * @dev Calculates quadratic voting power
      */
-    function calculateQuadraticVotingPower(uint256 linearPower) internal pure returns (uint256) {
+    function calculateQuadraticVotingPower(
+        uint256 linearPower
+    ) internal pure returns (uint256) {
         if (linearPower == 0) return 0;
         return sqrt(linearPower * 1000); // Scale to prevent too much reduction
     }
@@ -173,15 +184,15 @@ library GovernanceLibrary {
         mapping(string => uint256) storage categoryWeights
     ) internal view returns (uint256) {
         uint256 totalPower = 0;
-        
+
         for (uint256 i = 0; i < skillLevels.length; i++) {
             uint256 categoryWeight = categoryWeights[categories[i]];
             if (categoryWeight == 0) categoryWeight = 100; // Default weight
-            
+
             uint256 levelPower = skillLevels[i] * skillLevels[i]; // Quadratic scaling
             totalPower += (levelPower * categoryWeight) / 100;
         }
-        
+
         return totalPower;
     }
 
@@ -195,7 +206,8 @@ library GovernanceLibrary {
     ) internal pure returns (uint256) {
         // Prevent concentration of power
         uint256 maxDelegatable = (delegateePower * maxDelegationRatio) / 100;
-        return delegatorPower > maxDelegatable ? maxDelegatable : delegatorPower;
+        return
+            delegatorPower > maxDelegatable ? maxDelegatable : delegatorPower;
     }
 
     /**
@@ -209,11 +221,11 @@ library GovernanceLibrary {
         if (status != IGovernance.ProposalStatus.Queued) {
             revert ProposalNotSucceeded();
         }
-        
+
         if (block.timestamp < executionTime) {
             revert ExecutionDelayNotMet();
         }
-        
+
         if (executed) {
             revert("GovernanceLibrary: already executed");
         }
@@ -230,15 +242,15 @@ library GovernanceLibrary {
         if (block.timestamp <= lastActivityTime + decayPeriod) {
             return basePower;
         }
-        
+
         uint256 timeElapsed = block.timestamp - lastActivityTime;
         uint256 decayFactor = timeElapsed / decayPeriod;
-        
+
         // Maximum decay of 50%
         if (decayFactor >= 2) {
             return basePower / 2;
         }
-        
+
         return basePower - (basePower * decayFactor) / 4;
     }
 
@@ -251,22 +263,24 @@ library GovernanceLibrary {
         bytes[] memory calldatas
     ) internal view returns (uint256) {
         uint256 totalCost = 0;
-        
+
         for (uint256 i = 0; i < targets.length; i++) {
             totalCost += values[i];
-            
+
             // Estimate gas cost for call (simplified)
             uint256 gasCost = (calldatas[i].length * 16 + 21000) * tx.gasprice;
             totalCost += gasCost;
         }
-        
+
         return totalCost;
     }
 
     /**
      * @dev Formats proposal for display
      */
-    function formatProposalId(uint256 proposalId) internal pure returns (string memory) {
+    function formatProposalId(
+        uint256 proposalId
+    ) internal pure returns (string memory) {
         return string(abi.encodePacked("PROP-", uint2str(proposalId)));
     }
 
@@ -333,7 +347,7 @@ library GovernanceLibrary {
         uint256 k = len;
         while (_i != 0) {
             k = k - 1;
-            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
+            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
             bytes1 b1 = bytes1(temp);
             bstr[k] = b1;
             _i /= 10;

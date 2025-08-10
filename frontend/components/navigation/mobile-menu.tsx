@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Zap, Shield, Users, TrendingUp, ExternalLink, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { WalletButton } from "@/components/wallet/wallet-button";
 import { Logo } from "@/components/ui/logo";
@@ -95,45 +96,57 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
                         
                         <div className="space-y-2 ml-4 border-l-2 border-hedera-200/30 dark:border-hedera-800/30 pl-4">
                           {item.items.map((subItem, subIndex) => (
-                            <motion.a
+                            <motion.div
                               key={subItem.name}
-                              href={subItem.href}
                               initial={{ opacity: 0, x: 20 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: (index * 0.1) + (subIndex * 0.05), duration: 0.3 }}
-                              className="flex items-start space-x-3 p-3 rounded-lg hover:bg-hedera-50/50 dark:hover:bg-hedera-950/30 transition-colors duration-200 group"
-                              onClick={onClose}
                             >
-                              <div className="w-8 h-8 bg-gradient-to-br from-hedera-100 to-hedera-200 dark:from-hedera-800 dark:to-hedera-700 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-                                <subItem.icon className="w-4 h-4 text-hedera-600 dark:text-hedera-400" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-slate-900 dark:text-white group-hover:text-hedera-600 dark:group-hover:text-hedera-400 transition-colors">
-                                  {subItem.name}
+                              <Link
+                                href={subItem.href}
+                                className="flex items-start space-x-3 p-3 rounded-lg hover:bg-hedera-50/50 dark:hover:bg-hedera-950/30 transition-colors duration-200 group"
+                                onClick={onClose}
+                              >
+                                <div className="w-8 h-8 bg-gradient-to-br from-hedera-100 to-hedera-200 dark:from-hedera-800 dark:to-hedera-700 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
+                                  <subItem.icon className="w-4 h-4 text-hedera-600 dark:text-hedera-400" />
                                 </div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                                  {subItem.description}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-slate-900 dark:text-white group-hover:text-hedera-600 dark:group-hover:text-hedera-400 transition-colors">
+                                    {subItem.name}
+                                  </div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                                    {subItem.description}
+                                  </div>
                                 </div>
-                              </div>
-                            </motion.a>
+                              </Link>
+                            </motion.div>
                           ))}
                         </div>
                       </div>
-                    ) : (
+                    ) : item.external ? (
                       <a
                         href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="flex items-center justify-between py-3 px-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors duration-200 group"
                         onClick={onClose}
                       >
                         <span className="font-medium text-slate-900 dark:text-white group-hover:text-hedera-600 dark:group-hover:text-hedera-400 transition-colors">
                           {item.name}
                         </span>
-                        {item.external ? (
-                          <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-hedera-500 transition-colors" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-hedera-500 transition-colors" />
-                        )}
+                        <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-hedera-500 transition-colors" />
                       </a>
+                    ) : (
+                      <Link
+                        href={item.href || '#'}
+                        className="flex items-center justify-between py-3 px-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors duration-200 group"
+                        onClick={onClose}
+                      >
+                        <span className="font-medium text-slate-900 dark:text-white group-hover:text-hedera-600 dark:group-hover:text-hedera-400 transition-colors">
+                          {item.name}
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-hedera-500 transition-colors" />
+                      </Link>
                     )}
                   </motion.div>
                 ))}

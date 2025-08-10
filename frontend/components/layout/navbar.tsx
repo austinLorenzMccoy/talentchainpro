@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { 
   Menu, 
   X, 
@@ -43,6 +45,7 @@ const navigationItems = [
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -121,15 +124,28 @@ export function Navbar() {
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    ) : (
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="text-slate-700 dark:text-slate-300 hover:text-hedera-600 dark:hover:text-hedera-400 font-medium transition-all duration-200 hover:bg-hedera-50/50 dark:hover:bg-hedera-900/20"
+                    ) : item.external ? (
+                      <a
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-slate-700 dark:text-slate-300 hover:text-hedera-600 dark:hover:text-hedera-400 font-medium transition-all duration-200 hover:bg-hedera-50/50 dark:hover:bg-hedera-900/20 px-3 py-2 rounded-md inline-flex items-center"
                       >
                         {item.name}
-                        {item.external && <ExternalLink className="w-3 h-3 ml-1" />}
-                      </Button>
+                        <ExternalLink className="w-3 h-3 ml-1" />
+                      </a>
+                    ) : (
+                      <Link href={item.href || '#'} className="inline-block">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          className={`text-slate-700 dark:text-slate-300 hover:text-hedera-600 dark:hover:text-hedera-400 font-medium transition-all duration-200 hover:bg-hedera-50/50 dark:hover:bg-hedera-900/20 ${
+                            pathname === item.href ? 'bg-hedera-100/80 dark:bg-hedera-900/40 text-hedera-700 dark:text-hedera-300' : ''
+                          }`}
+                        >
+                          {item.name}
+                        </Button>
+                      </Link>
                     )}
                   </div>
                 ))}

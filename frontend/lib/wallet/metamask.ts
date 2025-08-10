@@ -5,12 +5,6 @@
 import { WalletConnection, HederaNetwork, TransactionResult } from '../types/wallet';
 import { APP_CONFIG, WALLET_CONFIG, getNetworkConfig } from '../config/networks';
 
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}
-
 interface MetaMaskWallet {
   isAvailable(): boolean;
   getConnection(): WalletConnection | null;
@@ -26,7 +20,7 @@ class MetaMaskWalletImpl implements MetaMaskWallet {
 
   constructor() {
     if (typeof window !== 'undefined' && window.ethereum) {
-      this.ethereum = window.ethereum;
+      this.ethereum = window.ethereum as any;
       this.setupEventListeners();
     }
   }
@@ -35,7 +29,7 @@ class MetaMaskWalletImpl implements MetaMaskWallet {
    * Check if MetaMask is available
    */
   isAvailable(): boolean {
-    return typeof window !== 'undefined' && !!window.ethereum && !!window.ethereum.isMetaMask;
+    return typeof window !== 'undefined' && !!window.ethereum && !!(window.ethereum as any).isMetaMask;
   }
 
   /**

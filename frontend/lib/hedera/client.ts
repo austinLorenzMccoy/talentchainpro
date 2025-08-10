@@ -173,7 +173,7 @@ export const getJobPoolInfo = async (
         data: {
           company: result.data.getAddress(0),
           description: result.data.getString(1),
-          requiredSkills: result.data.getUint256Array(2).map(n => n.toNumber()),
+          requiredSkills: result.data.getUint256Array(2).map((n: any) => n.toNumber()),
           stakeAmount: result.data.getUint256(3).toString(),
           salary: result.data.getUint256(4).toString(),
           status: result.data.getUint256(5).toNumber(),
@@ -228,7 +228,7 @@ export const getUserApplications = async (
     try {
       return {
         success: true,
-        data: result.data.getUint256Array(0).map(n => n.toNumber()),
+        data: result.data.getUint256Array(0).map((n: any) => n.toNumber()),
       };
     } catch (error) {
       console.error('Failed to parse user applications:', error);
@@ -367,15 +367,15 @@ export const createTalentPoolParams = {
   createPool: (description: string, requiredSkills: number[], salary: string, duration: number) => {
     return new ContractFunctionParameters()
       .addString(description)
-      .addUint256Array(requiredSkills.map(BigInt))
-      .addUint256(salary)
+      .addUint256Array(requiredSkills)
+      .addUint256(parseInt(salary))
       .addUint256(duration);
   },
   
   applyToPool: (poolId: number, skillTokenIds: number[]) => {
     return new ContractFunctionParameters()
       .addUint256(poolId)
-      .addUint256Array(skillTokenIds.map(BigInt));
+      .addUint256Array(skillTokenIds);
   },
   
   makeMatch: (poolId: number, candidate: string) => {

@@ -158,6 +158,9 @@ full_test_output.txt
 reputation_test_output.txt
 *.test.log
 
+# Development documentation
+CLAUDE.md
+
 # Error logs
 hs_err_pid*.log
 

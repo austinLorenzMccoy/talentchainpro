@@ -16,7 +16,7 @@ import "../libraries/GovernanceLibrary.sol";
  * @title Governance
  * @dev Enterprise-grade decentralized governance contract for TalentChain Pro
  * @author TalentChain Pro Team
- * 
+ *
  * Features:
  * - Proposal-based governance with configurable parameters
  * - Skill token-based voting power calculation
@@ -29,85 +29,99 @@ import "../libraries/GovernanceLibrary.sol";
  * - IPFS integration for proposal metadata
  * - Advanced quorum and threshold calculations
  */
-contract Governance is 
-    AccessControl, 
-    Pausable, 
-    ReentrancyGuard, 
+contract Governance is
+    AccessControl,
+    Pausable,
+    ReentrancyGuard,
     EIP712,
-    IGovernance 
+    IGovernance
 {
     using Counters for Counters.Counter;
     using ECDSA for bytes32;
     using GovernanceLibrary for uint256;
 
     // Role definitions
-    bytes32 public constant PROPOSAL_CREATOR_ROLE = keccak256("PROPOSAL_CREATOR_ROLE");
+    bytes32 public constant PROPOSAL_CREATOR_ROLE =
+        keccak256("PROPOSAL_CREATOR_ROLE");
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
     bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     // EIP-712 type hashes
-    bytes32 private constant _VOTE_TYPEHASH = 
-        keccak256("Vote(uint256 proposalId,uint8 vote,string reason,uint256 nonce,uint256 deadline)");
+    bytes32 private constant _VOTE_TYPEHASH =
+        keccak256(
+            "Vote(uint256 proposalId,uint8 vote,string reason,uint256 nonce,uint256 deadline)"
+        );
 
     // Governance parameters
     struct GovernanceSettings {
-        uint256 votingDelay;           // Delay before voting starts
-        uint256 votingPeriod;          // Duration of voting period
-        uint256 proposalThreshold;     // Min voting power to create proposal
-        uint256 quorum;                // Min participation for valid vote
-        uint256 executionDelay;        // Delay before execution
-        uint256 emergencyQuorum;       // Quorum for emergency proposals
+        uint256 votingDelay; // Delay before voting starts
+        uint256 votingPeriod; // Duration of voting period
+        uint256 proposalThreshold; // Min voting power to create proposal
+        uint256 quorum; // Min participation for valid vote
+        uint256 executionDelay; // Delay before execution
+        uint256 emergencyQuorum; // Quorum for emergency proposals
         uint256 emergencyVotingPeriod; // Voting period for emergency proposals
     }
 
     // State variables
     Counters.Counter private _proposalIdCounter;
     ISkillToken public immutable skillToken;
-    
+
     // Governance settings
     GovernanceSettings public settings;
-    
+
     // Proposals
     mapping(uint256 => Proposal) private _proposals;
     mapping(uint256 => mapping(address => VoteReceipt)) private _proposalVotes;
     mapping(uint256 => bool) private _proposalExecuted;
-    
+
     // Proposal indexes
     uint256[] private _allProposals;
     mapping(address => uint256[]) private _proposalsByProposer;
-    
+
     // Voting power delegation
     mapping(address => address) private _delegates;
     mapping(address => uint256) private _delegatedVotingPower;
-    
+
     // Voting power snapshots (for historical voting power)
-    mapping(address => mapping(uint256 => uint256)) private _votingPowerSnapshots;
+    mapping(address => mapping(uint256 => uint256))
+        private _votingPowerSnapshots;
     mapping(uint256 => uint256) private _proposalSnapshotBlocks;
-    
+
     // Emergency proposals
     mapping(uint256 => bool) private _emergencyProposals;
-    
+
     // Execution queue
     mapping(uint256 => uint256) private _executionTime;
-    
+
     // Nonces for meta-transactions
     mapping(address => uint256) private _nonces;
 
     // Events (additional to interface)
     event GovernanceSettingsUpdated(GovernanceSettings newSettings);
-    event VotingPowerDelegated(address indexed delegator, address indexed delegate, uint256 amount);
+    event VotingPowerDelegated(
+        address indexed delegator,
+        address indexed delegate,
+        uint256 amount
+    );
     event EmergencyProposalCreated(uint256 indexed proposalId);
     event ProposalQueued(uint256 indexed proposalId, uint256 executionTime);
 
     // Modifiers
     modifier proposalExists(uint256 proposalId) {
-        require(proposalId < _proposalIdCounter.current(), "Governance: proposal not found");
+        require(
+            proposalId < _proposalIdCounter.current(),
+            "Governance: proposal not found"
+        );
         _;
     }
 
     modifier onlyValidVoter(uint256 proposalId) {
-        require(_getVotingPower(_msgSender(), proposalId) > 0, "Governance: insufficient voting power");
+        require(
+            _getVotingPower(_msgSender(), proposalId) > 0,
+            "Governance: insufficient voting power"
+        );
         _;
     }
 
@@ -116,7 +130,10 @@ contract Governance is
         address _initialAdmin,
         GovernanceSettings memory _initialSettings
     ) EIP712("TalentChainGovernance", "1") {
-        require(_skillTokenAddress != address(0), "Governance: invalid skill token");
+        require(
+            _skillTokenAddress != address(0),
+            "Governance: invalid skill token"
+        );
         require(_initialAdmin != address(0), "Governance: invalid admin");
 
         skillToken = ISkillToken(_skillTokenAddress);
@@ -142,7 +159,7 @@ contract Governance is
         bool isEmergency
     ) internal returns (uint256 proposalId) {
         uint256 votingPower = _getCurrentVotingPower(_msgSender());
-        
+
         // Use library for validation
         GovernanceLibrary.validateProposalCreation(
             title,
@@ -159,7 +176,7 @@ contract Governance is
 
         uint256 startTime;
         uint256 endTime;
-        
+
         if (isEmergency) {
             startTime = block.timestamp + 1 hours; // Shorter delay for emergency
             endTime = startTime + settings.emergencyVotingPeriod;
@@ -194,7 +211,13 @@ contract Governance is
         _allProposals.push(proposalId);
         _proposalsByProposer[_msgSender()].push(proposalId);
 
-        emit ProposalCreated(proposalId, _msgSender(), description, startTime, endTime);
+        emit ProposalCreated(
+            proposalId,
+            _msgSender(),
+            description,
+            startTime,
+            endTime
+        );
     }
 
     /**
@@ -207,13 +230,17 @@ contract Governance is
         uint256[] calldata values,
         bytes[] calldata calldatas,
         string calldata ipfsHash
-    ) 
-        external 
-        override 
-        whenNotPaused
-        returns (uint256 proposalId)
-    {
-        return _createProposalInternal(title, description, targets, values, calldatas, ipfsHash, false);
+    ) external override whenNotPaused returns (uint256 proposalId) {
+        return
+            _createProposalInternal(
+                title,
+                description,
+                targets,
+                values,
+                calldatas,
+                ipfsHash,
+                false
+            );
     }
 
     /**
@@ -227,16 +254,27 @@ contract Governance is
         bytes[] calldata calldatas,
         string calldata ipfsHash,
         string calldata justification
-    ) 
-        external 
+    )
+        external
         onlyRole(EMERGENCY_ROLE)
         whenNotPaused
         returns (uint256 proposalId)
     {
-        require(bytes(justification).length > 0, "Governance: empty justification");
+        require(
+            bytes(justification).length > 0,
+            "Governance: empty justification"
+        );
 
         // Use internal function to create proposal
-        proposalId = _createProposalInternal(title, description, targets, values, calldatas, ipfsHash, true);
+        proposalId = _createProposalInternal(
+            title,
+            description,
+            targets,
+            values,
+            calldatas,
+            ipfsHash,
+            true
+        );
 
         emit EmergencyProposalCreated(proposalId);
     }
@@ -248,9 +286,9 @@ contract Governance is
         uint256 proposalId,
         VoteType vote,
         string calldata reason
-    ) 
-        external 
-        override 
+    )
+        external
+        override
         proposalExists(proposalId)
         onlyValidVoter(proposalId)
         whenNotPaused
@@ -296,23 +334,23 @@ contract Governance is
         VoteType vote,
         string calldata reason,
         bytes calldata signature
-    ) 
-        external 
-        override 
-        proposalExists(proposalId)
-        whenNotPaused
-    {
+    ) external override proposalExists(proposalId) whenNotPaused {
         Proposal memory proposal = _proposals[proposalId];
-        require(block.timestamp <= proposal.endTime, "Governance: signature expired");
+        require(
+            block.timestamp <= proposal.endTime,
+            "Governance: signature expired"
+        );
 
-        bytes32 structHash = keccak256(abi.encode(
-            _VOTE_TYPEHASH,
-            proposalId,
-            uint8(vote),
-            keccak256(bytes(reason)),
-            _useNonce(_msgSender()),
-            proposal.endTime
-        ));
+        bytes32 structHash = keccak256(
+            abi.encode(
+                _VOTE_TYPEHASH,
+                proposalId,
+                uint8(vote),
+                keccak256(bytes(reason)),
+                _useNonce(_msgSender()),
+                proposal.endTime
+            )
+        );
 
         bytes32 hash = _hashTypedDataV4(structHash);
         address signer = hash.recover(signature);
@@ -325,15 +363,17 @@ contract Governance is
     /**
      * @dev Queue proposal for execution
      */
-    function queueProposal(uint256 proposalId) 
-        external 
-        proposalExists(proposalId)
-    {
+    function queueProposal(
+        uint256 proposalId
+    ) external proposalExists(proposalId) {
         Proposal storage proposal = _proposals[proposalId];
-        require(proposal.status == ProposalStatus.Succeeded, "Governance: proposal not succeeded");
+        require(
+            proposal.status == ProposalStatus.Succeeded,
+            "Governance: proposal not succeeded"
+        );
 
         uint256 executionTime = block.timestamp + settings.executionDelay;
-        
+
         // Emergency proposals can be executed immediately
         if (_emergencyProposals[proposalId]) {
             executionTime = block.timestamp;
@@ -348,15 +388,17 @@ contract Governance is
     /**
      * @dev Execute proposal
      */
-    function executeProposal(uint256 proposalId) 
-        external 
-        override 
+    function executeProposal(
+        uint256 proposalId
+    )
+        external
+        override
         onlyRole(EXECUTOR_ROLE)
         proposalExists(proposalId)
         nonReentrant
     {
         Proposal storage proposal = _proposals[proposalId];
-        
+
         // Use library for validation
         GovernanceLibrary.validateExecution(
             proposal.status,
@@ -369,13 +411,46 @@ contract Governance is
         proposal.status = ProposalStatus.Executed;
 
         bool success = true;
-        
+
         // Execute all proposal calls
         for (uint256 i = 0; i < proposal.targets.length; i++) {
-            (bool callSuccess, ) = proposal.targets[i].call{value: proposal.values[i]}(
-                proposal.calldatas[i]
-            );
-            
+            (bool callSuccess, ) = proposal.targets[i].call{
+                value: proposal.values[i]
+            }(proposal.calldatas[i]);
+
+            if (!callSuccess) {
+                success = false;
+            }
+        }
+
+        emit ProposalExecuted(proposalId, success);
+    }
+
+    /**
+     * @dev Internal execution function for batch operations
+     */
+    function _executeProposal(uint256 proposalId) internal {
+        Proposal storage proposal = _proposals[proposalId];
+
+        // Use library for validation
+        GovernanceLibrary.validateExecution(
+            proposal.status,
+            _executionTime[proposalId],
+            _proposalExecuted[proposalId]
+        );
+
+        _proposalExecuted[proposalId] = true;
+        proposal.executed = true;
+        proposal.status = ProposalStatus.Executed;
+
+        bool success = true;
+
+        // Execute all proposal calls
+        for (uint256 i = 0; i < proposal.targets.length; i++) {
+            (bool callSuccess, ) = proposal.targets[i].call{
+                value: proposal.values[i]
+            }(proposal.calldatas[i]);
+
             if (!callSuccess) {
                 success = false;
             }
@@ -387,19 +462,18 @@ contract Governance is
     /**
      * @dev Cancel proposal
      */
-    function cancelProposal(uint256 proposalId) 
-        external 
-        override 
-        proposalExists(proposalId)
-    {
+    function cancelProposal(
+        uint256 proposalId
+    ) external override proposalExists(proposalId) {
         Proposal storage proposal = _proposals[proposalId];
         require(
-            _msgSender() == proposal.proposer || hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
+            _msgSender() == proposal.proposer ||
+                hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
             "Governance: unauthorized cancellation"
         );
         require(
             proposal.status != ProposalStatus.Executed &&
-            proposal.status != ProposalStatus.Cancelled,
+                proposal.status != ProposalStatus.Cancelled,
             "Governance: cannot cancel"
         );
 
@@ -410,22 +484,25 @@ contract Governance is
 
     // Delegation functions
     function delegate(address delegatee) external {
-        require(delegatee != _msgSender(), "Governance: cannot delegate to self");
-        
+        require(
+            delegatee != _msgSender(),
+            "Governance: cannot delegate to self"
+        );
+
         address currentDelegate = _delegates[_msgSender()];
         uint256 delegatorPower = _getCurrentVotingPower(_msgSender());
-        
+
         // Remove power from current delegate
         if (currentDelegate != address(0)) {
             _delegatedVotingPower[currentDelegate] -= delegatorPower;
         }
-        
+
         // Add power to new delegate
         _delegates[_msgSender()] = delegatee;
         if (delegatee != address(0)) {
             _delegatedVotingPower[delegatee] += delegatorPower;
         }
-        
+
         emit VotingPowerDelegated(_msgSender(), delegatee, delegatorPower);
     }
 
@@ -435,48 +512,52 @@ contract Governance is
             uint256 delegatorPower = _getCurrentVotingPower(_msgSender());
             _delegatedVotingPower[currentDelegate] -= delegatorPower;
             _delegates[_msgSender()] = address(0);
-            
+
             emit VotingPowerDelegated(_msgSender(), address(0), delegatorPower);
         }
     }
 
     // View functions
-    function getProposal(uint256 proposalId) 
-        external 
-        view 
-        override 
+    function getProposal(
+        uint256 proposalId
+    )
+        external
+        view
+        override
         proposalExists(proposalId)
-        returns (Proposal memory) 
+        returns (Proposal memory)
     {
         return _proposals[proposalId];
     }
 
-    function getVoteReceipt(uint256 proposalId, address voter) 
-        external 
-        view 
-        override 
+    function getVoteReceipt(
+        uint256 proposalId,
+        address voter
+    )
+        external
+        view
+        override
         proposalExists(proposalId)
-        returns (VoteReceipt memory) 
+        returns (VoteReceipt memory)
     {
         return _proposalVotes[proposalId][voter];
     }
 
-    function getProposalStatus(uint256 proposalId) 
-        external 
-        view 
-        override 
+    function getProposalStatus(
+        uint256 proposalId
+    )
+        external
+        view
+        override
         proposalExists(proposalId)
-        returns (ProposalStatus) 
+        returns (ProposalStatus)
     {
         return _proposals[proposalId].status;
     }
 
-    function getVotingPower(address account) 
-        external 
-        view 
-        override 
-        returns (uint256) 
-    {
+    function getVotingPower(
+        address account
+    ) external view override returns (uint256) {
         return _getCurrentVotingPower(account);
     }
 
@@ -496,63 +577,64 @@ contract Governance is
         return settings.proposalThreshold;
     }
 
-    function getAllProposals() external view override returns (uint256[] memory) {
+    function getAllProposals()
+        external
+        view
+        override
+        returns (uint256[] memory)
+    {
         return _allProposals;
     }
 
-    function getActiveProposals() external view override returns (uint256[] memory) {
+    function getActiveProposals()
+        external
+        view
+        override
+        returns (uint256[] memory)
+    {
         uint256 activeCount = 0;
-        
+
         // Count active proposals
         for (uint256 i = 0; i < _allProposals.length; i++) {
             if (_proposals[_allProposals[i]].status == ProposalStatus.Active) {
                 activeCount++;
             }
         }
-        
+
         // Collect active proposals
         uint256[] memory activeProposals = new uint256[](activeCount);
         uint256 index = 0;
-        
+
         for (uint256 i = 0; i < _allProposals.length; i++) {
             if (_proposals[_allProposals[i]].status == ProposalStatus.Active) {
                 activeProposals[index] = _allProposals[i];
                 index++;
             }
         }
-        
+
         return activeProposals;
     }
 
-    function getProposalsByProposer(address proposer) 
-        external 
-        view 
-        override 
-        returns (uint256[] memory) 
-    {
+    function getProposalsByProposer(
+        address proposer
+    ) external view override returns (uint256[] memory) {
         return _proposalsByProposer[proposer];
     }
 
-    function canExecute(uint256 proposalId) 
-        external 
-        view 
-        override 
-        proposalExists(proposalId)
-        returns (bool) 
-    {
+    function canExecute(
+        uint256 proposalId
+    ) external view override proposalExists(proposalId) returns (bool) {
         Proposal memory proposal = _proposals[proposalId];
-        return proposal.status == ProposalStatus.Queued && 
-               block.timestamp >= _executionTime[proposalId] &&
-               !_proposalExecuted[proposalId];
+        return
+            proposal.status == ProposalStatus.Queued &&
+            block.timestamp >= _executionTime[proposalId] &&
+            !_proposalExecuted[proposalId];
     }
 
-    function hasVoted(uint256 proposalId, address voter) 
-        external 
-        view 
-        override 
-        proposalExists(proposalId)
-        returns (bool) 
-    {
+    function hasVoted(
+        uint256 proposalId,
+        address voter
+    ) external view override proposalExists(proposalId) returns (bool) {
         return _proposalVotes[proposalId][voter].hasVoted;
     }
 
@@ -560,7 +642,9 @@ contract Governance is
         return _delegates[account];
     }
 
-    function getDelegatedVotingPower(address account) external view returns (uint256) {
+    function getDelegatedVotingPower(
+        address account
+    ) external view returns (uint256) {
         return _delegatedVotingPower[account];
     }
 
@@ -569,53 +653,67 @@ contract Governance is
     }
 
     // Internal functions
-    function _getCurrentVotingPower(address account) internal view returns (uint256) {
+    function _getCurrentVotingPower(
+        address account
+    ) internal view returns (uint256) {
         // Base voting power from skill tokens
         uint256[] memory userTokens = skillToken.getTokensByOwner(account);
         uint256 basePower = 0;
-        
+
         for (uint256 i = 0; i < userTokens.length; i++) {
             if (skillToken.isSkillActive(userTokens[i])) {
-                ISkillToken.SkillData memory skillData = skillToken.getSkillData(userTokens[i]);
+                ISkillToken.SkillData memory skillData = skillToken
+                    .getSkillData(userTokens[i]);
                 basePower += uint256(skillData.level) * 100; // Level-based voting power
             }
         }
-        
+
         // Add delegated voting power
         basePower += _delegatedVotingPower[account];
-        
+
         return basePower;
     }
 
-    function _getVotingPower(address account, uint256 proposalId) internal view returns (uint256) {
+    function _getVotingPower(
+        address account,
+        uint256 proposalId
+    ) internal view returns (uint256) {
         // For historical consistency, use snapshot if available
-        uint256 snapshotPower = _votingPowerSnapshots[account][_proposalSnapshotBlocks[proposalId]];
-        
+        uint256 snapshotPower = _votingPowerSnapshots[account][
+            _proposalSnapshotBlocks[proposalId]
+        ];
+
         if (snapshotPower > 0) {
             return snapshotPower;
         }
-        
+
         // Fall back to current voting power
         return _getCurrentVotingPower(account);
     }
 
     function _updateProposalStatus(uint256 proposalId) internal {
         Proposal storage proposal = _proposals[proposalId];
-        
+
         if (block.timestamp > proposal.endTime) {
             // Use library for outcome calculation
             // Calculate total eligible voting power (simplified approach)
-            uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
-            uint256 totalEligiblePower = totalVotes > 0 ? totalVotes * 10 : 1000; // Estimate based on participation
-            
-            ProposalStatus newStatus = GovernanceLibrary.calculateProposalOutcome(
-                proposal.forVotes,
-                proposal.againstVotes,
-                proposal.abstainVotes,
-                settings.quorum,
-                totalEligiblePower,
-                _emergencyProposals[proposalId]
-            );
+            uint256 totalVotes = proposal.forVotes +
+                proposal.againstVotes +
+                proposal.abstainVotes;
+            uint256 totalEligiblePower = totalVotes > 0
+                ? totalVotes * 10
+                : 1000; // Estimate based on participation
+
+            ProposalStatus newStatus = GovernanceLibrary
+                .calculateProposalOutcome(
+                    proposal.forVotes,
+                    proposal.againstVotes,
+                    proposal.abstainVotes,
+                    settings.quorum,
+                    totalEligiblePower,
+                    _emergencyProposals[proposalId],
+                    settings.emergencyQuorum
+                );
             proposal.status = newStatus;
         } else if (block.timestamp >= proposal.startTime) {
             proposal.status = ProposalStatus.Active;
@@ -628,10 +726,9 @@ contract Governance is
     }
 
     // Admin functions
-    function updateGovernanceSettings(GovernanceSettings calldata newSettings) 
-        external 
-        onlyRole(DEFAULT_ADMIN_ROLE) 
-    {
+    function updateGovernanceSettings(
+        GovernanceSettings calldata newSettings
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         // Use library for validation
         GovernanceLibrary.validateGovernanceSettings(
             newSettings.votingDelay,
@@ -640,20 +737,19 @@ contract Governance is
             newSettings.quorum,
             newSettings.executionDelay
         );
-        
+
         settings = newSettings;
-        
+
         emit GovernanceSettingsUpdated(newSettings);
     }
 
     // Batch operations for efficiency
-    function batchExecuteProposals(uint256[] calldata proposalIds) 
-        external 
-        onlyRole(EXECUTOR_ROLE) 
-    {
+    function batchExecuteProposals(
+        uint256[] calldata proposalIds
+    ) external onlyRole(EXECUTOR_ROLE) {
         for (uint256 i = 0; i < proposalIds.length; i++) {
             if (this.canExecute(proposalIds[i])) {
-                this.executeProposal(proposalIds[i]);
+                _executeProposal(proposalIds[i]);
             }
         }
     }

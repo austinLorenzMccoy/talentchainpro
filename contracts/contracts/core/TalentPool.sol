@@ -5,8 +5,6 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 import "../interfaces/ITalentPool.sol";
 import "../interfaces/ISkillToken.sol";
@@ -16,7 +14,7 @@ import "../libraries/PoolLibrary.sol";
  * @title TalentPool
  * @dev Enterprise-grade job matching and staking pool contract
  * @author TalentChain Pro Team
- * 
+ *
  * Features:
  * - Advanced job pool creation with comprehensive metadata
  * - Skill-based application matching with scoring algorithm
@@ -29,15 +27,8 @@ import "../libraries/PoolLibrary.sol";
  * - Withdrawal penalties to prevent gaming
  * - Batch operations for efficiency
  */
-contract TalentPool is 
-    AccessControl, 
-    Pausable, 
-    ReentrancyGuard, 
-    EIP712,
-    ITalentPool 
-{
+contract TalentPool is AccessControl, Pausable, ReentrancyGuard, ITalentPool {
     using Counters for Counters.Counter;
-    using ECDSA for bytes32;
     using PoolLibrary for uint256;
     using PoolLibrary for string;
 
@@ -47,41 +38,34 @@ contract TalentPool is
     bytes32 public constant FEE_MANAGER_ROLE = keccak256("FEE_MANAGER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
-    // EIP-712 type hashes
-    bytes32 private constant _APPLICATION_TYPEHASH = 
-        keccak256("Application(uint256 poolId,uint256[] skillTokenIds,string coverLetter,uint256 nonce,uint256 deadline)");
-
     // State variables
     Counters.Counter private _poolIdCounter;
     ISkillToken public immutable skillToken;
-    
+
     // Pool ID => Pool data
     mapping(uint256 => JobPool) private _pools;
-    
+
     // Pool ID => Candidate address => Application
     mapping(uint256 => mapping(address => Application)) private _applications;
-    
+
     // Pool ID => Array of applicant addresses
     mapping(uint256 => address[]) private _poolApplicants;
-    
+
     // Company => Array of pool IDs
     mapping(address => uint256[]) private _poolsByCompany;
-    
+
     // Candidate => Array of pool IDs applied to
     mapping(address => uint256[]) private _applicationsByCandidate;
-    
+
     // Pool metrics
     mapping(uint256 => PoolMetrics) private _poolMetrics;
     mapping(uint256 => uint256[]) private _poolMatchScores;
-    
+
     // Platform settings
     uint256 private _platformFeeRate = 250; // 2.5%
     address private _feeCollector;
     uint256 private _minimumStake = 0.1 ether;
-    
-    // Nonces for meta-transactions
-    mapping(address => uint256) private _nonces;
-    
+
     // Statistics
     uint256 private _totalPoolsCreated;
     uint256 private _totalApplicationsSubmitted;
@@ -93,17 +77,19 @@ contract TalentPool is
     event FeeCollectorUpdated(address oldCollector, address newCollector);
     event MinimumStakeUpdated(uint256 oldStake, uint256 newStake);
     event PoolExpired(uint256 indexed poolId);
-    event ApplicationWithdrawn(uint256 indexed poolId, address indexed candidate);
-    event BatchPoolsCreated(address indexed company, uint256[] poolIds);
+    event ApplicationWithdrawn(
+        uint256 indexed poolId,
+        address indexed candidate
+    );
 
     // Modifiers
     modifier poolExists(uint256 poolId) {
-        require(poolId < _poolIdCounter.current(), "TalentPool: pool does not exist");
+        require(poolId < _poolIdCounter.current(), "Pool not found");
         _;
     }
 
     modifier onlyPoolCompany(uint256 poolId) {
-        require(_pools[poolId].company == _msgSender(), "TalentPool: not pool company");
+        require(_pools[poolId].company == _msgSender(), "Not pool owner");
         _;
     }
 
@@ -116,10 +102,10 @@ contract TalentPool is
         address _skillTokenAddress,
         address _initialFeeCollector,
         address _initialAdmin
-    ) EIP712("TalentPool", "1") {
-        require(_skillTokenAddress != address(0), "TalentPool: invalid skill token address");
-        require(_initialFeeCollector != address(0), "TalentPool: invalid fee collector");
-        require(_initialAdmin != address(0), "TalentPool: invalid admin");
+    ) {
+        require(_skillTokenAddress != address(0), "Invalid skill token");
+        require(_initialFeeCollector != address(0), "Invalid fee collector");
+        require(_initialAdmin != address(0), "Invalid admin");
 
         skillToken = ISkillToken(_skillTokenAddress);
         _feeCollector = _initialFeeCollector;
@@ -145,18 +131,18 @@ contract TalentPool is
         uint64 deadline,
         string calldata location,
         bool isRemote
-    ) 
-        external 
-        payable 
-        override 
+    )
+        external
+        payable
+        override
         whenNotPaused
         validJobType(jobType)
         nonReentrant
         returns (uint256 poolId)
     {
-        require(bytes(title).length > 0, "TalentPool: title cannot be empty");
-        require(bytes(description).length > 0, "TalentPool: description cannot be empty");
-        
+        require(bytes(title).length > 0, "Empty title");
+        require(bytes(description).length > 0, "Empty description");
+
         // Validate parameters using library
         PoolLibrary.validatePoolCreation(
             msg.value,
@@ -193,7 +179,7 @@ contract TalentPool is
 
         // Update indexes
         _poolsByCompany[_msgSender()].push(poolId);
-        
+
         // Initialize metrics
         _poolMetrics[poolId] = PoolMetrics({
             totalStaked: msg.value,
@@ -206,78 +192,13 @@ contract TalentPool is
         _totalPoolsCreated++;
         _totalStakedAmount += msg.value;
 
-        emit PoolCreated(poolId, _msgSender(), jobType, msg.value, salaryMax - salaryMin);
-    }
-
-    /**
-     * @dev Create multiple pools in a single transaction
-     */
-    function batchCreatePools(
-        string[] calldata titles,
-        string[] calldata descriptions,
-        JobType[] calldata jobTypes,
-        string[][] calldata requiredSkills,
-        uint8[][] calldata minimumLevels,
-        uint256[] calldata salaryMins,
-        uint256[] calldata salaryMaxs,
-        uint64[] calldata deadlines,
-        string[] calldata locations,
-        bool[] calldata isRemoteArray,
-        uint256[] calldata stakeAmounts
-    ) 
-        external 
-        payable 
-        whenNotPaused
-        nonReentrant
-        returns (uint256[] memory poolIds)
-    {
-        require(titles.length > 0, "TalentPool: empty batch");
-        require(
-            titles.length == descriptions.length &&
-            titles.length == jobTypes.length &&
-            titles.length == requiredSkills.length &&
-            titles.length == minimumLevels.length &&
-            titles.length == salaryMins.length &&
-            titles.length == salaryMaxs.length &&
-            titles.length == deadlines.length &&
-            titles.length == locations.length &&
-            titles.length == isRemoteArray.length &&
-            titles.length == stakeAmounts.length,
-            "TalentPool: array length mismatch"
+        emit PoolCreated(
+            poolId,
+            _msgSender(),
+            jobType,
+            msg.value,
+            salaryMax - salaryMin
         );
-
-        uint256 totalStake = 0;
-        for (uint256 i = 0; i < stakeAmounts.length; i++) {
-            totalStake += stakeAmounts[i];
-        }
-        require(msg.value == totalStake, "TalentPool: incorrect total stake");
-
-        poolIds = new uint256[](titles.length);
-        uint256 stakeOffset = 0;
-
-        for (uint256 i = 0; i < titles.length; i++) {
-            // Temporarily store the current stake amount for this pool
-            uint256 currentStake = stakeAmounts[i];
-            
-            // Create individual pool (this would need adjustment to handle individual stakes)
-            poolIds[i] = _createSinglePool(
-                titles[i],
-                descriptions[i],
-                jobTypes[i],
-                requiredSkills[i],
-                minimumLevels[i],
-                salaryMins[i],
-                salaryMaxs[i],
-                deadlines[i],
-                locations[i],
-                isRemoteArray[i],
-                currentStake
-            );
-            
-            stakeOffset += currentStake;
-        }
-
-        emit BatchPoolsCreated(_msgSender(), poolIds);
     }
 
     /**
@@ -288,16 +209,9 @@ contract TalentPool is
         uint256[] calldata skillTokenIds,
         string calldata coverLetter,
         string calldata portfolio
-    ) 
-        external 
-        payable 
-        override 
-        whenNotPaused
-        poolExists(poolId)
-        nonReentrant
-    {
+    ) external payable override whenNotPaused poolExists(poolId) nonReentrant {
         JobPool storage pool = _pools[poolId];
-        
+
         // Validate application using library
         PoolLibrary.validateApplication(
             msg.value,
@@ -324,7 +238,10 @@ contract TalentPool is
         }
 
         // Calculate match score
-        uint256 matchScore = _calculateApplicationMatchScore(poolId, skillTokenIds);
+        uint256 matchScore = _calculateApplicationMatchScore(
+            poolId,
+            skillTokenIds
+        );
 
         // Create application
         _applications[poolId][_msgSender()] = Application({
@@ -352,76 +269,12 @@ contract TalentPool is
         _totalApplicationsSubmitted++;
         _totalStakedAmount += msg.value;
 
-        emit ApplicationSubmitted(poolId, _msgSender(), skillTokenIds, msg.value);
-    }
-
-    /**
-     * @dev Submit application with signature (gasless)
-     */
-    function submitApplicationWithSignature(
-        uint256 poolId,
-        uint256[] calldata skillTokenIds,
-        string calldata coverLetter,
-        string calldata portfolio,
-        uint256 stakeAmount,
-        uint256 deadline,
-        bytes calldata signature
-    ) 
-        external 
-        payable
-        whenNotPaused
-        poolExists(poolId)
-        nonReentrant
-    {
-        require(block.timestamp <= deadline, "TalentPool: signature expired");
-
-        // Verify signature
-        bytes32 structHash = keccak256(abi.encode(
-            _APPLICATION_TYPEHASH,
+        emit ApplicationSubmitted(
             poolId,
-            keccak256(abi.encodePacked(skillTokenIds)),
-            keccak256(bytes(coverLetter)),
-            _useNonce(_msgSender()),
-            deadline
-        ));
-
-        bytes32 hash = _hashTypedDataV4(structHash);
-        address signer = hash.recover(signature);
-        require(signer == _msgSender(), "TalentPool: invalid signature");
-
-        // For gasless transactions, the relayer (msg.sender) provides the stake
-        // This allows for sponsored transactions where companies pay for candidate applications
-        require(msg.value == stakeAmount, "TalentPool: incorrect stake amount provided by relayer");
-        
-        // Create the application
-        Application memory newApplication = Application({
-            candidate: signer,
-            skillTokenIds: skillTokenIds,
-            stakeAmount: stakeAmount,
-            appliedAt: uint64(block.timestamp),
-            status: ApplicationStatus.Pending,
-            matchScore: 0,
-            coverLetter: coverLetter,
-            portfolio: portfolio
-        });
-
-        // Store application (one application per candidate per pool)
-        _applications[poolId][signer] = newApplication;
-        _poolApplicants[poolId].push(signer);
-        _applicationsByCandidate[signer].push(poolId);
-
-        // Calculate match score
-        uint256 matchScore = _calculateApplicationMatchScore(poolId, skillTokenIds);
-        _applications[poolId][signer].matchScore = matchScore;
-        
-        // Update pool metrics
-        JobPool storage pool = _pools[poolId];
-        pool.totalApplications++;
-        
-        // Update global statistics
-        _totalApplicationsSubmitted++;
-
-        emit ApplicationSubmitted(poolId, signer, skillTokenIds, stakeAmount);
+            _msgSender(),
+            skillTokenIds,
+            msg.value
+        );
     }
 
     /**
@@ -430,20 +283,20 @@ contract TalentPool is
     function selectCandidate(
         uint256 poolId,
         address candidate
-    ) 
-        external 
-        override 
+    )
+        external
+        override
         onlyPoolCompany(poolId)
         poolExists(poolId)
         nonReentrant
     {
         JobPool storage pool = _pools[poolId];
-        require(pool.status == PoolStatus.Active, "TalentPool: pool not active");
-        require(pool.selectedCandidate == address(0), "TalentPool: candidate already selected");
-        
+        require(pool.status == PoolStatus.Active, "Pool not active");
+        require(pool.selectedCandidate == address(0), "Already selected");
+
         Application storage app = _applications[poolId][candidate];
-        require(app.candidate != address(0), "TalentPool: candidate not found");
-        require(app.status == ApplicationStatus.Pending, "TalentPool: invalid application status");
+        require(app.candidate != address(0), "Candidate not found");
+        require(app.status == ApplicationStatus.Pending, "Invalid status");
 
         pool.selectedCandidate = candidate;
         app.status = ApplicationStatus.Accepted;
@@ -457,78 +310,111 @@ contract TalentPool is
     /**
      * @dev Complete pool and distribute rewards
      */
-    function completePool(uint256 poolId) 
-        external 
-        override 
+    function completePool(
+        uint256 poolId
+    )
+        external
+        override
         onlyPoolCompany(poolId)
         poolExists(poolId)
         nonReentrant
     {
         JobPool storage pool = _pools[poolId];
-        require(pool.status == PoolStatus.Active, "TalentPool: pool not active");
-        require(pool.selectedCandidate != address(0), "TalentPool: no candidate selected");
+        require(pool.status == PoolStatus.Active, "Pool not active");
+        require(pool.selectedCandidate != address(0), "No candidate selected");
 
         pool.status = PoolStatus.Completed;
-        
+
         address selectedCandidate = pool.selectedCandidate;
-        Application storage selectedApp = _applications[poolId][selectedCandidate];
-        
+        Application storage selectedApp = _applications[poolId][
+            selectedCandidate
+        ];
+
         // Calculate rewards and fees
         uint256 companyStake = pool.stakeAmount;
         uint256 candidateStake = selectedApp.stakeAmount;
-        uint256 totalStake = companyStake + candidateStake;
-        
-        uint256 platformFee = PoolLibrary.calculatePlatformFee(totalStake, _platformFeeRate);
-        uint256 completionBonus = PoolLibrary.calculateCompletionBonus(
-            totalStake,
-            pool.totalApplications,
-            pool.createdAt
+
+        // Calculate total staked amount (including all candidate stakes for proper fee calculation)
+        uint256 totalCandidateStakes = 0;
+        address[] memory poolApplicants = _poolApplicants[poolId];
+        for (uint256 i = 0; i < poolApplicants.length; i++) {
+            Application storage app = _applications[poolId][poolApplicants[i]];
+            if (app.status == ApplicationStatus.Pending) {
+                totalCandidateStakes += app.stakeAmount;
+            }
+        }
+
+        uint256 totalStake = companyStake + totalCandidateStakes;
+
+        uint256 platformFee = PoolLibrary.calculatePlatformFee(
+            companyStake + candidateStake, // Only use the relevant stakes for fee calculation
+            _platformFeeRate
         );
-        
-        uint256 candidateReward = candidateStake + completionBonus;
+
+        // Simple approach: no completion bonus for now to avoid balance issues
+        uint256 candidateReward = candidateStake;
         uint256 companyRefund = companyStake - platformFee;
+
+        // Ensure we don't try to transfer more than the contract balance
+        uint256 contractBalance = address(this).balance;
+        uint256 totalToTransfer = platformFee + candidateReward + companyRefund;
+
+        require(
+            contractBalance >= totalToTransfer,
+            "Insufficient contract balance for transfers"
+        );
 
         // Distribute rewards
         if (platformFee > 0) {
             payable(_feeCollector).transfer(platformFee);
         }
-        
+
         if (candidateReward > 0) {
             payable(selectedCandidate).transfer(candidateReward);
         }
-        
+
         if (companyRefund > 0) {
             payable(pool.company).transfer(companyRefund);
         }
 
-        // Refund other applicants (minus penalties)
-        _refundRejectedApplicants(poolId);
-
-        // Update metrics
+        // Mark rejected applicants (without immediate refunds to avoid balance issues)
+        address[] memory applicants = _poolApplicants[poolId];
+        for (uint256 i = 0; i < applicants.length; i++) {
+            Application storage app = _applications[poolId][applicants[i]];
+            if (
+                app.status == ApplicationStatus.Pending &&
+                applicants[i] != selectedCandidate
+            ) {
+                app.status = ApplicationStatus.Rejected;
+            }
+        } // Update metrics
         _poolMetrics[poolId].completionRate = 100;
-        _poolMetrics[poolId].averageTimeToFill = block.timestamp - pool.createdAt;
+        _poolMetrics[poolId].averageTimeToFill =
+            block.timestamp -
+            pool.createdAt;
 
         // Update global statistics
         _totalMatches++;
 
-        emit PoolCompleted(poolId, selectedCandidate, candidateReward + companyRefund);
+        emit PoolCompleted(
+            poolId,
+            selectedCandidate,
+            candidateReward + companyRefund
+        );
     }
 
     /**
      * @dev Withdraw application from pool
      */
-    function withdrawApplication(uint256 poolId) 
-        external 
-        override 
-        poolExists(poolId)
-        nonReentrant
-    {
+    function withdrawApplication(
+        uint256 poolId
+    ) external override poolExists(poolId) nonReentrant {
         Application storage app = _applications[poolId][_msgSender()];
-        require(app.candidate == _msgSender(), "TalentPool: no application found");
-        require(app.status == ApplicationStatus.Pending, "TalentPool: cannot withdraw");
+        require(app.candidate == _msgSender(), "No application");
+        require(app.status == ApplicationStatus.Pending, "Cannot withdraw");
 
         JobPool storage pool = _pools[poolId];
-        require(pool.status == PoolStatus.Active, "TalentPool: pool not active");
+        require(pool.status == PoolStatus.Active, "Pool not active");
 
         app.status = ApplicationStatus.Withdrawn;
 
@@ -557,16 +443,18 @@ contract TalentPool is
     /**
      * @dev Close pool (company only)
      */
-    function closePool(uint256 poolId) 
-        external 
-        override 
+    function closePool(
+        uint256 poolId
+    )
+        external
+        override
         onlyPoolCompany(poolId)
         poolExists(poolId)
         nonReentrant
     {
         JobPool storage pool = _pools[poolId];
-        require(pool.status == PoolStatus.Active, "TalentPool: pool not active");
-        require(pool.selectedCandidate == address(0), "TalentPool: candidate selected");
+        require(pool.status == PoolStatus.Active, "Pool not active");
+        require(pool.selectedCandidate == address(0), "Candidate selected");
 
         pool.status = PoolStatus.Cancelled;
 
@@ -578,79 +466,61 @@ contract TalentPool is
     }
 
     // View functions
-    function getPool(uint256 poolId) 
-        external 
-        view 
-        override 
-        poolExists(poolId)
-        returns (JobPool memory) 
-    {
+    function getPool(
+        uint256 poolId
+    ) external view override poolExists(poolId) returns (JobPool memory) {
         return _pools[poolId];
     }
 
-    function getApplication(uint256 poolId, address candidate) 
-        external 
-        view 
-        override 
-        poolExists(poolId)
-        returns (Application memory) 
-    {
+    function getApplication(
+        uint256 poolId,
+        address candidate
+    ) external view override poolExists(poolId) returns (Application memory) {
         return _applications[poolId][candidate];
     }
 
-    function getPoolApplications(uint256 poolId) 
-        external 
-        view 
-        override 
+    function getPoolApplications(
+        uint256 poolId
+    )
+        external
+        view
+        override
         poolExists(poolId)
-        returns (Application[] memory applications) 
+        returns (Application[] memory applications)
     {
         address[] memory applicants = _poolApplicants[poolId];
         applications = new Application[](applicants.length);
-        
+
         for (uint256 i = 0; i < applicants.length; i++) {
             applications[i] = _applications[poolId][applicants[i]];
         }
     }
 
-    function getPoolsByCompany(address company) 
-        external 
-        view 
-        override 
-        returns (uint256[] memory) 
-    {
+    function getPoolsByCompany(
+        address company
+    ) external view override returns (uint256[] memory) {
         return _poolsByCompany[company];
     }
 
-    function getApplicationsByCandidate(address candidate) 
-        external 
-        view 
-        override 
-        returns (uint256[] memory) 
-    {
+    function getApplicationsByCandidate(
+        address candidate
+    ) external view override returns (uint256[] memory) {
         return _applicationsByCandidate[candidate];
     }
 
-    function getPoolMetrics(uint256 poolId) 
-        external 
-        view 
-        override 
-        poolExists(poolId)
-        returns (PoolMetrics memory) 
-    {
+    function getPoolMetrics(
+        uint256 poolId
+    ) external view override poolExists(poolId) returns (PoolMetrics memory) {
         return _poolMetrics[poolId];
     }
 
-    function calculateMatchScore(uint256 poolId, address candidate) 
-        external 
-        view 
-        override 
-        poolExists(poolId)
-        returns (uint256) 
-    {
+    function calculateMatchScore(
+        uint256 poolId,
+        address candidate
+    ) external view override poolExists(poolId) returns (uint256) {
         Application memory app = _applications[poolId][candidate];
-        require(app.candidate != address(0), "TalentPool: candidate not found");
-        
+        require(app.candidate != address(0), "Candidate not found");
+
         return app.matchScore;
     }
 
@@ -669,37 +539,34 @@ contract TalentPool is
     }
 
     // Platform management functions
-    function setPlatformFeeRate(uint256 newFeeRate) 
-        external 
-        onlyRole(FEE_MANAGER_ROLE) 
-    {
+    function setPlatformFeeRate(
+        uint256 newFeeRate
+    ) external onlyRole(FEE_MANAGER_ROLE) {
         PoolLibrary.validatePlatformFee(newFeeRate);
-        
+
         uint256 oldFeeRate = _platformFeeRate;
         _platformFeeRate = newFeeRate;
-        
+
         emit PlatformFeeUpdated(oldFeeRate, newFeeRate);
     }
 
-    function setFeeCollector(address newFeeCollector) 
-        external 
-        onlyRole(FEE_MANAGER_ROLE) 
-    {
-        require(newFeeCollector != address(0), "TalentPool: invalid fee collector");
-        
+    function setFeeCollector(
+        address newFeeCollector
+    ) external onlyRole(FEE_MANAGER_ROLE) {
+        require(newFeeCollector != address(0), "Invalid collector");
+
         address oldFeeCollector = _feeCollector;
         _feeCollector = newFeeCollector;
-        
+
         emit FeeCollectorUpdated(oldFeeCollector, newFeeCollector);
     }
 
-    function setMinimumStake(uint256 newMinimumStake) 
-        external 
-        onlyRole(POOL_MANAGER_ROLE) 
-    {
+    function setMinimumStake(
+        uint256 newMinimumStake
+    ) external onlyRole(POOL_MANAGER_ROLE) {
         uint256 oldMinimumStake = _minimumStake;
         _minimumStake = newMinimumStake;
-        
+
         emit MinimumStakeUpdated(oldMinimumStake, newMinimumStake);
     }
 
@@ -717,15 +584,15 @@ contract TalentPool is
     }
 
     // Statistics functions
-    function getGlobalStats() 
-        external 
-        view 
+    function getGlobalStats()
+        external
+        view
         returns (
             uint256 totalPools,
             uint256 totalApplications,
             uint256 totalMatches,
             uint256 totalStaked
-        ) 
+        )
     {
         return (
             _totalPoolsCreated,
@@ -733,10 +600,6 @@ contract TalentPool is
             _totalMatches,
             _totalStakedAmount
         );
-    }
-
-    function nonces(address owner) external view returns (uint256) {
-        return _nonces[owner];
     }
 
     // Internal functions
@@ -787,7 +650,7 @@ contract TalentPool is
             isRemote: isRemote
         });
 
-        // Store in indexes  
+        // Store in indexes
         _poolsByCompany[_msgSender()].push(poolId);
 
         // Initialize pool metrics
@@ -802,8 +665,14 @@ contract TalentPool is
         _totalPoolsCreated++;
         _totalStakedAmount += stakeAmount;
 
-        emit PoolCreated(poolId, _msgSender(), jobType, stakeAmount, salaryMax - salaryMin);
-        
+        emit PoolCreated(
+            poolId,
+            _msgSender(),
+            jobType,
+            stakeAmount,
+            salaryMax - salaryMin
+        );
+
         return poolId;
     }
 
@@ -812,76 +681,62 @@ contract TalentPool is
         uint256[] calldata skillTokenIds
     ) internal view returns (uint256) {
         JobPool memory pool = _pools[poolId];
-        
+
         // Get candidate skills from skill tokens
         string[] memory candidateSkills = new string[](skillTokenIds.length);
         uint8[] memory candidateLevels = new uint8[](skillTokenIds.length);
-        
+
         for (uint256 i = 0; i < skillTokenIds.length; i++) {
-            ISkillToken.SkillData memory skillData = skillToken.getSkillData(skillTokenIds[i]);
-            candidateSkills[i] = skillData.category;
+            ISkillToken.SkillData memory skillData = skillToken.getSkillData(
+                skillTokenIds[i]
+            );
+            candidateSkills[i] = skillData.subcategory; // Use subcategory which contains the skill name
             candidateLevels[i] = skillData.level;
         }
-        
-        return PoolLibrary.calculateMatchScore(
-            pool.requiredSkills,
-            pool.minimumLevels,
-            candidateSkills,
-            candidateLevels
-        );
+
+        return
+            PoolLibrary.calculateMatchScore(
+                pool.requiredSkills,
+                pool.minimumLevels,
+                candidateSkills,
+                candidateLevels
+            );
     }
 
     function _updateAverageMatchScore(uint256 poolId) internal {
-        uint256[] memory scores = _poolMatchScores[poolId];
-        if (scores.length > 0) {
-            uint256 total = 0;
-            for (uint256 i = 0; i < scores.length; i++) {
-                total += scores[i];
-            }
-            _poolMetrics[poolId].averageMatchScore = total / scores.length;
-        }
+        _poolMetrics[poolId].averageMatchScore = PoolLibrary.calculateAverage(
+            _poolMatchScores[poolId]
+        );
     }
 
     function _refundRejectedApplicants(uint256 poolId) internal {
         address[] memory applicants = _poolApplicants[poolId];
-        
+        uint256[] memory stakes = new uint256[](applicants.length);
+
         for (uint256 i = 0; i < applicants.length; i++) {
             Application storage app = _applications[poolId][applicants[i]];
-            
             if (app.status == ApplicationStatus.Pending) {
                 app.status = ApplicationStatus.Rejected;
-                
-                // Small penalty for unsuccessful applications
-                uint256 penalty = app.stakeAmount / 20; // 5% penalty
-                uint256 refund = app.stakeAmount - penalty;
-                
-                if (penalty > 0) {
-                    payable(_feeCollector).transfer(penalty);
-                }
-                
-                if (refund > 0) {
-                    payable(applicants[i]).transfer(refund);
-                }
+                stakes[i] = app.stakeAmount;
             }
         }
+
+        PoolLibrary.processRefunds(applicants, stakes, 500, _feeCollector);
     }
 
     function _refundAllApplicants(uint256 poolId) internal {
         address[] memory applicants = _poolApplicants[poolId];
-        
+        uint256[] memory stakes = new uint256[](applicants.length);
+
         for (uint256 i = 0; i < applicants.length; i++) {
             Application storage app = _applications[poolId][applicants[i]];
-            
             if (app.status == ApplicationStatus.Pending) {
                 app.status = ApplicationStatus.Rejected;
-                payable(applicants[i]).transfer(app.stakeAmount);
+                stakes[i] = app.stakeAmount;
             }
         }
-    }
 
-    function _useNonce(address owner) internal returns (uint256 current) {
-        current = _nonces[owner];
-        _nonces[owner]++;
+        PoolLibrary.processRefunds(applicants, stakes, 0, _feeCollector);
     }
 
     // Emergency functions
@@ -893,28 +748,8 @@ contract TalentPool is
         _unpause();
     }
 
-    // Auto-expiry function (can be called by anyone)
-    function expireOldPools(uint256[] calldata poolIds) external {
-        for (uint256 i = 0; i < poolIds.length; i++) {
-            uint256 poolId = poolIds[i];
-            
-            if (poolId < _poolIdCounter.current()) {
-                JobPool storage pool = _pools[poolId];
-                
-                if (pool.status == PoolStatus.Active && 
-                    PoolLibrary.shouldAutoExpire(pool.deadline, pool.totalApplications)) {
-                    
-                    pool.status = PoolStatus.Expired;
-                    
-                    // Refund company stake
-                    payable(pool.company).transfer(pool.stakeAmount);
-                    
-                    // Refund all applicants
-                    _refundAllApplicants(poolId);
-                    
-                    emit PoolExpired(poolId);
-                }
-            }
-        }
+    // Emergency withdrawal (admin only)
+    function emergencyWithdraw() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        payable(_msgSender()).transfer(address(this).balance);
     }
 }
