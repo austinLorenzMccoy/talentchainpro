@@ -273,13 +273,14 @@ def job_pool_request() -> Dict[str, Any]:
         Dict: Sample job pool request
     """
     return {
-        "company_id": "0.0.12345",
-        "job_title": "Senior Blockchain Developer",
-        "job_description": "Develop smart contracts for DeFi platform",
+        "title": "Senior Blockchain Developer",
+        "description": "Develop smart contracts for DeFi platform using Solidity and Hedera technologies",
         "required_skills": [
-            {"category": "blockchain", "name": "Solidity", "min_level": 4},
-            {"category": "blockchain", "name": "Hedera", "min_level": 3}
+            {"name": "Solidity", "level": 4},
+            {"name": "Hedera", "level": 3}
         ],
+        "min_reputation": 70,
         "stake_amount": 100.0,
-        "duration_days": 30
+        "duration_days": 30,
+        "max_applicants": 50
     }

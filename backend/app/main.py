@@ -111,11 +111,19 @@ app.include_router(mcp.router, prefix="/api/v1/mcp", tags=["AI & Analytics"])
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Handle validation errors and return appropriate response."""
-    logger.warning(f"Validation error on {request.url}: {exc.errors()}")
+    # Convert error context to string to ensure JSON serializability
+    errors = []
+    for error in exc.errors():
+        error_dict = dict(error)
+        if 'ctx' in error_dict and 'error' in error_dict['ctx']:
+            error_dict['ctx']['error'] = str(error_dict['ctx']['error'])
+        errors.append(error_dict)
+    
+    logger.warning(f"Validation error on {request.url}: {errors}")
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
-            "detail": exc.errors(), 
+            "detail": errors, 
             "body": exc.body,
             "message": "Request validation failed"
         },

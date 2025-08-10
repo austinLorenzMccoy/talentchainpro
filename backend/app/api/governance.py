@@ -7,11 +7,11 @@ including proposal management, voting, delegation, and governance analytics.
 
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, model_validator
 
 from app.services.governance import get_governance_service, GovernanceService, ProposalType, VoteType
 from app.utils.hedera import validate_hedera_address
@@ -20,7 +20,7 @@ from app.utils.hedera import validate_hedera_address
 logger = logging.getLogger(__name__)
 
 # Create router
-router = APIRouter(prefix="/api/v1/governance", tags=["governance"])
+router = APIRouter(tags=["governance"])
 
 # ============ REQUEST/RESPONSE MODELS ============
 
@@ -49,12 +49,12 @@ class CreateProposalRequest(BaseModel):
             raise ValueError(f'Invalid proposal type. Must be one of: {valid_types}')
         return v
     
-    @validator('targets', 'values', 'calldatas')
-    def validate_arrays_same_length(cls, v, values):
-        if 'targets' in values.data and 'values' in values.data:
-            if len(v) != len(values.data['targets']) or len(v) != len(values.data['values']):
-                raise ValueError('targets, values, and calldatas must have the same length')
-        return v
+    @model_validator(mode='after')
+    def validate_arrays_same_length(self):
+        """Validate that targets, values, and calldatas have the same length."""
+        if len(self.targets) != len(self.values) or len(self.targets) != len(self.calldatas):
+            raise ValueError('targets, values, and calldatas must have the same length')
+        return self
 
 class CastVoteRequest(BaseModel):
     """Request model for casting a vote."""
@@ -130,7 +130,7 @@ class VotingPowerResponse(BaseModel):
 
 # ============ API ENDPOINTS ============
 
-@router.post("/proposals", response_model=Dict[str, Any])
+@router.post("/proposals", response_model=Dict[str, Any], status_code=201)
 async def create_proposal(
     request: CreateProposalRequest,
     governance_service: GovernanceService = Depends(get_governance_service)

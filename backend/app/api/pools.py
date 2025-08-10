@@ -147,13 +147,15 @@ async def create_job_pool(
         pool_service = get_talent_pool_service()
         
         # Create job pool using enhanced service
-        result = await pool_service.create_job_pool(
+        result = await pool_service.create_pool(
+            creator_address="0.0.12345",  # This should come from authentication in real app
             title=request.title,
             description=request.description,
             required_skills=request.required_skills,
             min_reputation=request.min_reputation,
             stake_amount=request.stake_amount,
-            duration_days=request.duration_days
+            duration_days=request.duration_days,
+            max_candidates=request.max_applicants or 100
         )
         
         if not result["success"]:
@@ -162,32 +164,22 @@ async def create_job_pool(
                 detail=result.get("error", "Failed to create job pool")
             )
         
-        pool_data = result["pool"]
-        
-        # Add background task for reputation update
-        background_tasks.add_task(
-            update_reputation_for_pool_creation,
-            pool_data["creator_address"],
-            request.stake_amount,
-            len(request.required_skills)
-        )
-        
-        logger.info(f"Created job pool {pool_data['pool_id']} by {pool_data['creator_address']}")
+        logger.info(f"Created job pool {result['pool_id']} by {result['creator_address']}")
         
         return JobPoolDetailResponse(
-            pool_id=pool_data["pool_id"],
-            creator_address=pool_data["creator_address"],
+            pool_id=result["pool_id"],
+            creator_address=result["creator_address"],
             title=request.title,
             description=request.description,
             required_skills=request.required_skills,
             min_reputation=request.min_reputation,
             stake_amount=request.stake_amount,
             duration_days=request.duration_days,
-            status=pool_data.get("status", "active"),
+            status=result.get("status", "active"),
             applicants_count=0,
             max_applicants=request.max_applicants or 100,
-            created_at=datetime.now(timezone.utc),
-            application_deadline=request.application_deadline
+            created_at=datetime.fromisoformat(result.get("created_at", datetime.now(timezone.utc).isoformat())),
+            application_deadline=datetime.fromisoformat(result["deadline"]) if result.get("deadline") else None
         )
     
     except HTTPException:
@@ -224,15 +216,13 @@ async def get_job_pool(
         pool_service = get_talent_pool_service()
         
         # Get pool details
-        result = await pool_service.get_job_pool(pool_id)
+        pool_data = await pool_service.get_pool_details(pool_id)
         
-        if not result["success"]:
+        if not pool_data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Job pool not found"
             )
-        
-        pool_data = result["pool"]
         
         return JobPoolDetailResponse(
             pool_id=pool_id,
@@ -247,7 +237,7 @@ async def get_job_pool(
             applicants_count=pool_data.get("applicants_count", 0),
             max_applicants=pool_data.get("max_applicants", 100),
             created_at=datetime.fromisoformat(pool_data.get("created_at", datetime.now(timezone.utc).isoformat())),
-            application_deadline=datetime.fromisoformat(pool_data["application_deadline"]) if pool_data.get("application_deadline") else None,
+            application_deadline=datetime.fromisoformat(pool_data["deadline"]) if pool_data.get("deadline") else None,
             matched_candidate=pool_data.get("matched_candidate"),
             match_score=pool_data.get("match_score")
         )
@@ -293,8 +283,9 @@ async def apply_to_pool(
         
         # Apply to pool using enhanced service
         result = await pool_service.apply_to_pool(
-            pool_id=int(pool_id),
-            skill_token_ids=[int(id) for id in request.skill_token_ids],
+            pool_id=pool_id,
+            applicant_address=request.applicant_address,
+            skill_token_ids=request.skill_token_ids,
             cover_letter=request.cover_letter or ""
         )
         
@@ -303,8 +294,6 @@ async def apply_to_pool(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=result.get("error", "Failed to apply to pool")
             )
-        
-        application_data = result["application"]
         
         # Add background task for reputation update
         background_tasks.add_task(
@@ -317,11 +306,12 @@ async def apply_to_pool(
         logger.info(f"Application submitted to pool {pool_id} by {request.applicant_address}")
         
         return PoolApplicationResponse(
-            application_id=application_data["application_id"],
+            application_id=result.get("application_id", "app_" + pool_id + "_" + request.applicant_address),
             pool_id=pool_id,
             applicant_address=request.applicant_address,
             status="submitted",
-            applied_at=datetime.now(timezone.utc)
+            applied_at=datetime.fromisoformat(result.get("applied_at", datetime.now(timezone.utc).isoformat())),
+            match_score=result.get("match_score")
         )
     
     except HTTPException:
@@ -387,15 +377,13 @@ async def search_job_pools(
             search_criteria["creator_address"] = creator_address
         
         # Search for pools
-        result = await pool_service.search_job_pools(search_criteria, limit=limit, offset=offset)
-        
-        if not result["success"]:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to search job pools"
-            )
-        
-        pools_data = result["pools"]
+        pools_data = await pool_service.list_pools(
+            creator_address=creator_address,
+            status=status,
+            skill_name=skill_category,
+            limit=limit,
+            offset=offset
+        )
         
         # Convert to response models
         pools = []
@@ -413,7 +401,7 @@ async def search_job_pools(
                 applicants_count=pool.get("applicants_count", 0),
                 max_applicants=pool.get("max_applicants", 100),
                 created_at=datetime.fromisoformat(pool.get("created_at", datetime.now(timezone.utc).isoformat())),
-                application_deadline=datetime.fromisoformat(pool["application_deadline"]) if pool.get("application_deadline") else None,
+                application_deadline=datetime.fromisoformat(pool["deadline"]) if pool.get("deadline") else None,
                 matched_candidate=pool.get("matched_candidate"),
                 match_score=pool.get("match_score")
             ))
@@ -422,7 +410,7 @@ async def search_job_pools(
         
         return PoolSearchResponse(
             pools=pools,
-            total_count=result.get("total_count", len(pools)),
+            total_count=len(pools),
             filters_applied=search_criteria
         )
     

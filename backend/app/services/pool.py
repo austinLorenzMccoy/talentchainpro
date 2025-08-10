@@ -238,12 +238,12 @@ class TalentPoolService:
                         ])
                 except Exception as db_error:
                     logger.warning(f"Database storage failed, using fallback: {str(db_error)}")
-                    DATABASE_MODELS_AVAILABLE = False
+                    # Fall back to in-memory storage
+                    pass
             
             # Fallback storage
-            if not DATABASE_MODELS_AVAILABLE:
-                _fallback_counter += 1
-                _fallback_pools[pool_id] = {
+            _fallback_counter += 1
+            _fallback_pools[pool_id] = {
                     "pool_id": pool_id,
                     "creator_address": creator_address,
                     "title": title,
@@ -384,7 +384,8 @@ class TalentPoolService:
                         job_pool_data = job_pool
                 except Exception as db_error:
                     logger.warning(f"Database check failed, using fallback: {str(db_error)}")
-                    DATABASE_MODELS_AVAILABLE = False
+                    # Fall back to in-memory storage
+                    pass
             
             # Fallback validation
             if not DATABASE_MODELS_AVAILABLE:
@@ -473,14 +474,14 @@ class TalentPoolService:
                         ])
                 except Exception as db_error:
                     logger.warning(f"Database application storage failed: {str(db_error)}")
-                    DATABASE_MODELS_AVAILABLE = False
+                    # Fall back to in-memory storage
+                    pass
             
             # Fallback storage
-            if not DATABASE_MODELS_AVAILABLE:
-                if pool_id not in _fallback_applications:
-                    _fallback_applications[pool_id] = {}
-                
-                _fallback_applications[pool_id][applicant_address] = {
+            if pool_id not in _fallback_applications:
+                _fallback_applications[pool_id] = {}
+            
+            _fallback_applications[pool_id][applicant_address] = {
                     "applicant_address": applicant_address,
                     "cover_letter": cover_letter,
                     "skill_token_ids": skill_token_ids,
@@ -488,7 +489,7 @@ class TalentPoolService:
                     "status": "applied",
                     "transaction_id": contract_result.transaction_id,
                     "applied_at": datetime.now(timezone.utc).isoformat()
-                }
+            }
             
             logger.info(f"Application submitted to pool {pool_id} by {applicant_address}")
             

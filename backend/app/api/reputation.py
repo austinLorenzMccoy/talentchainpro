@@ -20,7 +20,7 @@ from app.utils.hedera import validate_hedera_address
 logger = logging.getLogger(__name__)
 
 # Create router
-router = APIRouter(prefix="/api/v1/reputation", tags=["reputation"])
+router = APIRouter(tags=["reputation"])
 
 # ============ REQUEST/RESPONSE MODELS ============
 
