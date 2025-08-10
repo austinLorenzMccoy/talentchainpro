@@ -344,8 +344,6 @@ contract TalentPool is AccessControl, Pausable, ReentrancyGuard, ITalentPool {
             }
         }
 
-        uint256 totalStake = companyStake + totalCandidateStakes;
-
         uint256 platformFee = PoolLibrary.calculatePlatformFee(
             companyStake + candidateStake, // Only use the relevant stakes for fee calculation
             _platformFeeRate
