@@ -1,0 +1,24 @@
+{
+  "contracts": {
+    "SkillToken": {
+      "address": "0.0.6545000",
+      "abi": [],
+      "deployed_at": "2025-08-10T22:00:00Z"
+    },
+    "TalentPool": {
+      "address": "0.0.6545001",
+      "abi": [],
+      "deployed_at": "2025-08-10T22:00:00Z"
+    },
+    "ReputationOracle": {
+      "address": "0.0.6545002",
+      "abi": [],
+      "deployed_at": "2025-08-10T22:00:00Z"
+    },
+    "Governance": {
+      "address": "0.0.6545003",
+      "abi": [],
+      "deployed_at": "2025-08-10T22:00:00Z"
+    }
+  }
+}

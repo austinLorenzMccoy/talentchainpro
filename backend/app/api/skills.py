@@ -23,6 +23,7 @@ from app.models.skills_schemas import (
 from app.models.common_schemas import ErrorResponse
 from app.services.skill import get_skill_service
 from app.services.reputation import get_reputation_service
+from app.utils.hedera import validate_hedera_address
 
 # Configure logging
 logger = logging.getLogger(__name__)

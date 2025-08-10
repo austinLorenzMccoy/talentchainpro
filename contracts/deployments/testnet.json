@@ -1,0 +1,57 @@
+{
+  "network": "testnet",
+  "timestamp": "2025-08-10T20:56:59.019Z",
+  "operator": "0.0.6514439",
+  "contracts": {
+    "skillToken": {
+      "contractId": "0.0.6544974",
+      "transactionId": "0.0.6514439@1754859330.977589445",
+      "contractAddress": "000000000000000000000000000000000063de4e",
+      "explorerUrl": "https://hashscan.io/testnet/contract/0.0.6544974",
+      "success": true
+    },
+    "reputationOracle": {
+      "contractId": "0.0.6544976",
+      "transactionId": "0.0.6514439@1754859367.924110516",
+      "contractAddress": "000000000000000000000000000000000063de50",
+      "explorerUrl": "https://hashscan.io/testnet/contract/0.0.6544976",
+      "success": true
+    },
+    "talentPool": {
+      "contractId": "0.0.6544980",
+      "transactionId": "0.0.6514439@1754859402.743531706",
+      "contractAddress": "000000000000000000000000000000000063de54",
+      "explorerUrl": "https://hashscan.io/testnet/contract/0.0.6544980",
+      "success": true
+    },
+    "governance": {
+      "success": false,
+      "error": "This value must be a String, Number, or BigNumber to be converted."
+    }
+  },
+  "networkInfo": {
+    "nodeId": "0.0.3",
+    "nodeAccountId": {
+      "shard": {
+        "low": 0,
+        "high": 0,
+        "unsigned": false
+      },
+      "realm": {
+        "low": 0,
+        "high": 0,
+        "unsigned": false
+      },
+      "num": {
+        "low": 3,
+        "high": 0,
+        "unsigned": false
+      },
+      "aliasKey": null,
+      "evmAddress": null,
+      "_checksum": null
+    },
+    "nodeAddress": "testnet.hedera.com:50211",
+    "mirrorNodeUrl": "https://testnet.mirrornode.hedera.com"
+  }
+}

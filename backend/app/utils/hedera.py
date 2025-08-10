@@ -75,13 +75,54 @@ except Exception as e:
             return self
         def __getattr__(self, name):
             return MockClass()
+        
+        @classmethod
+        def forTestnet(cls):
+            return cls()
+        
+        @classmethod
+        def forMainnet(cls):
+            return cls()
+        
+        @classmethod
+        def forPreviewnet(cls):
+            return cls()
+        
+        @classmethod
+        def fromString(cls, value):
+            return cls()
+        
+        def setOperator(self, *args, **kwargs):
+            return self
+        
+        def setDefaultMaxTransactionFee(self, *args, **kwargs):
+            return self
+        
+        def setDefaultMaxQueryPayment(self, *args, **kwargs):
+            return self
+    
+    # Mock TokenType enum
+    class MockTokenType:
+        NON_FUNGIBLE_UNIQUE = "NON_FUNGIBLE_UNIQUE"
+        FUNGIBLE_COMMON = "FUNGIBLE_COMMON"
+    
+    # Mock TokenSupplyType enum
+    class MockTokenSupplyType:
+        FINITE = "FINITE"
+        INFINITE = "INFINITE"
+    
+    # Mock Status
+    class MockStatus:
+        Success = "SUCCESS"
     
     # Assign mock classes
     Client = MockClass
     AccountId = PrivateKey = PublicKey = Hbar = MockClass
     ContractId = ContractCreateFlow = ContractExecuteTransaction = MockClass
     ContractCallQuery = ContractFunctionParameters = ContractFunctionResult = MockClass
-    TokenId = TokenCreateTransaction = TokenType = TokenSupplyType = MockClass
+    TokenId = TokenCreateTransaction = MockClass
+    TokenType = MockTokenType
+    TokenSupplyType = MockTokenSupplyType
     TokenMintTransaction = TransferTransaction = TokenBurnTransaction = MockClass
     TokenAssociateTransaction = TokenFreezeTransaction = TokenWipeTransaction = MockClass
     TopicId = TopicCreateTransaction = TopicMessageSubmitTransaction = MockClass
@@ -89,7 +130,8 @@ except Exception as e:
     Transaction = TransactionResponse = TransactionReceipt = TransactionRecord = MockClass
     AccountCreateTransaction = AccountUpdateTransaction = TransactionId = MockClass
     AccountBalanceQuery = AccountInfoQuery = MockClass
-    Status = PrecheckStatusException = ReceiptStatusException = MockClass
+    Status = MockStatus
+    PrecheckStatusException = ReceiptStatusException = MockClass
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -1171,6 +1213,12 @@ async def create_nft_token(
     metadata: Dict[str, Any]
 ) -> str:
     """Create NFT token (convenience function)."""
+    if not HEDERA_SDK_AVAILABLE:
+        # Return mock token ID for testing
+        import hashlib
+        token_hash = hashlib.md5(f"{name}{symbol}".encode()).hexdigest()[:8]
+        return f"0.0.{100000 + int(token_hash, 16) % 900000}"
+    
     manager = get_hedera_manager()
     result = await manager.create_nft_token(name, symbol, metadata)
     
@@ -1186,6 +1234,12 @@ async def mint_nft(
     recipient_id: str
 ) -> str:
     """Mint NFT (convenience function)."""
+    if not HEDERA_SDK_AVAILABLE:
+        # Return mock transaction ID for testing
+        import hashlib
+        tx_hash = hashlib.md5(f"{token_id}{recipient_id}".encode()).hexdigest()[:8]
+        return f"0.0.{int(tx_hash, 16) % 1000000}@1234567890.123456789"
+    
     manager = get_hedera_manager()
     result = await manager.mint_nft(token_id, metadata_uri, recipient_id)
     

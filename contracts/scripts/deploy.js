@@ -40,7 +40,32 @@ class HederaContractDeployer {
     constructor() {
         this.network = process.env.HEDERA_NETWORK || "testnet";
         this.operatorId = AccountId.fromString(process.env.HEDERA_ACCOUNT_ID);
-        this.operatorKey = PrivateKey.fromString(process.env.HEDERA_PRIVATE_KEY);
+        
+        // Handle private key properly - try different formats
+        let privateKeyString = process.env.HEDERA_PRIVATE_KEY;
+        
+        try {
+            // Try DER format first (if it's a long hex string without 0x prefix)
+            if (privateKeyString.length > 64 && !privateKeyString.startsWith("0x")) {
+                console.log("🔑 Trying DER format private key...");
+                this.operatorKey = PrivateKey.fromStringDer(privateKeyString);
+            }
+            // Try ECDSA format for hex-encoded keys
+            else if (privateKeyString.startsWith("0x")) {
+                console.log("🔑 Trying ECDSA format private key (with 0x prefix)...");
+                privateKeyString = privateKeyString.slice(2); // Remove 0x prefix
+                this.operatorKey = PrivateKey.fromStringECDSA(privateKeyString);
+            }
+            // Try ECDSA format for plain hex
+            else {
+                console.log("🔑 Trying ECDSA format private key...");
+                this.operatorKey = PrivateKey.fromStringECDSA(privateKeyString);
+            }
+        } catch (error) {
+            console.error("❌ Failed to parse private key:", error.message);
+            console.log("💡 Please check your HEDERA_PRIVATE_KEY format in .env file");
+            process.exit(1);
+        }
         
         // Initialize client
         this.client = Client.forName(this.network);
@@ -70,19 +95,36 @@ class HederaContractDeployer {
             let contractParams = new ContractFunctionParameters();
             
             // Add constructor parameters based on contract type
-            if (contractName === "SkillToken" && constructorParams.length > 0) {
-                contractParams.addAddress(constructorParams[0]); // initialOwner
-            } else if (contractName === "TalentPool" && constructorParams.length > 0) {
+            if (contractName === "SkillToken" && constructorParams.length >= 3) {
+                contractParams.addString(constructorParams[0]); // name
+                contractParams.addString(constructorParams[1]); // symbol
+                contractParams.addAddress(constructorParams[2]); // initialAdmin
+            } else if (contractName === "TalentPool" && constructorParams.length >= 3) {
                 contractParams.addAddress(constructorParams[0]); // skillToken address
                 contractParams.addAddress(constructorParams[1]); // feeCollector
                 contractParams.addAddress(constructorParams[2]); // initialAdmin
+            } else if (contractName === "ReputationOracle" && constructorParams.length >= 2) {
+                contractParams.addAddress(constructorParams[0]); // skillToken address
+                contractParams.addAddress(constructorParams[1]); // initialAdmin
+            } else if (contractName === "Governance" && constructorParams.length >= 3) {
+                contractParams.addAddress(constructorParams[0]); // skillToken address
+                contractParams.addAddress(constructorParams[1]); // initialAdmin
+                
+                // Add GovernanceSettings struct
+                const settings = constructorParams[2];
+                contractParams.addUint256(settings.votingDelay);
+                contractParams.addUint256(settings.votingPeriod);
+                contractParams.addUint256(settings.executionDelay);
+                contractParams.addUint256(settings.proposalThreshold);
+                contractParams.addUint32(settings.quorumPercentage);
+                contractParams.addUint256(settings.emergencyVotingPeriod);
+                contractParams.addUint32(settings.emergencyQuorumPercentage);
             }
             
             // Deploy contract
             const contractCreateFlow = new ContractCreateFlow()
                 .setGas(gas)
-                .setBytecode(cleanBytecode)
-                .setMaxTransactionFee(new Hbar(20)); // Set max fee to 20 HBAR
+                .setBytecode(cleanBytecode);
             
             if (constructorParams.length > 0) {
                 contractCreateFlow.setConstructorParameters(contractParams);
@@ -103,7 +145,7 @@ class HederaContractDeployer {
             return {
                 contractId: contractId.toString(),
                 transactionId: transactionId.toString(),
-                contractAddress: `0.0.${contractId.num}`,
+                contractAddress: contractId.toSolidityAddress(),
                 explorerUrl: `https://hashscan.io/${this.network}/contract/${contractId.toString()}`,
                 success: true
             };
@@ -124,16 +166,23 @@ class HederaContractDeployer {
      */
     readContractBytecode(contractName) {
         try {
-            const artifactPath = path.join(__dirname, "..", "artifacts", "contracts", `${contractName}Enhanced.sol`, `${contractName}.json`);
+            // Map contract names to their directory structure
+            const contractPaths = {
+                "SkillToken": "token/SkillToken.sol",
+                "TalentPool": "core/TalentPool.sol", 
+                "Governance": "governance/Governance.sol",
+                "ReputationOracle": "oracle/ReputationOracle.sol"
+            };
+            
+            const contractPath = contractPaths[contractName];
+            if (!contractPath) {
+                throw new Error(`Unknown contract: ${contractName}`);
+            }
+            
+            const artifactPath = path.join(__dirname, "..", "artifacts", "contracts", contractPath, `${contractName}.json`);
             
             if (!fs.existsSync(artifactPath)) {
-                // Try without Enhanced suffix
-                const fallbackPath = path.join(__dirname, "..", "artifacts", "contracts", `${contractName}.sol`, `${contractName}.json`);
-                if (!fs.existsSync(fallbackPath)) {
-                    throw new Error(`Contract artifact not found for ${contractName}. Please compile first.`);
-                }
-                const artifact = JSON.parse(fs.readFileSync(fallbackPath, "utf8"));
-                return artifact.bytecode;
+                throw new Error(`Contract artifact not found for ${contractName}. Please compile first. Expected: ${artifactPath}`);
             }
             
             const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
@@ -352,64 +401,58 @@ async function main() {
         // Check if contracts are compiled
         console.log("\n🔍 Checking compiled contracts...");
         
-        // Try different possible artifact paths
-        const skillTokenPaths = [
-            "SkillTokenSimple",
-            "SkillTokenEnhanced",
-            "SkillToken"
-        ];
+        // Read contract bytecodes directly
+        let skillTokenBytecode, talentPoolBytecode, governanceBytecode, reputationOracleBytecode;
         
-        const talentPoolPaths = [
-            "TalentPoolSimple",
-            "TalentPoolEnhanced", 
-            "TalentPool"
-        ];
-        
-        let skillTokenBytecode, talentPoolBytecode;
-        let skillTokenFound = false, talentPoolFound = false;
-        
-        // Find SkillToken contract
-        for (const contractName of skillTokenPaths) {
-            try {
-                skillTokenBytecode = deployer.readContractBytecode(contractName);
-                console.log(`✅ Found ${contractName} contract`);
-                skillTokenFound = true;
-                break;
-            } catch (error) {
-                console.log(`⚠️  ${contractName} not found, trying next...`);
-            }
-        }
-        
-        // Find TalentPool contract
-        for (const contractName of talentPoolPaths) {
-            try {
-                talentPoolBytecode = deployer.readContractBytecode(contractName);
-                console.log(`✅ Found ${contractName} contract`);
-                talentPoolFound = true;
-                break;
-            } catch (error) {
-                console.log(`⚠️  ${contractName} not found, trying next...`);
-            }
-        }
-        
-        if (!skillTokenFound || !talentPoolFound) {
-            console.error("\n❌ Required contracts not found!");
+        try {
+            skillTokenBytecode = deployer.readContractBytecode("SkillToken");
+            console.log(`✅ Found SkillToken contract`);
+        } catch (error) {
+            console.error("❌ SkillToken contract not found!");
             console.error("Please run 'npm run compile' first to compile the contracts.");
-            console.error("\nMake sure you have one of these contracts:");
-            console.error("- contracts/SkillToken.sol or contracts/SkillTokenEnhanced.sol");
-            console.error("- contracts/TalentPool.sol or contracts/TalentPoolEnhanced.sol");
+            process.exit(1);
+        }
+        
+        try {
+            talentPoolBytecode = deployer.readContractBytecode("TalentPool");
+            console.log(`✅ Found TalentPool contract`);
+        } catch (error) {
+            console.error("❌ TalentPool contract not found!");
+            console.error("Please run 'npm run compile' first to compile the contracts.");
+            process.exit(1);
+        }
+        
+        try {
+            governanceBytecode = deployer.readContractBytecode("Governance");
+            console.log(`✅ Found Governance contract`);
+        } catch (error) {
+            console.error("❌ Governance contract not found!");
+            console.error("Please run 'npm run compile' first to compile the contracts.");
+            process.exit(1);
+        }
+        
+        try {
+            reputationOracleBytecode = deployer.readContractBytecode("ReputationOracle");
+            console.log(`✅ Found ReputationOracle contract`);
+        } catch (error) {
+            console.error("❌ ReputationOracle contract not found!");
+            console.error("Please run 'npm run compile' first to compile the contracts.");
             process.exit(1);
         }
 
         // Deploy SkillToken contract
         console.log("\n1️⃣  Deploying SkillToken contract...");
-        const skillTokenParams = [deployer.operatorId.toSolidityAddress()]; // initialOwner
+        const skillTokenParams = [
+            "TalentChain Skill Token", // name
+            "TCST", // symbol  
+            deployer.operatorId.toSolidityAddress() // initialAdmin
+        ];
         
         const skillTokenDeployment = await deployer.deployContract(
             "SkillToken",
             skillTokenBytecode,
             skillTokenParams,
-            4000000
+            6000000  // Increased gas limit
         );
         
         deployments.skillToken = skillTokenDeployment;
@@ -421,12 +464,37 @@ async function main() {
         
         // Wait a bit for the contract to be available
         console.log("⏳ Waiting for contract to be available...");
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // Deploy ReputationOracle contract
+        console.log("\n2️⃣  Deploying ReputationOracle contract...");
+        const reputationOracleParams = [
+            skillTokenDeployment.contractAddress, // skillToken address in 0x format
+            deployer.operatorId.toSolidityAddress() // initialAdmin
+        ];
+        
+        const reputationOracleDeployment = await deployer.deployContract(
+            "ReputationOracle",
+            reputationOracleBytecode,
+            reputationOracleParams,
+            6000000  // Increased gas limit
+        );
+        
+        deployments.reputationOracle = reputationOracleDeployment;
+        
+        if (!reputationOracleDeployment.success) {
+            console.error("❌ ReputationOracle deployment failed. Aborting.");
+            process.exit(1);
+        }
+        
+        // Wait a bit for the contract to be available
+        console.log("⏳ Waiting for contract to be available...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
         
         // Deploy TalentPool contract
-        console.log("\n2️⃣  Deploying TalentPool contract...");
+        console.log("\n3️⃣  Deploying TalentPool contract...");
         const talentPoolParams = [
-            skillTokenDeployment.contractId, // skillToken address
+            skillTokenDeployment.contractAddress, // skillToken address in 0x format
             deployer.operatorId.toSolidityAddress(), // feeCollector
             deployer.operatorId.toSolidityAddress()  // initialAdmin
         ];
@@ -435,14 +503,49 @@ async function main() {
             "TalentPool",
             talentPoolBytecode,
             talentPoolParams,
-            4000000
+            6000000  // Increased gas limit
         );
         
         deployments.talentPool = talentPoolDeployment;
         
+        if (!talentPoolDeployment.success) {
+            console.error("❌ TalentPool deployment failed. Aborting.");
+            process.exit(1);
+        }
+        
+        // Wait a bit for the contract to be available
+        console.log("⏳ Waiting for contract to be available...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // Deploy Governance contract
+        console.log("\n4️⃣  Deploying Governance contract...");
+        // First create the GovernanceSettings struct parameters
+        const governanceParams = [
+            skillTokenDeployment.contractAddress, // skillToken address in 0x format
+            deployer.operatorId.toSolidityAddress(), // initialAdmin
+            {
+                votingDelay: 86400, // 24 hours
+                votingPeriod: 604800, // 7 days
+                executionDelay: 172800, // 48 hours
+                proposalThreshold: 1000000000000000000n, // 1 token
+                quorumPercentage: 20, // 20%
+                emergencyVotingPeriod: 43200, // 12 hours
+                emergencyQuorumPercentage: 30 // 30%
+            }
+        ];
+        
+        const governanceDeployment = await deployer.deployContract(
+            "Governance",
+            governanceBytecode,
+            governanceParams,
+            6000000  // Increased gas limit
+        );
+        
+        deployments.governance = governanceDeployment;
+        
         // Setup initial configuration
         if (skillTokenDeployment.success && talentPoolDeployment.success) {
-            console.log("\\n3️⃣  Setting up initial configuration...");
+            console.log("\n5️⃣  Setting up initial configuration...");
             
             // Add TalentPool as minter role to SkillToken
             const addMinterResult = await deployer.callContractFunction(
@@ -450,7 +553,7 @@ async function main() {
                 "grantRole",
                 [
                     "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6", // MINTER_ROLE hash
-                    talentPoolDeployment.contractId
+                    talentPoolDeployment.contractAddress // Use Solidity address format
                 ],
                 200000
             );
@@ -464,11 +567,11 @@ async function main() {
         deployer.saveDeploymentInfo(deployments);
         
         // Print deployment summary
-        console.log("\\n🎉 DEPLOYMENT COMPLETE!");
+        console.log("\n🎉 DEPLOYMENT COMPLETE!");
         console.log("=" .repeat(50));
         console.log(`Network: ${deployer.network}`);
         console.log(`Operator: ${deployer.operatorId.toString()}`);
-        console.log("\\nDeployed Contracts:");
+        console.log("\nDeployed Contracts:");
         
         Object.entries(deployments).forEach(([name, deployment]) => {
             if (deployment.success) {
@@ -478,7 +581,7 @@ async function main() {
             }
         });
         
-        console.log("\\n💡 Next Steps:");
+        console.log("\n💡 Next Steps:");
         console.log("1. Update your frontend with the contract addresses");
         console.log("2. Start the backend server to test API integration");
         console.log("3. Test contract functions through the web interface");

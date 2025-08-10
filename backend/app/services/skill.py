@@ -662,6 +662,78 @@ class SkillService:
         self.skill_token_contract = os.getenv("SKILL_TOKEN_CONTRACT")
         logger.info("Skill service initialized")
     
+    async def create_skill_token(
+        self,
+        recipient_address: str,
+        skill_name: str,
+        skill_category: str,
+        level: int = 1,
+        description: str = "",
+        metadata_uri: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Create a new skill token (wrapper for mint_skill_token).
+        
+        Args:
+            recipient_address: Hedera account ID of the recipient
+            skill_name: Name of the skill
+            skill_category: Category of the skill
+            level: Initial skill level
+            description: Description of the skill
+            metadata_uri: URI to metadata
+            
+        Returns:
+            Dict containing creation result
+        """
+        try:
+            # Convert string category to enum if needed
+            if isinstance(skill_category, str):
+                skill_category_enum = SkillCategory(skill_category.lower())
+            else:
+                skill_category_enum = skill_category
+            
+            # Convert level to enum if needed
+            if isinstance(level, int):
+                if level < 1 or level > 5:
+                    level = min(5, max(1, level))  # Clamp to valid range
+                skill_level_enum = SkillLevel(level)
+            else:
+                skill_level_enum = level
+            
+            # Call the mint function
+            result = await self.mint_skill_token(
+                recipient_id=recipient_address,
+                skill_name=skill_name,
+                skill_category=skill_category_enum,
+                skill_level=skill_level_enum,
+                description=description,
+                metadata={
+                    "metadata_uri": metadata_uri,
+                    "description": description
+                }
+            )
+            
+            # Return in expected format
+            return {
+                "success": True,
+                "token_id": result["token_id"],
+                "transaction_id": result["transaction_id"],
+                "recipient_address": recipient_address,
+                "skill_name": skill_name,
+                "skill_category": skill_category,
+                "level": level,
+                "description": description,
+                "metadata_uri": metadata_uri,
+                "created_at": result["timestamp"].isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating skill token: {str(e)}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
     async def mint_skill_token(
         self,
         recipient_id: str,
