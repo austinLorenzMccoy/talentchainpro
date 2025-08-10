@@ -85,7 +85,7 @@ def test_get_job_pool(
         test_client: Test client
         job_pool_request: Sample job pool request to create a pool first
     """
-    with patch('app.services.pool.get_talent_pool_service') as mock_service:
+    with patch('app.api.pools.get_talent_pool_service') as mock_service:
         # Mock the service
         mock_pool_service = AsyncMock()
         mock_service.return_value = mock_pool_service
@@ -151,32 +151,28 @@ def test_search_job_pools(
         test_client: Test client
         job_pool_request: Sample job pool request to create a pool first
     """
-    with patch('app.services.pool.get_talent_pool_service') as mock_service:
+    with patch('app.api.pools.get_talent_pool_service') as mock_service:
         # Mock the service
         mock_pool_service = AsyncMock()
         mock_service.return_value = mock_pool_service
         
-        # Mock search_job_pools method
-        mock_pool_service.search_job_pools.return_value = {
-            "success": True,
-            "pools": [
-                {
-                    "pool_id": "pool_12345",
-                    "creator_address": "0.0.12345",
-                    "title": job_pool_request["title"],
-                    "description": job_pool_request["description"],
-                    "required_skills": job_pool_request["required_skills"],
-                    "min_reputation": job_pool_request["min_reputation"],
-                    "stake_amount": job_pool_request["stake_amount"],
-                    "duration_days": job_pool_request["duration_days"],
-                    "status": "active",
-                    "applicants_count": 0,
-                    "max_applicants": 100,
-                    "created_at": "2025-08-10T10:00:00Z"
-                }
-            ],
-            "total_count": 1
-        }
+        # Mock list_pools method
+        mock_pool_service.list_pools.return_value = [
+            {
+                "pool_id": "pool_12345",
+                "creator_address": "0.0.12345",
+                "title": job_pool_request["title"],
+                "description": job_pool_request["description"],
+                "required_skills": job_pool_request["required_skills"],
+                "min_reputation": job_pool_request["min_reputation"],
+                "stake_amount": job_pool_request["stake_amount"],
+                "duration_days": job_pool_request["duration_days"],
+                "status": "active",
+                "applicants_count": 0,
+                "max_applicants": 100,
+                "created_at": "2025-08-10T10:00:00Z"
+            }
+        ]
         
         response = test_client.get("/api/v1/pools/search")
         
@@ -198,32 +194,28 @@ def test_search_job_pools_with_filters(
         test_client: Test client
         job_pool_request: Sample job pool request to create a pool first
     """
-    with patch('app.services.pool.get_talent_pool_service') as mock_service:
+    with patch('app.api.pools.get_talent_pool_service') as mock_service:
         # Mock the service
         mock_pool_service = AsyncMock()
         mock_service.return_value = mock_pool_service
         
-        # Mock search_job_pools method
-        mock_pool_service.search_job_pools.return_value = {
-            "success": True,
-            "pools": [
-                {
-                    "pool_id": "pool_12345",
-                    "creator_address": "0.0.12345",
-                    "title": job_pool_request["title"],
-                    "description": job_pool_request["description"],
-                    "required_skills": job_pool_request["required_skills"],
-                    "min_reputation": job_pool_request["min_reputation"],
-                    "stake_amount": job_pool_request["stake_amount"],
-                    "duration_days": job_pool_request["duration_days"],
-                    "status": "active",
-                    "applicants_count": 0,
-                    "max_applicants": 100,
-                    "created_at": "2025-08-10T10:00:00Z"
-                }
-            ],
-            "total_count": 1
-        }
+        # Mock list_pools method
+        mock_pool_service.list_pools.return_value = [
+            {
+                "pool_id": "pool_12345",
+                "creator_address": "0.0.12345",
+                "title": job_pool_request["title"],
+                "description": job_pool_request["description"],
+                "required_skills": job_pool_request["required_skills"],
+                "min_reputation": job_pool_request["min_reputation"],
+                "stake_amount": job_pool_request["stake_amount"],
+                "duration_days": job_pool_request["duration_days"],
+                "status": "active",
+                "applicants_count": 0,
+                "max_applicants": 100,
+                "created_at": "2025-08-10T10:00:00Z"
+            }
+        ]
         
         creator_address = "0.0.12345"
         response = test_client.get(f"/api/v1/pools/search?creator_address={creator_address}")
@@ -242,7 +234,7 @@ def test_apply_to_pool(
     Args:
         test_client: Test client
     """
-    with patch('app.services.pool.get_talent_pool_service') as mock_service:
+    with patch('app.api.pools.get_talent_pool_service') as mock_service:
         # Mock the service
         mock_pool_service = AsyncMock()
         mock_service.return_value = mock_pool_service

@@ -11,8 +11,18 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, validator
 
+from app.models.reputation_schemas import (
+    RegisterOracleRequest,
+    WorkEvaluationRequest,
+    ChallengeEvaluationRequest,
+    UpdateReputationRequest,
+    OracleResponse,
+    EvaluationResponse,
+    ChallengeResponse,
+    ReputationResponse
+)
+from app.models.common_schemas import ErrorResponse, BatchResponse
 from app.services.reputation import get_reputation_service, ReputationService, ReputationEventType, ReputationCategory
 from app.utils.hedera import validate_hedera_address
 
@@ -21,83 +31,6 @@ logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(tags=["reputation"])
-
-# ============ REQUEST/RESPONSE MODELS ============
-
-class RegisterOracleRequest(BaseModel):
-    """Request model for oracle registration."""
-    oracle_address: str = Field(..., description="Oracle's Hedera account address")
-    name: str = Field(..., min_length=3, max_length=100, description="Oracle display name")
-    specializations: List[str] = Field(..., min_items=1, description="List of specialization categories")
-    stake_amount: float = Field(100.0, ge=1.0, description="Stake amount for oracle registration")
-    
-    @validator('oracle_address')
-    def validate_oracle_address(cls, v):
-        if not validate_hedera_address(v):
-            raise ValueError('Invalid Hedera address format')
-        return v
-
-class WorkEvaluationRequest(BaseModel):
-    """Request model for work evaluation submission."""
-    oracle_address: str = Field(..., description="Oracle submitting the evaluation")
-    user_address: str = Field(..., description="User being evaluated")
-    skill_token_ids: List[str] = Field(..., min_items=1, description="Skill tokens being evaluated")
-    work_description: str = Field(..., min_length=10, description="Description of the work")
-    artifacts: List[str] = Field(default_factory=list, description="Work artifacts (URLs, IPFS hashes)")
-    overall_score: int = Field(..., ge=0, le=100, description="Overall evaluation score")
-    skill_scores: Dict[str, int] = Field(..., description="Individual skill scores")
-    feedback: str = Field("", description="Detailed feedback")
-    ipfs_hash: Optional[str] = Field(None, description="IPFS hash for additional data")
-    
-    @validator('oracle_address', 'user_address')
-    def validate_addresses(cls, v):
-        if not validate_hedera_address(v):
-            raise ValueError('Invalid Hedera address format')
-        return v
-
-class ChallengeEvaluationRequest(BaseModel):
-    """Request model for challenging an evaluation."""
-    challenger_address: str = Field(..., description="Address challenging the evaluation")
-    evaluation_id: str = Field(..., description="ID of evaluation being challenged")
-    reason: str = Field(..., min_length=20, description="Reason for the challenge")
-    evidence: List[str] = Field(..., min_items=1, description="Supporting evidence")
-    stake_amount: float = Field(10.0, ge=1.0, description="Stake required for challenge")
-    
-    @validator('challenger_address')
-    def validate_challenger_address(cls, v):
-        if not validate_hedera_address(v):
-            raise ValueError('Invalid Hedera address format')
-        return v
-
-class UpdateReputationRequest(BaseModel):
-    """Request model for reputation updates."""
-    user_address: str = Field(..., description="User's address")
-    event_type: str = Field(..., description="Type of reputation event")
-    impact_score: float = Field(..., ge=-100, le=100, description="Impact score")
-    context: Dict[str, Any] = Field(..., description="Event context")
-    validator_address: Optional[str] = Field(None, description="Validator address")
-    blockchain_evidence: Optional[str] = Field(None, description="Blockchain evidence")
-    
-    @validator('user_address')
-    def validate_user_address(cls, v):
-        if not validate_hedera_address(v):
-            raise ValueError('Invalid Hedera address format')
-        return v
-    
-    @validator('validator_address')
-    def validate_validator_address(cls, v):
-        if v and not validate_hedera_address(v):
-            raise ValueError('Invalid validator address format')
-        return v
-
-# Legacy request models for backward compatibility
-class LegacyWorkEvaluationRequest(BaseModel):
-    """Legacy request model for work evaluation."""
-    user_id: str = Field(..., description="User ID")
-    skill_token_ids: List[str] = Field(..., description="Skill token IDs")
-    work_description: str = Field(..., description="Work description")
-    work_content: str = Field(..., description="Work content")
-    evaluation_criteria: Optional[str] = Field(None, description="Evaluation criteria")
 
 # ============ ORACLE MANAGEMENT ENDPOINTS ============
 
@@ -472,7 +405,11 @@ async def update_user_reputation(
 
 @router.post("/evaluate-work", response_model=Dict[str, Any])
 async def legacy_evaluate_work(
-    request: LegacyWorkEvaluationRequest,
+    user_id: str = Body(..., description="User ID"),
+    skill_token_ids: List[str] = Body(..., description="Skill token IDs"),
+    work_description: str = Body(..., description="Work description"),
+    work_content: str = Body(..., description="Work content"),
+    evaluation_criteria: Optional[str] = Body(None, description="Evaluation criteria"),
     reputation_service: ReputationService = Depends(get_reputation_service)
 ) -> Dict[str, Any]:
     """
@@ -482,14 +419,14 @@ async def legacy_evaluate_work(
     """
     try:
         result = await reputation_service.evaluate_work(
-            user_id=request.user_id,
-            skill_token_ids=request.skill_token_ids,
-            work_description=request.work_description,
-            work_content=request.work_content,
-            evaluation_criteria=request.evaluation_criteria
+            user_id=user_id,
+            skill_token_ids=skill_token_ids,
+            work_description=work_description,
+            work_content=work_content,
+            evaluation_criteria=evaluation_criteria
         )
         
-        logger.info(f"Legacy work evaluation completed for {request.user_id}")
+        logger.info(f"Legacy work evaluation completed for {user_id}")
         return result
     
     except Exception as e:

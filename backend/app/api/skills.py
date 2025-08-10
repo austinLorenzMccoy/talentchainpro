@@ -9,95 +9,26 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, BackgroundTasks
-from pydantic import BaseModel, Field, validator
 
-from app.models.schemas import (
-    SkillTokenRequest,
-    SkillTokenResponse,
+from app.models.skills_schemas import (
+    SkillTokenCreateRequest,
+    SkillTokenUpdateRequest,
+    BatchSkillTokenRequest,
+    SkillSearchRequest,
+    SkillTokenDetailResponse,
+    BatchOperationResponse,
     WorkEvaluationRequest,
-    WorkEvaluationResponse,
-    ErrorResponse
+    WorkEvaluationResponse
 )
+from app.models.common_schemas import ErrorResponse
 from app.services.skill import get_skill_service
 from app.services.reputation import get_reputation_service
-from app.utils.hedera import validate_hedera_address
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter()
-
-# Enhanced Request/Response Models
-
-class SkillTokenCreateRequest(BaseModel):
-    """Enhanced request model for skill token creation."""
-    recipient_address: str = Field(..., description="Recipient's Hedera account address")
-    skill_name: str = Field(..., min_length=2, max_length=100, description="Name of the skill")
-    skill_category: str = Field(..., description="Category of the skill")
-    level: int = Field(..., ge=1, le=10, description="Initial skill level (1-10)")
-    description: Optional[str] = Field(None, max_length=500, description="Skill description")
-    metadata_uri: Optional[str] = Field(None, description="URI to additional metadata")
-    
-    @validator('recipient_address')
-    def validate_address(cls, v):
-        if not validate_hedera_address(v):
-            raise ValueError('Invalid Hedera address format')
-        return v
-
-
-class SkillTokenUpdateRequest(BaseModel):
-    """Request model for skill token updates."""
-    new_level: Optional[int] = Field(None, ge=1, le=10, description="New skill level")
-    experience_points: Optional[int] = Field(None, ge=0, description="Experience points to add")
-    evidence_uri: Optional[str] = Field(None, description="Evidence supporting the update")
-
-
-class BatchSkillTokenRequest(BaseModel):
-    """Request model for batch skill token creation."""
-    recipient_address: str = Field(..., description="Recipient's Hedera account address")
-    skills: List[Dict[str, Any]] = Field(..., min_items=1, max_items=50, description="List of skills to create")
-    
-    @validator('recipient_address')
-    def validate_address(cls, v):
-        if not validate_hedera_address(v):
-            raise ValueError('Invalid Hedera address format')
-        return v
-
-
-class SkillSearchRequest(BaseModel):
-    """Request model for skill search."""
-    skill_name: Optional[str] = Field(None, description="Skill name to search")
-    skill_category: Optional[str] = Field(None, description="Skill category filter")
-    min_level: Optional[int] = Field(None, ge=1, le=10, description="Minimum skill level")
-    max_level: Optional[int] = Field(None, ge=1, le=10, description="Maximum skill level")
-    owner_address: Optional[str] = Field(None, description="Owner address filter")
-
-
-class SkillTokenDetailResponse(BaseModel):
-    """Detailed response model for skill tokens."""
-    token_id: str
-    owner_address: str
-    skill_name: str
-    skill_category: str
-    level: int
-    experience_points: int
-    description: Optional[str]
-    metadata_uri: Optional[str]
-    is_active: bool
-    created_at: datetime
-    last_updated: datetime
-    reputation_impact: Optional[Dict[str, Any]] = None
-
-
-class BatchOperationResponse(BaseModel):
-    """Response model for batch operations."""
-    success: bool
-    total_requested: int
-    successful: int
-    failed: int
-    results: List[Dict[str, Any]]
-    errors: List[str]
 
 
 # Enhanced API Endpoints
@@ -339,7 +270,7 @@ async def update_skill_token(
         # Update level if requested
         if request.new_level is not None:
             update_result = await skill_service.update_skill_level(
-                token_id=int(token_id),
+                token_id=token_id,
                 new_level=request.new_level,
                 evidence_uri=request.evidence_uri or ""
             )
@@ -356,7 +287,7 @@ async def update_skill_token(
         # Add experience points if requested
         if request.experience_points is not None:
             exp_result = await skill_service.add_skill_experience(
-                token_id=int(token_id),
+                token_id=token_id,
                 experience_points=request.experience_points
             )
             
@@ -706,36 +637,8 @@ async def update_reputation_for_level_change(user_address: str, token_id: str, o
     
     except Exception as e:
         logger.error(f"Error updating reputation for level change: {str(e)}")
-        result = skill_service.mint_skill_token(
-            recipient_id=request.recipient_id,
-            skill_name=request.skill_name,
-            skill_category=request.skill_category,
-            skill_level=request.skill_level,
-            description=request.description,
-            evidence_links=request.evidence_links,
-            metadata=request.metadata
-        )
-        
-        # Handle both async and sync responses for testing compatibility
-        if hasattr(result, '__await__'):
-            result = await result
-        
-        logger.info(f"Created skill token for {request.recipient_id}: {request.skill_name}")
-        return result
-    
-    except ValueError as e:
-        logger.error(f"Validation error: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    
-    except Exception as e:
-        logger.error(f"Error creating skill token: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create skill token"
-        )
+
+# End of Skills API
 
 @router.get(
     "/{token_id}",

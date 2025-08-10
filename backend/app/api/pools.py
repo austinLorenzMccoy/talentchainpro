@@ -1,9 +1,34 @@
 """
-Enhanced Pools API Router
+Enhanced Job Pools API Router
 
-This module provides comprehensive API endpoints for managing talent pools,
-including creation, application, matching, and integration with reputation system.
+This module provides comprehensive API endpoints for managing job pools,
+including creation, application management, matching, and search functionality.
 """
+
+import logging
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
+from fastapi.responses import JSONResponse
+
+from app.models.pools_schemas import (
+    JobPoolCreateRequest,
+    PoolApplicationRequest,
+    PoolMatchRequest,
+    PoolSearchRequest,
+    JobPoolDetailResponse,
+    PoolApplicationResponse,
+    PoolSearchResponse
+)
+from app.models.common_schemas import ErrorResponse, BatchResponse
+from app.services.pool import get_pool_service
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Create router
+router = APIRouter()
 
 import logging
 from typing import List, Dict, Any, Optional
@@ -193,6 +218,106 @@ async def create_job_pool(
 
 
 @router.get(
+    "/search",
+    response_model=PoolSearchResponse,
+    responses={
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def search_job_pools(
+    skill_category: Optional[str] = Query(None, description="Filter by skill category"),
+    min_stake: Optional[float] = Query(None, ge=0, description="Minimum stake amount"),
+    max_stake: Optional[float] = Query(None, gt=0, description="Maximum stake amount"),
+    status: Optional[str] = Query(None, description="Pool status filter"),
+    creator_address: Optional[str] = Query(None, description="Creator address filter"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum results to return"),
+    offset: int = Query(0, ge=0, description="Results offset for pagination")
+) -> PoolSearchResponse:
+    """
+    Search for job pools based on various criteria.
+    
+    Args:
+        skill_category: Filter by required skill category
+        min_stake: Minimum stake amount filter
+        max_stake: Maximum stake amount filter
+        status: Pool status filter
+        creator_address: Creator address filter
+        limit: Maximum results to return
+        offset: Results offset for pagination
+        
+    Returns:
+        Search results with matching pools
+    """
+    try:
+        pool_service = get_talent_pool_service()
+        
+        # Build search criteria
+        search_criteria = {}
+        if skill_category:
+            search_criteria["skill_category"] = skill_category
+        if min_stake is not None:
+            search_criteria["min_stake"] = min_stake
+        if max_stake is not None:
+            search_criteria["max_stake"] = max_stake
+        if status:
+            search_criteria["status"] = status
+        if creator_address:
+            if not validate_hedera_address(creator_address):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid creator address format"
+                )
+            search_criteria["creator_address"] = creator_address
+        
+        # Search for pools
+        pools_data = await pool_service.list_pools(
+            creator_address=creator_address,
+            status=status,
+            skill_name=skill_category,
+            limit=limit,
+            offset=offset
+        )
+        
+        # Convert to response models
+        pools = []
+        for pool in pools_data:
+            pools.append(JobPoolDetailResponse(
+                pool_id=pool["pool_id"],
+                creator_address=pool["creator_address"],
+                title=pool["title"],
+                description=pool["description"],
+                required_skills=pool["required_skills"],
+                min_reputation=pool["min_reputation"],
+                stake_amount=pool["stake_amount"],
+                duration_days=pool["duration_days"],
+                status=pool.get("status", "active"),
+                applicants_count=pool.get("applicants_count", 0),
+                max_applicants=pool.get("max_applicants", 100),
+                created_at=datetime.fromisoformat(pool.get("created_at", datetime.now(timezone.utc).isoformat())),
+                application_deadline=datetime.fromisoformat(pool["deadline"]) if pool.get("deadline") else None,
+                matched_candidate=pool.get("matched_candidate"),
+                match_score=pool.get("match_score")
+            ))
+        
+        logger.info(f"Found {len(pools)} pools matching search criteria")
+        
+        return PoolSearchResponse(
+            pools=pools,
+            total_count=len(pools),
+            filters_applied=search_criteria
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error searching job pools: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to search job pools"
+        )
+
+
+@router.get(
     "/{pool_id}",
     response_model=JobPoolDetailResponse,
     responses={
@@ -322,107 +447,6 @@ async def apply_to_pool(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to apply to pool"
         )
-
-
-@router.get(
-    "/search",
-    response_model=PoolSearchResponse,
-    responses={
-        500: {"model": ErrorResponse, "description": "Internal server error"}
-    }
-)
-async def search_job_pools(
-    skill_category: Optional[str] = Query(None, description="Filter by skill category"),
-    min_stake: Optional[float] = Query(None, ge=0, description="Minimum stake amount"),
-    max_stake: Optional[float] = Query(None, gt=0, description="Maximum stake amount"),
-    status: Optional[str] = Query(None, description="Pool status filter"),
-    creator_address: Optional[str] = Query(None, description="Creator address filter"),
-    limit: int = Query(50, ge=1, le=100, description="Maximum results to return"),
-    offset: int = Query(0, ge=0, description="Results offset for pagination")
-) -> PoolSearchResponse:
-    """
-    Search for job pools based on various criteria.
-    
-    Args:
-        skill_category: Filter by required skill category
-        min_stake: Minimum stake amount filter
-        max_stake: Maximum stake amount filter
-        status: Pool status filter
-        creator_address: Creator address filter
-        limit: Maximum results to return
-        offset: Results offset for pagination
-        
-    Returns:
-        Search results with matching pools
-    """
-    try:
-        pool_service = get_talent_pool_service()
-        
-        # Build search criteria
-        search_criteria = {}
-        if skill_category:
-            search_criteria["skill_category"] = skill_category
-        if min_stake is not None:
-            search_criteria["min_stake"] = min_stake
-        if max_stake is not None:
-            search_criteria["max_stake"] = max_stake
-        if status:
-            search_criteria["status"] = status
-        if creator_address:
-            if not validate_hedera_address(creator_address):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid creator address format"
-                )
-            search_criteria["creator_address"] = creator_address
-        
-        # Search for pools
-        pools_data = await pool_service.list_pools(
-            creator_address=creator_address,
-            status=status,
-            skill_name=skill_category,
-            limit=limit,
-            offset=offset
-        )
-        
-        # Convert to response models
-        pools = []
-        for pool in pools_data:
-            pools.append(JobPoolDetailResponse(
-                pool_id=pool["pool_id"],
-                creator_address=pool["creator_address"],
-                title=pool["title"],
-                description=pool["description"],
-                required_skills=pool["required_skills"],
-                min_reputation=pool["min_reputation"],
-                stake_amount=pool["stake_amount"],
-                duration_days=pool["duration_days"],
-                status=pool.get("status", "active"),
-                applicants_count=pool.get("applicants_count", 0),
-                max_applicants=pool.get("max_applicants", 100),
-                created_at=datetime.fromisoformat(pool.get("created_at", datetime.now(timezone.utc).isoformat())),
-                application_deadline=datetime.fromisoformat(pool["deadline"]) if pool.get("deadline") else None,
-                matched_candidate=pool.get("matched_candidate"),
-                match_score=pool.get("match_score")
-            ))
-        
-        logger.info(f"Found {len(pools)} pools matching search criteria")
-        
-        return PoolSearchResponse(
-            pools=pools,
-            total_count=len(pools),
-            filters_applied=search_criteria
-        )
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error searching job pools: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to search job pools"
-        )
-
 
 # Background Task Functions
 

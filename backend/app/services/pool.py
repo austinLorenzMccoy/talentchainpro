@@ -35,8 +35,8 @@ except ImportError:
     logger.warning("Database models not available, using fallback functionality")
 
 from app.utils.hedera import (
-    get_contract_manager, create_job_pool, apply_to_pool, make_pool_match,
-    get_job_pool_info
+    get_contract_manager, create_job_pool, apply_to_pool as hedera_apply_to_pool, 
+    make_pool_match, get_job_pool_info
 )
 
 try:
@@ -97,7 +97,7 @@ class TalentPoolService:
             for pattern in patterns:
                 try:
                     cache_manager.invalidate_pattern(pattern)
-                except:
+                except Exception:
                     pass
     
     # ============ POOL CREATION FUNCTIONS ============
@@ -215,19 +215,12 @@ class TalentPoolService:
                         db.add(initial_stake)
                         
                         # Add audit log
-                        audit_log = AuditLog(
-                            user_address=creator_address,
-                            action="create_job_pool",
-                            resource_type="job_pool",
-                            resource_id=pool_id,
-                            details={
-                                "title": title,
-                                "required_skills": required_skills,
-                                "stake_amount": stake_amount,
-                                "duration_days": duration_days,
-                                "transaction_id": contract_result.transaction_id
-                            },
-                            success=True
+                        audit_log = audit_log_class(
+                            action_type="CREATE_POOL",
+                            pool_id=pool_id,
+                            user_address=request.creator_address,
+                            success=False,
+                            error_message=str(e)
                         )
                         db.add(audit_log)
                         
@@ -236,6 +229,7 @@ class TalentPoolService:
                             "job_pools:*",
                             f"creator_pools:{creator_address}:*"
                         ])
+                        
                 except Exception as db_error:
                     logger.warning(f"Database storage failed, using fallback: {str(db_error)}")
                     # Fall back to in-memory storage
@@ -306,7 +300,7 @@ class TalentPoolService:
                             error_message=str(e)
                         )
                         db.add(audit_log)
-                except:
+                except Exception:
                     pass  # Ignore audit log failures
             
             raise
@@ -425,9 +419,9 @@ class TalentPoolService:
                 match_score = 75.0  # Default fallback score
             
             # Apply on blockchain
-            contract_result = await apply_to_pool(
-                pool_id=int(pool_id.split('_')[1]) if '_' in pool_id else int(pool_id),
-                skill_token_ids=[int(tid.split('_')[1]) if '_' in tid else int(tid) for tid in skill_token_ids],
+            contract_result = await hedera_apply_to_pool(
+                pool_id=self._extract_numeric_id(pool_id),
+                skill_token_ids=[self._extract_numeric_id(tid) for tid in skill_token_ids],
                 cover_letter=cover_letter
             )
             
@@ -511,6 +505,20 @@ class TalentPoolService:
             raise
     
     # ============ HELPER FUNCTIONS ============
+    
+    def _extract_numeric_id(self, id_str: str) -> int:
+        """Extract numeric ID from string, handling various formats."""
+        try:
+            # If it's already a number, convert directly
+            return int(id_str)
+        except ValueError:
+            # Try to extract number from string like "pool_123" or "skill_456"
+            import re
+            match = re.search(r'\d+', id_str)
+            if match:
+                return int(match.group())
+            # Fallback: use hash of the string for consistent numeric ID
+            return abs(hash(id_str)) % 1000000
     
     async def _calculate_match_score(
         self,
@@ -734,10 +742,20 @@ class TalentPoolService:
             return []
 
 
-# Singleton getter for dependency injection
+# Singleton getters for dependency injection
 def get_talent_pool_service() -> TalentPoolService:
     """
     Get the talent pool service instance.
+    
+    Returns:
+        TalentPoolService: The talent pool service instance
+    """
+    return TalentPoolService()
+
+
+def get_pool_service() -> TalentPoolService:
+    """
+    Get the pool service instance (alias for get_talent_pool_service).
     
     Returns:
         TalentPoolService: The talent pool service instance

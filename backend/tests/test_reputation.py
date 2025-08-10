@@ -154,18 +154,12 @@ def test_evaluate_work():
     mock_reputation_service.evaluate_work.return_value = {
         "evaluation_id": "eval-123",
         "user_id": "0.0.12345",
-        "overall_score": 4.5,
-        "skill_scores": {
-            "0.0.54321": {
-                "score": 4.2,
-                "reasoning": "Good implementation",
-                "strengths": ["Clean code", "Good performance"],
-                "weaknesses": ["Limited test coverage"]
-            }
-        },
-        "recommendation": "Focus on improving test coverage",
-        "level_changes": {"0.0.54321": 1},
-        "timestamp": "2025-07-17T10:00:00Z"
+        "skill_token_ids": ["0.0.54321"],
+        "overall_score": 85,
+        "skill_scores": {"React.js": 85, "JavaScript": 80},
+        "feedback": "Good implementation with clean code and good performance. Focus on improving test coverage.",
+        "evaluated_at": "2023-01-01T00:00:00+00:00",
+        "evaluator": "AI Oracle"
     }
     
     # Patch the reputation service
@@ -182,9 +176,11 @@ def test_evaluate_work():
         response = client.post("/api/v1/skills/evaluate", json=request_data)
         
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["user_id"] == "0.0.12345"
-        assert "overall_score" in response.json()
-        assert "skill_scores" in response.json()
+        data = response.json()
+        assert data["user_id"] == "0.0.12345"
+        assert data["overall_score"] == 85
+        assert "skill_scores" in data
+        assert "feedback" in data
         
         # Verify service was called with correct arguments
         mock_reputation_service.evaluate_work.assert_called_once_with(
