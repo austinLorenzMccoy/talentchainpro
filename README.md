@@ -1,6 +1,6 @@
 # 🌟 TalentChain Pro 🌟
 
-![TalentChain Pro](https://via.placeholder.com/1200x300/4a90e2/ffffff?text=TalentChain+Pro)
+![TalentChain Pro Logo](./assets/logo.svg)
 
 > **Revolutionizing talent ecosystems with blockchain-verified skills, AI reputation oracles, and decentralized job matching**
 
