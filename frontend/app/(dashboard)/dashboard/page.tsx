@@ -9,6 +9,7 @@ import {
   TransactionHistoryWidget
 } from "@/components/dashboard";
 import { useAuth } from "@/hooks/useAuth";
+import { WifiOff } from "lucide-react";
 
 interface DashboardPageProps { }
 
@@ -80,11 +81,9 @@ export default function DashboardPage({ }: DashboardPageProps) {
             className="flex items-center justify-center min-h-[60vh]"
           >
             <div className="text-center max-w-md mx-auto">
-              <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-hedera-100 to-hedera-200 dark:from-hedera-900/30 dark:to-hedera-800/30 rounded-full flex items-center justify-center">
-                <div className="w-10 h-10 bg-gradient-to-br from-hedera-500 to-hedera-600 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
+              <div className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                  <WifiOff className="w-8 h-8 text-slate-400" />
                 </div>
               </div>
               <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">

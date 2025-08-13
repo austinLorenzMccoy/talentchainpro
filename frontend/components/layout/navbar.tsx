@@ -20,6 +20,7 @@ import { NavbarBackground } from "@/components/ui/background-elements";
 import { Logo } from "@/components/ui/logo";
 import WalletButton from "@/components/wallet/wallet-button";
 import { MobileMenu } from "@/components/navigation/mobile-menu";
+import { useAuth } from "@/hooks/useAuth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,25 +28,28 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const navigationItems = [
-  {
-    name: "Solutions",
-    items: [
-      { name: "Skill Tokens", icon: Shield, description: "Verifiable soulbound credentials" },
-      { name: "AI Matching", icon: Zap, description: "Smart talent discovery" },
-      { name: "Reputation", icon: TrendingUp, description: "Build your professional score" },
-      { name: "Community", icon: Users, description: "Connect with talents" }
-    ]
-  },
-  { name: "Marketplace", href: "/marketplace" },
-  { name: "Dashboard", href: "/dashboard" },
-  { name: "Docs", href: "/docs", external: true }
-];
-
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
+  const { isConnected } = useAuth();
+
+  // Dynamically build navigation items based on connection status
+  const navigationItems = [
+    {
+      name: "Solutions",
+      items: [
+        { name: "Skill Tokens", icon: Shield, description: "Verifiable soulbound credentials" },
+        { name: "AI Matching", icon: Zap, description: "Smart talent discovery" },
+        { name: "Reputation", icon: TrendingUp, description: "Build your professional score" },
+        { name: "Community", icon: Users, description: "Connect with talents" }
+      ]
+    },
+    { name: "Marketplace", href: "/marketplace" },
+    // Only show Dashboard when wallet is connected
+    ...(isConnected ? [{ name: "Dashboard", href: "/dashboard" }] : []),
+    { name: "Docs", href: "/docs", external: true }
+  ];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -63,8 +67,8 @@ export function Navbar() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
         className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled
-            ? 'backdrop-blur-md bg-white/80 dark:bg-hedera-950/80 border-b border-gray-200/20 dark:border-hedera-800/30 shadow-lg'
-            : 'backdrop-blur-sm bg-white/60 dark:bg-hedera-950/60 border-b border-transparent'
+          ? 'backdrop-blur-md bg-white/80 dark:bg-hedera-950/80 border-b border-gray-200/20 dark:border-hedera-800/30 shadow-lg'
+          : 'backdrop-blur-sm bg-white/60 dark:bg-hedera-950/60 border-b border-transparent'
           }`}
       >
         <NavbarBackground />

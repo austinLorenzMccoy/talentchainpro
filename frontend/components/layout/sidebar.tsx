@@ -3,19 +3,9 @@
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-    LayoutDashboard,
-    Trophy,
-    Briefcase,
-    Users,
-    Settings,
-    X,
-    LogOut,
-    User,
-    ChevronLeft,
-    ChevronRight
-} from "lucide-react";
+import { LayoutDashboard, Trophy, Briefcase, Users, Settings, X, LogOut, User, ChevronLeft, ChevronRight, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/ui/logo";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +42,12 @@ const navigation = [
         href: '/dashboard/companies',
         icon: Users,
         description: 'Company profiles'
+    },
+    {
+        name: 'Notifications',
+        href: '/dashboard/notifications',
+        icon: Bell,
+        description: 'View all notifications'
     },
     {
         name: 'Settings',
@@ -119,20 +115,8 @@ export function Sidebar({ isOpen, onToggle, onClose, isCollapsed, onToggleCollap
                 {/* Header */}
                 <div className="flex h-16 shrink-0 items-center justify-between px-4 border-b border-slate-200 dark:border-slate-800">
                     {/* Logo */}
-                    <Link href="/dashboard" className="flex items-center space-x-3 min-w-0" onClick={handleNavClick}>
-                        <div className="w-8 h-8 bg-gradient-to-br from-hedera-500 to-pink-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <Trophy className="w-5 h-5 text-white" />
-                        </div>
-                        {!isCollapsed && (
-                            <motion.span
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="text-lg font-bold text-slate-900 dark:text-white truncate"
-                            >
-                                TalentChain
-                            </motion.span>
-                        )}
+                    <Link href="/" className="flex items-center space-x-3 min-w-0" onClick={handleNavClick}>
+                        <Logo size={isCollapsed ? "sm" : "md"} showText={!isCollapsed} showSubtitle={false} />
                     </Link>
 
                     {/* Desktop collapse toggle button */}
@@ -144,7 +128,7 @@ export function Sidebar({ isOpen, onToggle, onClose, isCollapsed, onToggleCollap
                             className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
                             {isCollapsed ? (
-                                <ChevronRight className="h-4 w-4" />
+                                <ChevronRight className="ml-8 h-4 w-4" />
                             ) : (
                                 <ChevronLeft className="h-4 w-4" />
                             )}

@@ -28,27 +28,7 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
   // Show connection prompt if not connected
   if (!isConnected) {
     return (
-      <div className={cn("space-y-6", className)}>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center py-12"
-        >
-          <div className="w-16 h-16 mx-auto mb-4 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
-            <WifiOff className="w-8 h-8 text-slate-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
-            Connect Your Wallet
-          </h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-md mx-auto">
-            Connect your Hedera wallet to access your TalentChain Pro dashboard and manage your professional identity.
-          </p>
-          <Button className="bg-hedera-600 hover:bg-hedera-700">
-            Connect Wallet
-          </Button>
-        </motion.div>
-      </div>
+      <></>
     );
   }
 

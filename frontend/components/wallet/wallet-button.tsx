@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Wallet, ChevronDown, Loader2, User, LogOut, ExternalLink, Sparkles, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { Wallet, ChevronDown, Loader2, User, LogOut, ExternalLink, Sparkles, AlertCircle, Wifi, WifiOff, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -22,6 +22,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { WalletType } from '@/lib/wallet/wallet-connector';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 interface WalletButtonProps {
   variant?: 'default' | 'compact' | 'icon';
@@ -44,6 +46,10 @@ const WalletButton: React.FC<WalletButtonProps> = ({
   } = useAuth();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Check if we're on a dashboard page
+  const isOnDashboard = pathname?.startsWith('/dashboard');
 
   const walletOptions = [
     {
@@ -202,6 +208,15 @@ const WalletButton: React.FC<WalletButtonProps> = ({
           </div>
 
           <DropdownMenuSeparator />
+
+          {!isOnDashboard && (
+            <Link href="/dashboard">
+              <DropdownMenuItem className="p-3 cursor-pointer">
+                <LayoutDashboard className="mr-2 h-4 w-4" />
+                Go to Dashboard
+              </DropdownMenuItem>
+            </Link>
+          )}
 
           <DropdownMenuItem className="p-3">
             <User className="mr-2 h-4 w-4" />

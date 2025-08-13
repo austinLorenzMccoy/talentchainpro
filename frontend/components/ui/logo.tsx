@@ -6,9 +6,10 @@ interface LogoProps {
   size?: "sm" | "md" | "lg" | "xl";
   showText?: boolean;
   className?: string;
+  showSubtitle?: boolean;
 }
 
-export function Logo({ size = "md", showText = true, className = "" }: LogoProps) {
+export function Logo({ size = "md", showText = true, showSubtitle = true, className = "" }: LogoProps) {
   const sizeConfig = {
     sm: { icon: "w-8 h-8", text: "text-sm sm:text-base", subtitle: "text-[10px]" },
     md: { icon: "w-8 h-8 sm:w-10 sm:h-10", text: "text-base sm:text-lg", subtitle: "text-[10px] sm:text-xs" },
@@ -19,7 +20,7 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
   const config = sizeConfig[size];
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
@@ -40,14 +41,14 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
               <rect width="100%" height="100%" fill="url(#logo-pattern)" />
             </svg>
           </div>
-          
+
           {/* Central Icon - Blockchain/Chain Links */}
           <div className="relative z-10 flex items-center justify-center">
-            <svg 
-              width="60%" 
-              height="60%" 
-              viewBox="0 0 24 24" 
-              fill="none" 
+            <svg
+              width="60%"
+              height="60%"
+              viewBox="0 0 24 24"
+              fill="none"
               xmlns="http://www.w3.org/2000/svg"
               className="text-white"
             >
@@ -61,7 +62,7 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
                 <path d="M18 8L21.5 10V14L18 16L14.5 14V10L18 8Z" opacity="0.7" />
                 {/* Bottom Hexagon */}
                 <path d="M12 14L15.5 16V20L12 22L8.5 20V16L12 14Z" opacity="0.9" />
-                
+
                 {/* Connection Lines */}
                 <path d="M12 10L12 14" stroke="currentColor" strokeWidth="1.5" opacity="0.6" />
                 <path d="M9.5 12L14.5 12" stroke="currentColor" strokeWidth="1.5" opacity="0.6" />
@@ -72,7 +73,7 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
           {/* Animated Glow Rings */}
           <motion.div
             animate={{ rotate: 360, scale: [1, 1.1, 1] }}
-            transition={{ 
+            transition={{
               rotate: { duration: 20, repeat: Infinity, ease: "linear" },
               scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }
             }}
@@ -80,28 +81,28 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
           />
           <motion.div
             animate={{ rotate: -360, scale: [1, 0.9, 1] }}
-            transition={{ 
+            transition={{
               rotate: { duration: 15, repeat: Infinity, ease: "linear" },
               scale: { duration: 3, repeat: Infinity, ease: "easeInOut", delay: 1 }
             }}
             className="absolute inset-2 border border-white/10 rounded-lg"
           />
         </div>
-        
+
         {/* Animated Glow Effect */}
         <motion.div
-          animate={{ 
+          animate={{
             scale: [1, 1.2, 1],
             opacity: [0.3, 0.6, 0.3]
           }}
-          transition={{ 
-            duration: 3, 
-            repeat: Infinity, 
-            ease: "easeInOut" 
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: "easeInOut"
           }}
           className={`absolute inset-0 ${config.icon} bg-gradient-to-br from-hedera-400 to-hedera-600 rounded-xl blur-sm -z-10`}
         />
-        
+
         {/* Particle Effects */}
         <div className="absolute -inset-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           {[...Array(8)].map((_, i) => (
@@ -127,10 +128,10 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
           ))}
         </div>
       </div>
-      
+
       {/* Logo Text */}
       {showText && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
@@ -140,7 +141,7 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
           <div className="flex flex-col">
             {/* Desktop Layout - Professional inline */}
             <div className="hidden sm:flex items-baseline space-x-0.5">
-              <motion.span 
+              <motion.span
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
@@ -149,7 +150,7 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
               >
                 Talent
               </motion.span>
-              <motion.span 
+              <motion.span
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.5, ease: "easeOut" }}
@@ -158,7 +159,7 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
               >
                 Chain
               </motion.span>
-              <motion.span 
+              <motion.span
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4, delay: 0.6 }}
@@ -172,7 +173,7 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
             {/* Mobile Layout - PRO underneath as requested */}
             <div className="flex flex-col sm:hidden">
               <div className="flex items-baseline space-x-0.5">
-                <motion.span 
+                <motion.span
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
@@ -181,7 +182,7 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
                 >
                   Talent
                 </motion.span>
-                <motion.span 
+                <motion.span
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.5, ease: "easeOut" }}
@@ -191,7 +192,7 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
                   Chain
                 </motion.span>
               </div>
-              <motion.span 
+              <motion.span
                 initial={{ opacity: 0, y: 3 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.6 }}
@@ -202,17 +203,19 @@ export function Logo({ size = "md", showText = true, className = "" }: LogoProps
               </motion.span>
             </div>
           </div>
-          
+
           {/* Original Stylish Tagline */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-            className={`${config.subtitle} text-slate-500 dark:text-slate-400 font-medium tracking-wide hidden sm:block leading-none mt-0.5 opacity-75`}
-            style={{ letterSpacing: '0.1em' }}
-          >
-            Web3 Talent Ecosystem
-          </motion.div>
+          {showSubtitle && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+              className={`${config.subtitle} text-slate-500 dark:text-slate-400 font-medium tracking-wide hidden sm:block leading-none mt-0.5 opacity-75`}
+              style={{ letterSpacing: '0.1em' }}
+            >
+              Web3 Talent Ecosystem
+            </motion.div>
+          )}
         </motion.div>
       )}
     </motion.div>

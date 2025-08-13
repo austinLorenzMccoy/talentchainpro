@@ -776,11 +776,60 @@ export class WalletConnector {
             if (saved) {
                 try {
                     this.connection = JSON.parse(saved);
+                    
+                    // If we have a saved connection, try to restore it
+                    if (this.connection) {
+                        // For MetaMask, check if the account is still accessible
+                        if (this.connection.type === WalletType.METAMASK) {
+                            this.restoreMetaMaskConnection();
+                        } else if (this.connection.type === WalletType.HASHPACK) {
+                            this.restoreHashPackConnection();
+                        }
+                        // For WalletConnect, the connection might need to be re-established
+                    }
                 } catch (error) {
                     console.error('Error loading saved connection:', error);
                     this.clearSavedConnection();
                 }
             }
+        }
+    }
+
+    private async restoreMetaMaskConnection() {
+        try {
+            const ethereum = window.ethereum as any;
+            if (ethereum && ethereum.isMetaMask) {
+                // Check if the saved account is still accessible
+                const accounts = await ethereum.request({ method: 'eth_accounts' });
+                if (accounts && accounts.length > 0 && accounts[0].toLowerCase() === this.connection?.address.toLowerCase()) {
+                    // Account is still accessible, restore the connection
+                    console.log('Restoring MetaMask connection...');
+                    this.emit('connected', this.connection);
+                } else {
+                    console.log('Saved MetaMask account no longer accessible, clearing connection');
+                    this.clearSavedConnection();
+                }
+            }
+        } catch (error) {
+            console.error('Error restoring MetaMask connection:', error);
+            this.clearSavedConnection();
+        }
+    }
+
+    private async restoreHashPackConnection() {
+        try {
+            // For HashPack, we might need to check if the extension is still available
+            // and if the account is still accessible
+            if (WalletConnector.isHashPackInstalled()) {
+                console.log('Restoring HashPack connection...');
+                this.emit('connected', this.connection);
+            } else {
+                console.log('HashPack extension not available, clearing connection');
+                this.clearSavedConnection();
+            }
+        } catch (error) {
+            console.error('Error restoring HashPack connection:', error);
+            this.clearSavedConnection();
         }
     }
 
