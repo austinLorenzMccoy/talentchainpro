@@ -26,7 +26,7 @@ export default function WalletTestPage() {
         checkAvailableWallets();
     }, []);
 
-    const checkAvailableWallets = () => {
+    const checkAvailableWallets = async () => {
         addLog('Checking available wallets...');
 
         // Check HashPack
@@ -38,7 +38,7 @@ export default function WalletTestPage() {
         addLog(`MetaMask installed: ${metamaskInstalled}`);
 
         // Get all available wallets
-        const available = getAvailableWallets();
+        const available = await getAvailableWallets();
         setAvailableWallets(available);
         addLog(`Available wallets: ${available.join(', ')}`);
     };

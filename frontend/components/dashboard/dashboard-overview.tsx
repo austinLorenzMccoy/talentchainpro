@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { RefreshCw, AlertCircle, Wifi, WifiOff } from "lucide-react";
+import { RefreshCw, AlertCircle, Wifi, WifiOff, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -93,19 +93,20 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
 
   return (
     <div className={cn("space-y-6 sm:space-y-8", className)}>
-      {/* Header */}
+      {/* Header Section */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6"
       >
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
+        {/* Left Side - Welcome Message */}
+        <div className="flex-1">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white mb-3 tracking-tight">
             Welcome back! 👋
           </h1>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-slate-600 dark:text-slate-400">
-            <span>Here's your TalentChain Pro overview</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-sm text-slate-600 dark:text-slate-400">
+            <span className="text-base">Here's your TalentChain Pro overview</span>
             <div className="flex items-center gap-4">
               {/* Real-time Connection Status */}
               <div className="flex items-center gap-2">
@@ -115,7 +116,7 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
                   <WifiOff className="w-4 h-4 text-slate-400" />
                 )}
                 <span className={cn(
-                  "text-xs",
+                  "text-xs font-medium",
                   realtimeConnected ? "text-success-600 dark:text-success-400" : "text-slate-500"
                 )}>
                   {connectionStatus === 'connected' && 'Live'}
@@ -135,11 +136,12 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Right Side - Network Status & Actions */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
           {/* Network Status */}
           <Badge
             variant="outline"
-            className="bg-success-50/50 dark:bg-success-900/20 border-success-200/30 dark:border-success-800/30 text-success-700 dark:text-success-400"
+            className="bg-success-50/50 dark:bg-success-900/20 border-success-200/30 dark:border-success-800/30 text-success-700 dark:text-success-400 px-3 py-1.5"
           >
             <div className="w-2 h-2 bg-success-500 rounded-full animate-pulse mr-2" />
             Hedera Network
@@ -151,7 +153,7 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
             size="sm"
             onClick={refetch}
             disabled={isLoading}
-            className="hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="hover:bg-slate-50 dark:hover:bg-slate-800 px-4 py-2"
           >
             <RefreshCw className={cn("w-4 h-4 mr-2", isLoading && "animate-spin")} />
             Refresh
@@ -183,9 +185,14 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
         </motion.div>
       )}
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Improved Layout */}
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8"
+        >
           <SkillTokensStatsCard
             value={stats.totalSkillTokens}
             trend={
@@ -200,7 +207,7 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
             value={stats.activeApplications}
             trend={
               stats.activeApplications > 0
-                ? { value: 8, label: "new this week", isPositive: true }
+                ? { value: 8, label: "vs last month", isPositive: true }
                 : undefined
             }
             delay={0.2}
@@ -210,7 +217,7 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
             value={stats.completedMatches}
             trend={
               stats.completedMatches > 0
-                ? { value: 25, label: "success rate", isPositive: true }
+                ? { value: 15, label: "vs last month", isPositive: true }
                 : undefined
             }
             delay={0.3}
@@ -229,49 +236,33 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
             }
             delay={0.4}
           />
-        </div>
+        </motion.div>
       )}
 
-      {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.5 }}
-        className="flex flex-wrap gap-3"
-      >
-        <Button className="bg-hedera-600 hover:bg-hedera-700 text-white">
-          Create Skill Token
-        </Button>
-        <Button variant="outline" className="hover:bg-slate-50 dark:hover:bg-slate-800">
-          Browse Jobs
-        </Button>
-        <Button variant="outline" className="hover:bg-slate-50 dark:hover:bg-slate-800">
-          Submit Work for Evaluation
-        </Button>
-      </motion.div>
-
-      {/* Pro Tip */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
-        className="bg-gradient-to-r from-hedera-50 to-pink-50 dark:from-hedera-950/20 dark:to-pink-950/20 rounded-xl p-6 border border-hedera-200/50 dark:border-hedera-800/50"
-      >
-        <div className="flex items-start space-x-4">
-          <div className="w-10 h-10 bg-gradient-to-br from-hedera-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-sm">💡</span>
+      {/* Tips Section */}
+      {stats && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+          className="bg-gradient-to-r from-hedera-50 to-blue-50 dark:from-hedera-950/30 dark:to-blue-950/30 border border-hedera-200/30 dark:border-hedera-800/30 rounded-xl p-6"
+        >
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 bg-gradient-to-br from-hedera-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <Star className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                Pro Tips for Success
+              </h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                Regularly submit your work for AI evaluation to increase your skill levels and reputation score.
+                Higher reputation scores lead to better job matches and higher earning potential.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold text-slate-900 dark:text-white mb-1">
-              Pro Tip: Maximize Your Reputation
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              Regularly submit your work for AI evaluation to increase your skill levels and reputation score.
-              Higher reputation scores lead to better job matches and higher earning potential.
-            </p>
-          </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }

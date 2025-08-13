@@ -149,9 +149,9 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
   };
 
   const canApplyToPool = (pool: JobPoolInfo) => {
-      return pool.status === PoolStatus.Active &&
-    !isUserApplied(pool) &&
-    user?.accountId !== pool.company;
+    return pool.status === PoolStatus.Active &&
+      !isUserApplied(pool) &&
+      user?.accountId !== pool.company;
   };
 
   const handleApplyToPool = async () => {
@@ -203,15 +203,28 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
       icon={Briefcase}
       className={className}
       headerActions={
-        <div className="flex items-center space-x-2">
-          <Button size="sm" variant="outline" onClick={refetch} disabled={isLoading}>
+        <div className="flex items-center space-x-3">
+          {/* Refresh Button */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={refetch}
+            disabled={isLoading}
+            className="hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <TrendingUp className="w-4 h-4" />
             )}
+            <span className="hidden sm:inline ml-2">Refresh</span>
           </Button>
-          <Button size="sm" className="bg-hedera-600 hover:bg-hedera-700 text-white">
+
+          {/* Create Pool Button */}
+          <Button
+            size="sm"
+            className="bg-gradient-to-r from-hedera-600 to-hedera-700 hover:from-hedera-700 hover:to-hedera-800 text-white shadow-sm"
+          >
             <Plus className="w-4 h-4 mr-2" />
             <span className="hidden sm:inline">Create Pool</span>
           </Button>

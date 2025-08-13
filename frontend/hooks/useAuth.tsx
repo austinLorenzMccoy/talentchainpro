@@ -36,7 +36,7 @@ interface AuthContextType {
     setUserRole: (role: UserRole) => void;
     updateProfile: (profile: Partial<User['profile']>) => void;
     updateBalance: () => Promise<void>;
-    getAvailableWallets: () => WalletType[];
+    getAvailableWallets: () => Promise<WalletType[]>;
     connection: WalletConnection | null;
 }
 
@@ -129,18 +129,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             const currentConnection = walletConnector.getConnection();
             if (currentConnection && walletConnector.isConnected()) {
-                setConnection(currentConnection);
-                setIsConnected(true);
+                // Check if the connection is still healthy
+                const isHealthy = await walletConnector.checkConnectionHealth();
 
-                // Check for existing user profile
-                const existingUser = localStorage.getItem(`user_${currentConnection.accountId}`);
-                if (existingUser) {
-                    const userProfile = JSON.parse(existingUser);
-                    setUser(userProfile);
+                if (isHealthy) {
+                    setConnection(currentConnection);
+                    setIsConnected(true);
+
+                    // Check for existing user profile
+                    const existingUser = localStorage.getItem(`user_${currentConnection.accountId}`);
+                    if (existingUser) {
+                        const userProfile = JSON.parse(existingUser);
+                        setUser(userProfile);
+                    }
+                } else {
+                    console.log('Stored connection is unhealthy, clearing...');
+                    walletConnector.resetConnectionState();
                 }
             }
         } catch (error) {
             console.error('Error checking existing session:', error);
+            // If there's an error, reset the connection state
+            walletConnector.resetConnectionState();
         } finally {
             setIsLoading(false);
         }
@@ -220,8 +230,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const getAvailableWallets = (): WalletType[] => {
-        return WalletConnector.getAvailableWallets();
+    const getAvailableWallets = async (): Promise<WalletType[]> => {
+        return await WalletConnector.getAvailableWallets();
     };
 
     const value: AuthContextType = {

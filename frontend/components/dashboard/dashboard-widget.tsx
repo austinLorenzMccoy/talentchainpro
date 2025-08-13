@@ -54,17 +54,17 @@ export function DashboardWidget({
           "flex-shrink-0 pb-4",
           noPadding ? "p-4 sm:p-6" : ""
         )}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3 min-w-0">
+          <div className="flex flex-wrap gap-3 items-center justify-between">
+            <div className="flex flex-wrap gap-2 items-center space-x-3 min-w-0">
               {Icon && (
                 <motion.div
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
-                  transition={{ 
-                    type: "spring", 
-                    stiffness: 260, 
+                  transition={{
+                    type: "spring",
+                    stiffness: 260,
                     damping: 20,
-                    delay: delay + 0.1 
+                    delay: delay + 0.1
                   }}
                   className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-hedera-100 to-hedera-200 dark:from-hedera-800/30 dark:to-hedera-700/30 rounded-lg flex items-center justify-center"
                 >
@@ -86,12 +86,12 @@ export function DashboardWidget({
             {/* Header Actions */}
             <div className="flex items-center space-x-2 flex-shrink-0">
               {headerActions}
-              
+
               {actions && actions.length > 0 && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       size="sm"
                       className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
@@ -101,8 +101,8 @@ export function DashboardWidget({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
                     {actions.map((action, index) => (
-                      <DropdownMenuItem 
-                        key={index} 
+                      <DropdownMenuItem
+                        key={index}
                         onClick={action.onClick}
                         className="cursor-pointer"
                       >

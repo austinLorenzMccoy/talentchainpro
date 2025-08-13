@@ -41,31 +41,34 @@ export function StatsCard({
       transition={{ duration: 0.5, delay }}
       className={className}
     >
-      <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border-slate-200/50 dark:border-slate-700/50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+      <Card className="relative overflow-hidden group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border-slate-200/50 dark:border-slate-700/50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm h-full">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.05]">
           <div className="absolute inset-0 bg-gradient-to-br from-current/5 to-transparent" />
         </div>
 
-        <CardContent className="p-4 sm:p-6">
-          <div className="flex items-start justify-between">
+        {/* Hover Effect Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-hedera-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+        <CardContent className="p-5 sm:p-6 h-full flex flex-col">
+          <div className="flex items-start justify-between mb-4">
             <div className="flex-1 min-w-0">
               {/* Title */}
-              <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-slate-400 mb-1 truncate">
+              <p className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-2 truncate">
                 {title}
               </p>
-              
+
               {/* Value */}
-              <div className="flex items-baseline space-x-2 mb-2">
-                <motion.p 
+              <div className="flex items-baseline space-x-3 mb-3">
+                <motion.p
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ duration: 0.5, delay: delay + 0.2 }}
-                  className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 dark:text-white tracking-tight"
+                  className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 dark:text-white tracking-tight"
                 >
                   {value}
                 </motion.p>
-                
+
                 {/* Trend Indicator */}
                 {trend && (
                   <motion.div
@@ -73,7 +76,7 @@ export function StatsCard({
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4, delay: delay + 0.3 }}
                     className={cn(
-                      "text-xs font-semibold px-1.5 py-0.5 rounded-full",
+                      "text-xs font-bold px-2 py-1 rounded-full whitespace-nowrap",
                       trend.isPositive
                         ? "text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30"
                         : "text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30"
@@ -86,14 +89,14 @@ export function StatsCard({
 
               {/* Description */}
               {description && (
-                <p className="text-xs text-slate-500 dark:text-slate-500 leading-relaxed">
+                <p className="text-sm text-slate-500 dark:text-slate-500 leading-relaxed mb-2">
                   {description}
                 </p>
               )}
 
               {/* Trend Label */}
               {trend && (
-                <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 dark:text-slate-500 mt-auto">
                   {trend.label}
                 </p>
               )}
@@ -103,29 +106,22 @@ export function StatsCard({
             <motion.div
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
-              transition={{ 
-                type: "spring", 
-                stiffness: 260, 
-                damping: 20,
-                delay: delay + 0.1 
-              }}
+              transition={{ duration: 0.5, delay: delay + 0.1, type: "spring" }}
               className={cn(
-                "flex-shrink-0 p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 group-hover:scale-110",
+                "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0",
                 iconBg
               )}
             >
-              <Icon className={cn("w-5 h-5 sm:w-6 sm:h-6", iconColor)} />
+              <Icon className={cn("w-6 h-6", iconColor)} />
             </motion.div>
           </div>
-        </CardContent>
 
-        {/* Gradient Bottom Border */}
-        <div className={cn("absolute inset-x-0 bottom-0 h-1 bg-gradient-to-r", gradient)} />
-        
-        {/* Hover Glow Effect */}
-        <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-          <div className={cn("absolute inset-0 bg-gradient-to-r opacity-5 rounded-lg", gradient)} />
-        </div>
+          {/* Bottom Border Accent */}
+          <div className={cn(
+            "absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r",
+            gradient
+          )} />
+        </CardContent>
       </Card>
     </motion.div>
   );
@@ -134,16 +130,16 @@ export function StatsCard({
 /**
  * Pre-configured stats cards for common dashboard metrics
  */
-export function SkillTokensStatsCard({ 
-  value, 
-  trend, 
-  delay = 0, 
-  className 
-}: { 
-  value: number; 
-  trend?: { value: number; label: string; isPositive: boolean }; 
-  delay?: number; 
-  className?: string; 
+export function SkillTokensStatsCard({
+  value,
+  trend,
+  delay = 0,
+  className
+}: {
+  value: number;
+  trend?: { value: number; label: string; isPositive: boolean };
+  delay?: number;
+  className?: string;
 }) {
   return (
     <StatsCard
@@ -161,16 +157,16 @@ export function SkillTokensStatsCard({
   );
 }
 
-export function ActiveApplicationsStatsCard({ 
-  value, 
-  trend, 
-  delay = 0, 
-  className 
-}: { 
-  value: number; 
-  trend?: { value: number; label: string; isPositive: boolean }; 
-  delay?: number; 
-  className?: string; 
+export function ActiveApplicationsStatsCard({
+  value,
+  trend,
+  delay = 0,
+  className
+}: {
+  value: number;
+  trend?: { value: number; label: string; isPositive: boolean };
+  delay?: number;
+  className?: string;
 }) {
   return (
     <StatsCard
@@ -188,16 +184,16 @@ export function ActiveApplicationsStatsCard({
   );
 }
 
-export function CompletedMatchesStatsCard({ 
-  value, 
-  trend, 
-  delay = 0, 
-  className 
-}: { 
-  value: number; 
-  trend?: { value: number; label: string; isPositive: boolean }; 
-  delay?: number; 
-  className?: string; 
+export function CompletedMatchesStatsCard({
+  value,
+  trend,
+  delay = 0,
+  className
+}: {
+  value: number;
+  trend?: { value: number; label: string; isPositive: boolean };
+  delay?: number;
+  className?: string;
 }) {
   return (
     <StatsCard
@@ -215,16 +211,16 @@ export function CompletedMatchesStatsCard({
   );
 }
 
-export function ReputationStatsCard({ 
-  value, 
-  trend, 
-  delay = 0, 
-  className 
-}: { 
-  value: number; 
-  trend?: { value: number; label: string; isPositive: boolean }; 
-  delay?: number; 
-  className?: string; 
+export function ReputationStatsCard({
+  value,
+  trend,
+  delay = 0,
+  className
+}: {
+  value: number;
+  trend?: { value: number; label: string; isPositive: boolean };
+  delay?: number;
+  className?: string;
 }) {
   return (
     <StatsCard

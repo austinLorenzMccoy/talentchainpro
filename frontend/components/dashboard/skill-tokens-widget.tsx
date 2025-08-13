@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Trophy, 
-  Plus, 
-  Edit3, 
-  ExternalLink, 
-  Star, 
-  Award, 
-  BookOpen, 
+import {
+  Trophy,
+  Plus,
+  Edit3,
+  ExternalLink,
+  Star,
+  Award,
+  BookOpen,
   Target,
   TrendingUp,
   Filter,
@@ -54,7 +54,7 @@ import { cn } from "@/lib/utils";
 
 const skillCategories = [
   "Blockchain Development",
-  "Frontend Development", 
+  "Frontend Development",
   "Backend Development",
   "Smart Contracts",
   "UI/UX Design",
@@ -72,17 +72,17 @@ interface SkillTokensWidgetProps {
 
 export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
   const { skillTokens, isLoading, error, refetch, createSkillToken, updateSkillLevel } = useSkillTokens();
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [sortBy, setSortBy] = useState("level"); // level, category, recent
-  
+
   // Create skill token dialog state
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState(false);
-  
+
   const [newSkill, setNewSkill] = useState({
     category: "",
     customCategory: "",
@@ -95,7 +95,7 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
   const filteredAndSortedSkills = skillTokens
     .filter(skill => {
       const matchesSearch = skill.category.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = selectedCategory === "all" || 
+      const matchesCategory = selectedCategory === "all" ||
         skill.category.toLowerCase().includes(selectedCategory.toLowerCase());
       return matchesSearch && matchesCategory;
     })
@@ -114,27 +114,27 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
 
   // Skill level configuration
   const getSkillLevelConfig = (level: number) => {
-    if (level >= 8) return { 
-      bg: "bg-emerald-100 dark:bg-emerald-900/30", 
-      text: "text-emerald-700 dark:text-emerald-300", 
+    if (level >= 8) return {
+      bg: "bg-emerald-100 dark:bg-emerald-900/30",
+      text: "text-emerald-700 dark:text-emerald-300",
       border: "border-emerald-200 dark:border-emerald-800",
       label: "Expert"
     };
-    if (level >= 6) return { 
-      bg: "bg-blue-100 dark:bg-blue-900/30", 
-      text: "text-blue-700 dark:text-blue-300", 
+    if (level >= 6) return {
+      bg: "bg-blue-100 dark:bg-blue-900/30",
+      text: "text-blue-700 dark:text-blue-300",
       border: "border-blue-200 dark:border-blue-800",
       label: "Advanced"
     };
-    if (level >= 4) return { 
-      bg: "bg-yellow-100 dark:bg-yellow-900/30", 
-      text: "text-yellow-700 dark:text-yellow-300", 
+    if (level >= 4) return {
+      bg: "bg-yellow-100 dark:bg-yellow-900/30",
+      text: "text-yellow-700 dark:text-yellow-300",
       border: "border-yellow-200 dark:border-yellow-800",
       label: "Intermediate"
     };
-    return { 
-      bg: "bg-slate-100 dark:bg-slate-900/30", 
-      text: "text-slate-700 dark:text-slate-300", 
+    return {
+      bg: "bg-slate-100 dark:bg-slate-900/30",
+      text: "text-slate-700 dark:text-slate-300",
       border: "border-slate-200 dark:border-slate-800",
       label: "Beginner"
     };
@@ -167,7 +167,7 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
 
       if (result.success) {
         setCreateSuccess(true);
-        
+
         // Reset form after successful creation
         setTimeout(() => {
           setNewSkill({
@@ -190,8 +190,8 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
     }
   };
 
-  const averageLevel = skillTokens.length > 0 
-    ? skillTokens.reduce((acc, skill) => acc + skill.level, 0) / skillTokens.length 
+  const averageLevel = skillTokens.length > 0
+    ? skillTokens.reduce((acc, skill) => acc + skill.level, 0) / skillTokens.length
     : 0;
 
   const expertSkills = skillTokens.filter(s => s.level >= 8).length;
@@ -203,27 +203,30 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
       icon={Trophy}
       className={className}
       headerActions={
-        <div className="flex items-center space-x-2">
-          {/* Quick Stats */}
-          <div className="hidden sm:flex items-center space-x-4 text-sm text-slate-600 dark:text-slate-400 mr-4">
-            <div className="flex items-center space-x-1">
-              <Trophy className="w-4 h-4" />
-              <span>{skillTokens.length}</span>
+        <div className="flex items-center space-x-4">
+          {/* Quick Stats - Better Layout */}
+          <div className="hidden lg:flex items-center space-x-6 text-sm text-slate-600 dark:text-slate-400">
+            <div className="flex items-center space-x-2 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+              <Trophy className="w-4 h-4 text-hedera-500" />
+              <span className="font-medium">{skillTokens.length}</span>
+              <span className="text-xs">Skills</span>
             </div>
-            <div className="flex items-center space-x-1">
-              <TrendingUp className="w-4 h-4" />
-              <span>{averageLevel.toFixed(1)}</span>
+            <div className="flex items-center space-x-2 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+              <TrendingUp className="w-4 h-4 text-blue-500" />
+              <span className="font-medium">{averageLevel.toFixed(1)}</span>
+              <span className="text-xs">Avg Level</span>
             </div>
-            <div className="flex items-center space-x-1">
-              <Star className="w-4 h-4" />
-              <span>{expertSkills}</span>
+            <div className="flex items-center space-x-2 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+              <Star className="w-4 h-4 text-yellow-500" />
+              <span className="font-medium">{expertSkills}</span>
+              <span className="text-xs">Expert</span>
             </div>
           </div>
 
           {/* Create Skill Button */}
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="bg-hedera-600 hover:bg-hedera-700 text-white">
+              <Button size="sm" className="bg-gradient-to-r from-hedera-600 to-hedera-700 hover:from-hedera-700 hover:to-hedera-800 text-white shadow-sm">
                 <Plus className="w-4 h-4 mr-2" />
                 <span className="hidden sm:inline">Create Skill</span>
               </Button>
@@ -235,14 +238,14 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
                   Mint a new soulbound token representing your professional skill
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="space-y-4 max-h-[60vh] overflow-y-auto">
                 {/* Skill Category */}
                 <div className="space-y-2">
                   <Label htmlFor="category">Skill Category</Label>
-                  <Select 
-                    value={newSkill.category} 
-                    onValueChange={(value) => setNewSkill({...newSkill, category: value})}
+                  <Select
+                    value={newSkill.category}
+                    onValueChange={(value) => setNewSkill({ ...newSkill, category: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a skill category" />
@@ -265,7 +268,7 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
                     <Input
                       id="customCategory"
                       value={newSkill.customCategory}
-                      onChange={(e) => setNewSkill({...newSkill, customCategory: e.target.value})}
+                      onChange={(e) => setNewSkill({ ...newSkill, customCategory: e.target.value })}
                       placeholder="Enter custom skill category"
                     />
                   </div>
@@ -274,15 +277,15 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
                 {/* Skill Level */}
                 <div className="space-y-2">
                   <Label htmlFor="level">Initial Level (1-10)</Label>
-                  <Select 
-                    value={newSkill.level.toString()} 
-                    onValueChange={(value) => setNewSkill({...newSkill, level: parseInt(value)})}
+                  <Select
+                    value={newSkill.level.toString()}
+                    onValueChange={(value) => setNewSkill({ ...newSkill, level: parseInt(value) })}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Array.from({length: 10}, (_, i) => i + 1).map((level) => (
+                      {Array.from({ length: 10 }, (_, i) => i + 1).map((level) => (
                         <SelectItem key={level} value={level.toString()}>
                           Level {level} - {level <= 3 ? 'Beginner' : level <= 6 ? 'Intermediate' : level <= 8 ? 'Advanced' : 'Expert'}
                         </SelectItem>
@@ -297,7 +300,7 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
                   <Textarea
                     id="evidence"
                     value={newSkill.evidence}
-                    onChange={(e) => setNewSkill({...newSkill, evidence: e.target.value})}
+                    onChange={(e) => setNewSkill({ ...newSkill, evidence: e.target.value })}
                     placeholder="Provide links to your work, certifications, or portfolio"
                     rows={3}
                   />
@@ -309,7 +312,7 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
                   <Textarea
                     id="description"
                     value={newSkill.description}
-                    onChange={(e) => setNewSkill({...newSkill, description: e.target.value})}
+                    onChange={(e) => setNewSkill({ ...newSkill, description: e.target.value })}
                     placeholder="Describe your experience and expertise in this skill"
                     rows={3}
                   />
@@ -338,8 +341,8 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
                 )}
 
                 {/* Create Button */}
-                <Button 
-                  onClick={handleCreateSkill} 
+                <Button
+                  onClick={handleCreateSkill}
                   disabled={!newSkill.category || isCreating || createSuccess}
                   className="w-full bg-hedera-600 hover:bg-hedera-700"
                 >
@@ -447,7 +450,7 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
             {filteredAndSortedSkills.map((skill, index) => {
               const levelConfig = getSkillLevelConfig(skill.level);
               const SkillIcon = getSkillIcon(skill.category);
-              
+
               return (
                 <motion.div
                   key={skill.tokenId}
@@ -539,8 +542,8 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
             <div className="text-center py-8">
               <Trophy className="w-12 h-12 mx-auto text-slate-400 mb-4" />
               <p className="text-slate-600 dark:text-slate-400">No skills match your filters</p>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   setSearchTerm("");
                   setSelectedCategory("all");
@@ -562,7 +565,7 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
               <p className="text-slate-600 dark:text-slate-400 mb-6">
                 Create your first skill token to get started with TalentChain Pro
               </p>
-              <Button 
+              <Button
                 onClick={() => setIsCreateDialogOpen(true)}
                 className="bg-hedera-600 hover:bg-hedera-700"
               >
