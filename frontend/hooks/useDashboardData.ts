@@ -11,7 +11,7 @@ import {
   TransactionResult
 } from '@/lib/types/wallet';
 import { dashboardApi } from '@/lib/api/dashboard-service';
-import { useHederaWallet } from './useHederaWallet';
+import { useAuth } from './useAuth';
 import { useDashboardRealtimeSync } from './useRealTimeUpdates';
 
 interface UseDashboardDataReturn {
@@ -47,7 +47,7 @@ interface UseJobPoolsReturn {
  * Main dashboard data hook - aggregates all dashboard information
  */
 export function useDashboardData(): UseDashboardDataReturn {
-  const { wallet, isConnected } = useHederaWallet();
+  const { user, isConnected } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [skillTokens, setSkillTokens] = useState<SkillTokenInfo[]>([]);
   const [jobPools, setJobPools] = useState<JobPoolInfo[]>([]);
@@ -56,7 +56,7 @@ export function useDashboardData(): UseDashboardDataReturn {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
-    if (!isConnected || !wallet?.accountId) {
+    if (!isConnected || !user?.accountId) {
       return;
     }
 
@@ -65,7 +65,7 @@ export function useDashboardData(): UseDashboardDataReturn {
 
     try {
       // Fetch dashboard stats
-      const statsResponse = await dashboardApi.getDashboardStats(wallet.accountId);
+      const statsResponse = await dashboardApi.getDashboardStats(user.accountId);
       if (statsResponse.success && statsResponse.data) {
         setStats(statsResponse.data);
       } else {
@@ -73,7 +73,7 @@ export function useDashboardData(): UseDashboardDataReturn {
       }
 
       // Fetch skill tokens
-      const skillsResponse = await dashboardApi.getUserSkillTokens(wallet.accountId);
+      const skillsResponse = await dashboardApi.getUserSkillTokens(user.accountId);
       if (skillsResponse.success && skillsResponse.data) {
         setSkillTokens(skillsResponse.data);
       } else {
@@ -98,7 +98,7 @@ export function useDashboardData(): UseDashboardDataReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [isConnected, wallet?.accountId]);
+  }, [isConnected, user?.accountId]);
 
   // Auto-fetch on wallet connection
   useEffect(() => {
@@ -150,13 +150,13 @@ export function useDashboardData(): UseDashboardDataReturn {
  * Skill tokens specific hook with CRUD operations
  */
 export function useSkillTokens(): UseSkillTokensReturn {
-  const { wallet, isConnected } = useHederaWallet();
+  const { user, isConnected } = useAuth();
   const [skillTokens, setSkillTokens] = useState<SkillTokenInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchSkillTokens = useCallback(async () => {
-    if (!isConnected || !wallet?.accountId) {
+    if (!isConnected || !user?.accountId) {
       setSkillTokens([]);
       return;
     }
@@ -165,7 +165,7 @@ export function useSkillTokens(): UseSkillTokensReturn {
     setError(null);
 
     try {
-      const response = await dashboardApi.getUserSkillTokens(wallet.accountId);
+      const response = await dashboardApi.getUserSkillTokens(user.accountId);
       if (response.success && response.data) {
         setSkillTokens(response.data);
       } else {
@@ -178,7 +178,7 @@ export function useSkillTokens(): UseSkillTokensReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [isConnected, wallet?.accountId]);
+  }, [isConnected, user?.accountId]);
 
   const createSkillToken = useCallback(async (data: {
     skill_category: string;
@@ -187,13 +187,13 @@ export function useSkillTokens(): UseSkillTokensReturn {
     evidence: string;
     description: string;
   }): Promise<TransactionResult> => {
-    if (!wallet?.accountId) {
+    if (!user?.accountId) {
       return { success: false, error: 'Wallet not connected' };
     }
 
     try {
       const response = await dashboardApi.createSkillToken({
-        to: wallet.accountId,
+        to: user.accountId,
         ...data,
       });
 
@@ -204,7 +204,7 @@ export function useSkillTokens(): UseSkillTokensReturn {
           category: data.skill_category,
           level: data.level,
           uri: data.uri,
-          owner: wallet.accountId,
+          owner: user.accountId,
         };
         setSkillTokens(prev => [...prev, newToken]);
 
@@ -224,7 +224,7 @@ export function useSkillTokens(): UseSkillTokensReturn {
         error: err instanceof Error ? err.message : 'Failed to create skill token',
       };
     }
-  }, [wallet?.accountId]);
+  }, [user?.accountId]);
 
   const updateSkillLevel = useCallback(async (
     tokenId: number, 
@@ -282,7 +282,7 @@ export function useSkillTokens(): UseSkillTokensReturn {
  * Job pools specific hook with application operations
  */
 export function useJobPools(): UseJobPoolsReturn {
-  const { wallet, isConnected } = useHederaWallet();
+  const { user, isConnected } = useAuth();
   const [jobPools, setJobPools] = useState<JobPoolInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -351,7 +351,7 @@ export function useJobPools(): UseJobPoolsReturn {
         setJobPools(prev =>
           prev.map(pool =>
             pool.id === poolId
-              ? { ...pool, applicants: [...pool.applicants, wallet?.accountId || ''] }
+              ? { ...pool, applicants: [...pool.applicants, user?.accountId || ''] }
               : pool
           )
         );
@@ -372,7 +372,7 @@ export function useJobPools(): UseJobPoolsReturn {
         error: err instanceof Error ? err.message : 'Failed to apply to job pool',
       };
     }
-  }, [wallet?.accountId]);
+  }, [user?.accountId]);
 
   const leavePool = useCallback(async (poolId: number): Promise<TransactionResult> => {
     try {
@@ -383,10 +383,10 @@ export function useJobPools(): UseJobPoolsReturn {
         setJobPools(prev =>
           prev.map(pool =>
             pool.id === poolId
-              ? {
-                  ...pool,
-                  applicants: pool.applicants.filter(addr => addr !== wallet?.accountId),
-                }
+                              ? {
+                    ...pool,
+                    applicants: pool.applicants.filter(addr => addr !== user?.accountId),
+                  }
               : pool
           )
         );
@@ -407,7 +407,7 @@ export function useJobPools(): UseJobPoolsReturn {
         error: err instanceof Error ? err.message : 'Failed to leave job pool',
       };
     }
-  }, [wallet?.accountId]);
+  }, [user?.accountId]);
 
   useEffect(() => {
     fetchJobPools();
@@ -431,8 +431,8 @@ export function useJobPools(): UseJobPoolsReturn {
  * Reputation data hook
  */
 export function useReputation(userId?: string) {
-  const { wallet } = useHederaWallet();
-  const targetUserId = userId || wallet?.accountId;
+  const { user } = useAuth();
+  const targetUserId = userId || user?.accountId;
   
   const [reputation, setReputation] = useState<{
     overall_score: number;

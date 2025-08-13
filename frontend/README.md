@@ -1,340 +1,326 @@
-# TalentChain Pro Frontend
+# 🚀 TalentChain Pro Frontend
 
-A modern, responsive web application for the TalentChain Pro ecosystem - a blockchain-based talent platform with AI-powered reputation oracles and decentralized job matching.
+Advanced Web3 talent ecosystem frontend built on Hedera Hashgraph with comprehensive wallet integration, AI-powered matching, and enterprise-grade UX.
 
-## 🚀 Features
+## ✨ **Features**
 
-### ✨ Core Features
-- **Dual Wallet Support**: Connect with HashPack (recommended) or MetaMask
-- **Dark Mode**: Elegant dark/light theme with smooth transitions
-- **Responsive Design**: Optimized for desktop, tablet, and mobile
-- **Real-time Updates**: Live wallet status and transaction feedback
-- **Professional UI**: Modern design with Hedera branding
-
-### 🎯 Wallet Integration
-- **HashPack Wallet**: Official Hedera wallet with WalletConnect
-- **MetaMask Support**: Ethereum wallet with Hedera network support
+### 🔗 **Multi-Wallet Support**
+- **HashPack**: Official Hedera wallet with full ecosystem integration
+- **MetaMask**: EVM-compatible wallet with Hedera network support
+- **WalletConnect**: Universal wallet connectivity for mobile and desktop
 - **Automatic Detection**: Smart wallet availability checking
-- **Network Switching**: Seamless network management
-- **Transaction Execution**: Contract interactions for both wallet types
+- **Seamless Switching**: Easy wallet switching and account management
 
-### 🎨 Design System
-- **Component Library**: Built with Radix UI and Tailwind CSS
-- **Animations**: Smooth Framer Motion transitions
-- **Accessibility**: WCAG compliant design
-- **Custom Theming**: Hedera-inspired color palette
+### 🎨 **Modern UI/UX**
+- **Responsive Design**: Works perfectly on all devices
+- **Dark Mode**: Full dark mode support with system preference detection
+- **Smooth Animations**: Framer Motion powered interactions
+- **Accessibility**: Screen reader and keyboard navigation support
+- **Brand Consistency**: Maintains TalentChain Pro visual identity
 
-## 🛠️ Tech Stack
+### ⚡ **Performance & Security**
+- **TypeScript**: Full type safety and IntelliSense support
+- **Next.js 14**: Latest React framework with App Router
+- **Optimized Builds**: Efficient bundling and code splitting
+- **Security First**: Secure wallet connections and data handling
+- **Error Handling**: Comprehensive error management and user feedback
 
-| **Category** | **Technology** | **Purpose** |
-|--------------|----------------|-------------|
-| **Framework** | Next.js 14 | React framework with App Router |
-| **Language** | TypeScript | Type-safe development |
-| **Styling** | Tailwind CSS | Utility-first CSS framework |
-| **Components** | Radix UI | Accessible component primitives |
-| **Animations** | Framer Motion | Smooth UI animations |
-| **Blockchain** | Hedera SDK | Hedera network integration |
-| **Wallets** | WalletConnect | Multi-wallet support |
-| **State** | React Hooks | Local state management |
+## 🛠 **Tech Stack**
 
-## 📦 Installation
+### **Core Framework**
+- **Next.js 14**: React framework with App Router
+- **React 18**: Latest React with concurrent features
+- **TypeScript**: Full type safety and development experience
 
-### Prerequisites
-- Node.js 18+ 
-- npm or yarn
-- HashPack or MetaMask wallet extension
+### **Styling & UI**
+- **Tailwind CSS**: Utility-first CSS framework
+- **Radix UI**: Accessible component primitives
+- **Framer Motion**: Smooth animations and transitions
+- **Lucide React**: Beautiful icon library
 
-### Quick Start
+### **Wallet Integration**
+- **@hashgraph/hedera-wallet-connect**: Official Hedera wallet integration
+- **@hashgraph/sdk**: Hedera blockchain SDK
+- **@walletconnect/ethereum-provider**: WalletConnect v2 support
+- **ethers.js**: Ethereum compatibility layer
+- **@metamask/providers**: MetaMask integration
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd talentchainpro/frontend
-   ```
+### **Development Tools**
+- **ESLint**: Code quality and consistency
+- **Prettier**: Code formatting
+- **TypeScript**: Static type checking
+- **Tailwind CSS IntelliSense**: Enhanced development experience
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+## 🚀 **Quick Start**
 
-3. **Set up environment variables**
-   ```bash
-   # Copy environment template
-   cp env.example .env.local
-   
-   # Or run the automated setup
-   npm run setup-wallet
-   ```
+### **1. Prerequisites**
+- Node.js 18+ and npm
+- Git
+- WalletConnect Project ID (get from [WalletConnect Cloud](https://cloud.walletconnect.com/))
 
-4. **Start development server**
-   ```bash
-   npm run dev
-   ```
+### **2. Clone & Install**
+```bash
+# Clone the repository
+git clone <repository-url>
+cd talentchainpro/frontend
 
-5. **Open your browser**
-   Navigate to [http://localhost:3000](http://localhost:3000)
+# Install dependencies
+npm install
+```
 
-## 🔧 Configuration
+### **3. Environment Setup**
+```bash
+# Run the automated setup script
+npm run setup-wallet
 
-### Environment Variables
+# Or manually create .env.local
+cp env.example .env.local
+# Edit .env.local with your values
+```
 
-Create a `.env.local` file in the frontend directory:
+### **4. Start Development**
+```bash
+# Start development server
+npm run dev
 
-```env
+# Open http://localhost:3000
+```
+
+## ⚙️ **Configuration**
+
+### **Environment Variables**
+
+Create a `.env.local` file in the `frontend` directory:
+
+```bash
 # WalletConnect Configuration
-NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=your_project_id_here
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id_here
 
 # Hedera Network Configuration
 NEXT_PUBLIC_HEDERA_NETWORK=testnet
+# Options: testnet, mainnet
+
+# MetaMask Configuration
+NEXT_PUBLIC_METAMASK_CHAIN_ID=296
+# 296 for Hedera Testnet, 295 for Hedera Mainnet
+
+# HashPack App Configuration
+NEXT_PUBLIC_HASHPACK_APP_NAME=TalentChain Pro
+NEXT_PUBLIC_HASHPACK_APP_DESCRIPTION=Blockchain-based talent ecosystem on Hedera
+NEXT_PUBLIC_HASHPACK_APP_URL=https://talentchainpro.com
 
 # App Configuration
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-
-# API Configuration
-NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
-
-# Contract Addresses (optional)
-NEXT_PUBLIC_CONTRACT_SKILLTOKEN=
-NEXT_PUBLIC_CONTRACT_TALENTPOOL=
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-### Getting WalletConnect Project ID
+### **WalletConnect Project ID**
 
 1. Visit [WalletConnect Cloud](https://cloud.walletconnect.com/)
-2. Sign up or log in to your account
-3. Create a new project:
-   - **Name**: TalentChain Pro
-   - **Description**: Blockchain-based talent ecosystem on Hedera
-   - **URL**: Your app URL (e.g., `https://yourdomain.com`)
-4. Copy the Project ID and add it to your `.env.local`
+2. Sign up/Login with your account
+3. Create a new project
+4. Copy your Project ID (32 character hex string)
 
-## 🎒 Wallet Setup
+## 🔗 **Wallet Setup**
 
-### HashPack Wallet
-1. Visit [HashPack](https://hashpack.com/)
+### **HashPack Wallet**
+1. Visit [HashPack.app](https://hashpack.app)
 2. Install the browser extension
-3. Create a new account or import existing
-4. Switch to Testnet for development
+3. Create or import your Hedera wallet
+4. No additional configuration needed
 
-### MetaMask Wallet
-1. Install [MetaMask](https://metamask.io/)
-2. Add Hedera network to MetaMask:
+### **MetaMask Wallet**
+1. Install [MetaMask](https://metamask.io/) extension
+2. Add Hedera network:
+   - **Testnet**: Chain ID 296, RPC: `https://testnet.hashio.io/api`
+   - **Mainnet**: Chain ID 295, RPC: `https://mainnet.hashio.io/api`
 
-**For Testnet:**
-- Network Name: `Hedera Testnet`
-- RPC URL: `https://testnet.hashio.io/api`
-- Chain ID: `296`
-- Currency Symbol: `HBAR`
-- Block Explorer: `https://hashscan.io/testnet`
+### **Testing Wallet Connections**
+Visit `/wallet-test` to test all wallet connections:
+- Wallet detection
+- Connection testing
+- Real-time logs
+- Connection status
 
-**For Mainnet:**
-- Network Name: `Hedera Mainnet`
-- RPC URL: `https://mainnet.hashio.io/api`
-- Chain ID: `295`
-- Currency Symbol: `HBAR`
-- Block Explorer: `https://hashscan.io/mainnet`
-
-## 🏗️ Project Structure
+## 📁 **Project Structure**
 
 ```
 frontend/
 ├── app/                    # Next.js App Router
-│   ├── (dashboard)/       # Dashboard pages
+│   ├── (dashboard)/       # Dashboard routes
+│   ├── wallet-test/       # Wallet testing page
 │   ├── globals.css        # Global styles
 │   ├── layout.tsx         # Root layout
 │   └── page.tsx           # Landing page
-├── components/            # React components
-│   ├── ui/               # Base UI components
-│   ├── wallet/           # Wallet integration
-│   ├── layout/           # Layout components
-│   └── landing/          # Landing page components
-├── hooks/                # Custom React hooks
-│   └── useHederaWallet.ts # Wallet management hook
-├── lib/                  # Utility libraries
-│   ├── config/           # Configuration files
-│   ├── types/            # TypeScript types
-│   ├── utils.ts          # Utility functions
-│   └── wallet/           # Wallet implementations
-├── scripts/              # Build and setup scripts
-└── docs/                 # Documentation
+├── components/             # React components
+│   ├── ui/                # Base UI components
+│   ├── wallet/            # Wallet-related components
+│   ├── layout/            # Layout components
+│   └── landing/           # Landing page components
+├── hooks/                  # Custom React hooks
+│   └── useAuth.tsx        # Authentication hook
+├── lib/                    # Utility libraries
+│   ├── wallet/            # Wallet integration
+│   │   └── wallet-connector.ts  # Main wallet connector
+│   ├── config/            # Configuration files
+│   └── types/             # TypeScript type definitions
+├── scripts/                # Build and setup scripts
+│   └── setup-wallet.js    # Wallet configuration script
+└── docs/                   # Documentation
+    └── wallet-setup-guide.md  # Wallet setup guide
 ```
 
-## 🎨 Component Library
+## 🧪 **Testing**
 
-### Core Components
-- **WalletButton**: Multi-wallet connection with elegant UI
-- **ThemeProvider**: Dark/light mode management
-- **Layout Components**: Header, footer, navigation
-- **UI Components**: Buttons, cards, modals, forms
-
-### Wallet Components
-- **useHederaWallet**: Main wallet management hook
-- **HederaWalletManager**: HashPack integration
-- **MetaMaskWallet**: MetaMask integration
-- **WalletConnect**: Multi-wallet support
-
-## 🔄 Development
-
-### Available Scripts
-
+### **Wallet Connection Testing**
 ```bash
-# Development
-npm run dev              # Start development server
-npm run build            # Build for production
-npm run start            # Start production server
-npm run lint             # Run ESLint
+# Start development server
+npm run dev
 
-# Setup
-npm run setup-wallet     # Automated wallet setup
+# Visit wallet test page
+http://localhost:3000/wallet-test
 ```
 
-### Development Workflow
+### **Available Tests**
+- ✅ Wallet detection and availability
+- ✅ Connection establishment
+- ✅ Error handling and recovery
+- ✅ Real-time connection status
+- ✅ Wallet switching and disconnection
 
-1. **Start development server**
-   ```bash
-   npm run dev
-   ```
+## 🚀 **Development Workflow**
 
-2. **Open browser and connect wallet**
-   - Click "Connect Wallet" button
-   - Choose HashPack or MetaMask
-   - Approve connection in wallet
-
-3. **Test wallet functionality**
-   - Check wallet detection
-   - Test network switching
-   - Verify transaction execution
-
-4. **Build for production**
-   ```bash
-   npm run build
-   npm run start
-   ```
-
-## 🧪 Testing
-
-### Manual Testing Checklist
-
-- [ ] Wallet detection (HashPack, MetaMask)
-- [ ] Connection/disconnection flow
-- [ ] Network switching
-- [ ] Dark/light mode toggle
-- [ ] Responsive design (mobile, tablet, desktop)
-- [ ] Error handling and user feedback
-- [ ] Transaction execution
-- [ ] Cross-browser compatibility
-
-### Browser Support
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
-
-## 🚀 Deployment
-
-### Vercel (Recommended)
-
-1. **Connect repository to Vercel**
-2. **Set environment variables** in Vercel dashboard
-3. **Deploy automatically** on push to main branch
-
-### Other Platforms
-
-The app can be deployed to any platform that supports Next.js:
-- Netlify
-- AWS Amplify
-- DigitalOcean App Platform
-- Railway
-
-### Environment Variables for Production
-
-```env
-NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID=your_production_project_id
-NEXT_PUBLIC_HEDERA_NETWORK=mainnet
-NEXT_PUBLIC_APP_URL=https://yourdomain.com
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com/api/v1
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### Wallet Connection Fails
+### **1. Development Mode**
 ```bash
-# Check console for errors
-# Verify environment variables
-# Ensure wallet extension is installed
+npm run dev
+# Hot reloading, TypeScript checking, error overlay
 ```
 
-#### MetaMask Not Detected
+### **2. Building for Production**
 ```bash
-# Refresh page
-# Check if MetaMask is enabled
-# Verify network configuration
-```
-
-#### Build Errors
-```bash
-# Clear cache
-rm -rf .next
 npm run build
+npm start
+# Optimized production build
 ```
 
-#### TypeScript Errors
+### **3. Code Quality**
 ```bash
-# Check type definitions
 npm run lint
-# Fix any type issues
+# ESLint checking and auto-fixing
 ```
 
-### Debug Steps
+### **4. Wallet Setup**
+```bash
+npm run setup-wallet
+# Interactive wallet configuration
+```
 
-1. **Check browser console** for error messages
-2. **Verify environment variables** are loaded
-3. **Test wallet availability**:
-   ```javascript
-   console.log('MetaMask:', typeof window !== 'undefined' && !!window.ethereum && !!window.ethereum.isMetaMask);
-   console.log('HashPack:', typeof window !== 'undefined');
-   ```
-4. **Check network connection** in wallet
-5. **Verify project ID** in WalletConnect Cloud
+## 🔧 **Customization**
 
-## 📚 Documentation
+### **Adding New Wallets**
+1. Extend `WalletType` enum in `lib/wallet/wallet-connector.ts`
+2. Implement connection logic in `WalletConnector` class
+3. Add UI components in `components/wallet/`
+4. Update types and interfaces
 
-- [Wallet Setup Guide](../docs/wallet-setup-guide.md)
-- [API Documentation](../backend/README.md)
-- [Smart Contracts](../contracts/README.md)
-- [Project Overview](../README.md)
+### **Styling Customization**
+- **Tailwind Config**: `tailwind.config.ts`
+- **CSS Variables**: `app/globals.css`
+- **Component Themes**: `components/ui/`
 
-## 🤝 Contributing
+### **Configuration Updates**
+- **Networks**: `lib/config/networks.ts`
+- **Wallet Options**: `components/wallet/wallet-button.tsx`
+- **Environment**: `.env.local`
 
+## 🚀 **Deployment**
+
+### **Vercel (Recommended)**
+1. Connect your GitHub repository
+2. Set environment variables in Vercel dashboard
+3. Deploy automatically on push to main branch
+
+### **Other Platforms**
+1. Build the project: `npm run build`
+2. Set production environment variables
+3. Deploy the `out` directory or use `npm start`
+
+### **Environment Variables for Production**
+```bash
+NEXT_PUBLIC_HEDERA_NETWORK=mainnet
+NEXT_PUBLIC_METAMASK_CHAIN_ID=295
+NEXT_PUBLIC_APP_URL=https://yourdomain.com
+NEXT_PUBLIC_API_URL=https://api.yourdomain.com
+```
+
+## 🔍 **Troubleshooting**
+
+### **Common Issues**
+
+#### **WalletConnect Connection Fails**
+- Verify Project ID is correct and 32 characters
+- Check environment variables are loaded
+- Ensure HTTPS in production
+
+#### **MetaMask Not Detected**
+- Install MetaMask browser extension
+- Refresh the page
+- Check browser console for errors
+
+#### **HashPack Connection Issues**
+- Install HashPack extension
+- Verify WalletConnect Project ID
+- Check network configuration
+
+### **Debug Steps**
+1. **Check Console Logs**: Open browser dev tools
+2. **Verify Environment**: Check `.env.local` file
+3. **Test Wallet Detection**: Use `/wallet-test` page
+4. **Check Dependencies**: Ensure all packages are installed
+
+## 📚 **Documentation**
+
+### **Guides**
+- [Wallet Setup Guide](docs/wallet-setup-guide.md) - Complete wallet configuration
+- [Component Library](components/ui/) - Available UI components
+- [API Integration](lib/) - Backend integration examples
+
+### **External Resources**
+- [Hedera Documentation](https://docs.hedera.com/)
+- [HashPack Developer Guide](https://docs.hashpack.app/)
+- [WalletConnect Documentation](https://docs.walletconnect.com/)
+- [Next.js Documentation](https://nextjs.org/docs)
+
+## 🤝 **Contributing**
+
+### **Development Setup**
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests if applicable
+4. Test thoroughly
 5. Submit a pull request
 
-### Development Guidelines
+### **Code Standards**
+- Use TypeScript for all new code
+- Follow existing component patterns
+- Add proper error handling
+- Include TypeScript types
+- Test wallet connections
 
-- Follow TypeScript best practices
-- Use consistent code formatting
-- Write meaningful commit messages
-- Test wallet functionality thoroughly
-- Ensure responsive design
-
-## 📄 License
+## 📄 **License**
 
 This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## 🙏 **Acknowledgments**
 
-- [Hedera Hashgraph](https://hedera.com/) for blockchain infrastructure
-- [HashPack](https://hashpack.com/) for Hedera wallet
-- [WalletConnect](https://walletconnect.com/) for multi-wallet support
-- [Next.js](https://nextjs.org/) for the React framework
-- [Tailwind CSS](https://tailwindcss.com/) for styling
-- [Radix UI](https://www.radix-ui.com/) for accessible components
+- **Hedera Hashgraph** for the blockchain infrastructure
+- **HashPack** for the official Hedera wallet
+- **WalletConnect** for universal wallet connectivity
+- **Next.js Team** for the amazing React framework
+- **Tailwind CSS** for the utility-first CSS framework
 
 ---
 
-**Built with ❤️ for the Hedera ecosystem**
+**Ready to build the future of talent management on Hedera?** 🚀
+
+Connect your wallet and start exploring the TalentChain Pro ecosystem!

@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { 
-  Trophy, 
-  Plus, 
-  Search, 
+import {
+  Trophy,
+  Plus,
+  Search,
   Filter,
   ArrowUpRight,
   Edit3,
@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useHederaWallet } from "@/hooks/useHederaWallet";
+import { useAuth } from "@/hooks/useAuth";
 import { SkillTokenInfo } from "@/lib/types/wallet";
 
 // Mock data - will be replaced with real API calls
@@ -101,7 +101,7 @@ const skillCategories = [
 ];
 
 export default function SkillsPage() {
-  const { wallet, isConnected } = useHederaWallet();
+  const { user, isConnected } = useAuth();
   const [skills, setSkills] = useState<SkillTokenInfo[]>(mockSkillTokens);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -118,16 +118,16 @@ export default function SkillsPage() {
   });
 
   useEffect(() => {
-    if (isConnected && wallet) {
+    if (isConnected && user) {
       fetchUserSkills();
     }
-  }, [isConnected, wallet]);
+  }, [isConnected, user]);
 
   const fetchUserSkills = async () => {
     setIsLoading(true);
     try {
       // TODO: Replace with real API call
-      // const userSkills = await getUserSkillTokens(wallet.accountId);
+      // const userSkills = await getUserSkillTokens(user.accountId);
       // setSkills(userSkills);
     } catch (error) {
       console.error('Failed to fetch skills:', error);
@@ -149,21 +149,21 @@ export default function SkillsPage() {
 
       // TODO: Implement skill creation via smart contract
       // const result = await createSkillToken(skillData);
-      
+
       console.log('Creating skill token:', skillData);
-      
+
       // Mock success
       const newSkillToken: SkillTokenInfo = {
         tokenId: skills.length + 1,
         category: skillData.category,
         level: skillData.level,
         uri: skillData.uri,
-        owner: wallet?.accountId || ""
+        owner: user?.accountId || ""
       };
-      
+
       setSkills([...skills, newSkillToken]);
       setIsCreateDialogOpen(false);
-      
+
       // Reset form
       setNewSkill({
         category: "",
@@ -172,7 +172,7 @@ export default function SkillsPage() {
         evidence: "",
         description: ""
       });
-      
+
     } catch (error) {
       console.error('Failed to create skill:', error);
     } finally {
@@ -222,7 +222,7 @@ export default function SkillsPage() {
                   Manage your blockchain-verified skill tokens
                 </p>
               </div>
-              
+
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="bg-hedera-600 hover:bg-hedera-700">
@@ -237,11 +237,11 @@ export default function SkillsPage() {
                       Mint a new soulbound token representing your skill
                     </DialogDescription>
                   </DialogHeader>
-                  
+
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="category">Skill Category</Label>
-                      <Select value={newSkill.category} onValueChange={(value) => setNewSkill({...newSkill, category: value})}>
+                      <Select value={newSkill.category} onValueChange={(value) => setNewSkill({ ...newSkill, category: value })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a skill category" />
                         </SelectTrigger>
@@ -262,7 +262,7 @@ export default function SkillsPage() {
                         <Input
                           id="customCategory"
                           value={newSkill.customCategory}
-                          onChange={(e) => setNewSkill({...newSkill, customCategory: e.target.value})}
+                          onChange={(e) => setNewSkill({ ...newSkill, customCategory: e.target.value })}
                           placeholder="Enter custom skill category"
                         />
                       </div>
@@ -270,12 +270,12 @@ export default function SkillsPage() {
 
                     <div className="space-y-2">
                       <Label htmlFor="level">Initial Level (1-10)</Label>
-                      <Select value={newSkill.initialLevel.toString()} onValueChange={(value) => setNewSkill({...newSkill, initialLevel: parseInt(value)})}>
+                      <Select value={newSkill.initialLevel.toString()} onValueChange={(value) => setNewSkill({ ...newSkill, initialLevel: parseInt(value) })}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {Array.from({length: 10}, (_, i) => i + 1).map((level) => (
+                          {Array.from({ length: 10 }, (_, i) => i + 1).map((level) => (
                             <SelectItem key={level} value={level.toString()}>
                               Level {level} - {level <= 3 ? 'Beginner' : level <= 6 ? 'Intermediate' : level <= 8 ? 'Advanced' : 'Expert'}
                             </SelectItem>
@@ -289,7 +289,7 @@ export default function SkillsPage() {
                       <Textarea
                         id="evidence"
                         value={newSkill.evidence}
-                        onChange={(e) => setNewSkill({...newSkill, evidence: e.target.value})}
+                        onChange={(e) => setNewSkill({ ...newSkill, evidence: e.target.value })}
                         placeholder="Provide links to your work, certifications, or portfolio"
                         rows={3}
                       />
@@ -300,14 +300,14 @@ export default function SkillsPage() {
                       <Textarea
                         id="description"
                         value={newSkill.description}
-                        onChange={(e) => setNewSkill({...newSkill, description: e.target.value})}
+                        onChange={(e) => setNewSkill({ ...newSkill, description: e.target.value })}
                         placeholder="Describe your experience and expertise in this skill"
                         rows={3}
                       />
                     </div>
 
-                    <Button 
-                      onClick={handleCreateSkill} 
+                    <Button
+                      onClick={handleCreateSkill}
                       disabled={!newSkill.category || isLoading}
                       className="w-full bg-hedera-600 hover:bg-hedera-700"
                     >
@@ -407,7 +407,7 @@ export default function SkillsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredSkills.map((skill, index) => {
             const colorConfig = getSkillLevelColor(skill.level);
-            
+
             return (
               <motion.div
                 key={skill.tokenId}
@@ -443,7 +443,7 @@ export default function SkillsPage() {
                           Level {skill.level}
                         </Badge>
                       </div>
-                      
+
                       <div className="space-y-1">
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-slate-600 dark:text-slate-400">Progress</span>
@@ -477,13 +477,13 @@ export default function SkillsPage() {
               No skills found
             </h3>
             <p className="text-slate-600 dark:text-slate-400 mb-6">
-              {searchTerm || selectedCategory !== "all" 
-                ? "Try adjusting your search or filters" 
+              {searchTerm || selectedCategory !== "all"
+                ? "Try adjusting your search or filters"
                 : "Create your first skill token to get started"
               }
             </p>
             {!searchTerm && selectedCategory === "all" && (
-              <Button 
+              <Button
                 onClick={() => setIsCreateDialogOpen(true)}
                 className="bg-hedera-600 hover:bg-hedera-700"
               >

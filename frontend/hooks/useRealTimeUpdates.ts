@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useCallback, useRef, useState } from 'react';
-import { useHederaWallet } from './useHederaWallet';
+import { useAuth } from './useAuth';
 
 interface RealtimeEvent {
   type: 'skill_created' | 'skill_updated' | 'pool_created' | 'pool_applied' | 'pool_matched' | 'transaction_confirmed';
@@ -27,7 +27,7 @@ const RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 
 export function useRealTimeUpdates(): UseRealTimeUpdatesReturn {
-  const { wallet, isConnected: walletConnected } = useHederaWallet();
+  const { user, isConnected: walletConnected } = useAuth();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const eventCallbacksRef = useRef<Map<string, Set<(event: RealtimeEvent) => void>>>(new Map());
@@ -38,7 +38,7 @@ export function useRealTimeUpdates(): UseRealTimeUpdatesReturn {
   const [connectionStatus, setConnectionStatus] = useState<UseRealTimeUpdatesReturn['connectionStatus']>('disconnected');
 
   const connect = useCallback(() => {
-    if (!walletConnected || !wallet?.accountId) {
+    if (!walletConnected || !user?.accountId) {
       return;
     }
 
@@ -48,7 +48,7 @@ export function useRealTimeUpdates(): UseRealTimeUpdatesReturn {
 
     try {
       setConnectionStatus('connecting');
-      const wsUrl = `${WS_BASE_URL}/ws?user_id=${encodeURIComponent(wallet.accountId)}`;
+      const wsUrl = `${WS_BASE_URL}/ws?user_id=${encodeURIComponent(user.accountId)}`;
       const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
@@ -60,7 +60,7 @@ export function useRealTimeUpdates(): UseRealTimeUpdatesReturn {
         // Send authentication/identification message
         ws.send(JSON.stringify({
           type: 'auth',
-          user_id: wallet.accountId,
+          user_id: user.accountId,
           timestamp: Date.now()
         }));
       };
@@ -126,7 +126,7 @@ export function useRealTimeUpdates(): UseRealTimeUpdatesReturn {
       console.error('📡 Failed to connect WebSocket:', error);
       setConnectionStatus('error');
     }
-  }, [walletConnected, wallet?.accountId]);
+  }, [walletConnected, user?.accountId]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -169,14 +169,14 @@ export function useRealTimeUpdates(): UseRealTimeUpdatesReturn {
         type: eventType,
         data,
         timestamp: Date.now(),
-        userId: wallet?.accountId
+        userId: user?.accountId
       }));
     }
-  }, [wallet?.accountId]);
+  }, [user?.accountId]);
 
   // Connect when wallet is connected
   useEffect(() => {
-    if (walletConnected && wallet?.accountId) {
+    if (walletConnected && user?.accountId) {
       connect();
     } else {
       disconnect();
@@ -185,7 +185,7 @@ export function useRealTimeUpdates(): UseRealTimeUpdatesReturn {
     return () => {
       disconnect();
     };
-  }, [walletConnected, wallet?.accountId, connect, disconnect]);
+  }, [walletConnected, user?.accountId, connect, disconnect]);
 
   // Cleanup on unmount
   useEffect(() => {

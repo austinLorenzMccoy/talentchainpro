@@ -2,13 +2,13 @@
 
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Briefcase, 
-  Plus, 
-  Search, 
-  Filter, 
-  MapPin, 
-  Clock, 
+import {
+  Briefcase,
+  Plus,
+  Search,
+  Filter,
+  MapPin,
+  Clock,
   DollarSign,
   Users,
   Star,
@@ -45,7 +45,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { DashboardWidget } from "./dashboard-widget";
 import { useJobPools, useSkillTokens } from "@/hooks/useDashboardData";
-import { useHederaWallet } from "@/hooks/useHederaWallet";
+import { useAuth } from "@/hooks/useAuth";
 import { JobPoolInfo, PoolStatus } from "@/lib/types/wallet";
 import { cn } from "@/lib/utils";
 
@@ -54,14 +54,14 @@ interface JobPoolsWidgetProps {
 }
 
 export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
-  const { wallet } = useHederaWallet();
+  const { user } = useAuth();
   const { jobPools, isLoading, error, refetch, applyToPool, leavePool } = useJobPools();
   const { skillTokens } = useSkillTokens();
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("recent"); // recent, salary, applicants
-  
+
   // Application dialog state
   const [selectedPool, setSelectedPool] = useState<JobPoolInfo | null>(null);
   const [isApplicationDialogOpen, setIsApplicationDialogOpen] = useState(false);
@@ -73,15 +73,15 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
   const filteredAndSortedPools = useMemo(() => {
     return jobPools
       .filter(pool => {
-        const matchesSearch = 
+        const matchesSearch =
           pool.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
           pool.description.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        const matchesStatus = statusFilter === "all" || 
+
+        const matchesStatus = statusFilter === "all" ||
           (statusFilter === "active" && pool.status === PoolStatus.Active) ||
           (statusFilter === "completed" && pool.status === PoolStatus.Completed) ||
           (statusFilter === "paused" && pool.status === PoolStatus.Paused);
-        
+
         return matchesSearch && matchesStatus;
       })
       .sort((a, b) => {
@@ -136,7 +136,7 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
     const now = Date.now();
     const diff = now - (timestamp * 1000); // Convert to milliseconds
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (days === 0) return "Today";
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days} days ago`;
@@ -145,13 +145,13 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
   };
 
   const isUserApplied = (pool: JobPoolInfo) => {
-    return pool.applicants.includes(wallet?.accountId || '');
+    return pool.applicants.includes(user?.accountId || '');
   };
 
   const canApplyToPool = (pool: JobPoolInfo) => {
-    return pool.status === PoolStatus.Active && 
-           !isUserApplied(pool) && 
-           wallet?.accountId !== pool.company;
+      return pool.status === PoolStatus.Active &&
+    !isUserApplied(pool) &&
+    user?.accountId !== pool.company;
   };
 
   const handleApplyToPool = async () => {
@@ -293,7 +293,7 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
               const StatusIcon = statusConfig.icon;
               const userApplied = isUserApplied(pool);
               const canApply = canApplyToPool(pool);
-              
+
               return (
                 <motion.div
                   key={pool.id}
@@ -323,7 +323,7 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
                                 {statusConfig.label}
                               </Badge>
                             </div>
-                            
+
                             <p className="text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">
                               {pool.description}
                             </p>
@@ -372,7 +372,7 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
                               Apply
                             </Button>
                           ) : null}
-                          
+
                           <Button variant="ghost" size="sm">
                             <ExternalLink className="w-4 h-4" />
                           </Button>
@@ -415,7 +415,7 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
                 {jobPools.length === 0 ? "No job pools available" : "No pools match your filters"}
               </h3>
               <p className="text-slate-600 dark:text-slate-400 mb-6">
-                {jobPools.length === 0 
+                {jobPools.length === 0
                   ? "Check back later for new opportunities or create your own job pool"
                   : "Try adjusting your search terms or filters"
                 }
@@ -426,7 +426,7 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
                   Create Job Pool
                 </Button>
               ) : (
-                <Button 
+                <Button
                   variant="outline"
                   onClick={() => {
                     setSearchTerm("");
@@ -533,7 +533,7 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
               )}
 
               {/* Apply Button */}
-              <Button 
+              <Button
                 onClick={handleApplyToPool}
                 disabled={selectedSkillTokens.length === 0 || isApplying || skillTokens.length === 0}
                 className="w-full bg-hedera-600 hover:bg-hedera-700"

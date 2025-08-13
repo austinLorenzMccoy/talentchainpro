@@ -7,8 +7,7 @@ import {
   DashboardStats, 
   SkillTokenInfo, 
   JobPoolInfo, 
-  UserProfile,
-  TransactionResult,
+  PoolStatus,
   ApiResponse 
 } from '../types/wallet';
 
@@ -315,7 +314,7 @@ class DashboardApiService {
         totalSkillTokens: skills.length,
         totalJobPools: pools.length,
         activeApplications,
-        completedMatches: pools.filter(p => p.status === 2).length, // Completed status
+        completedMatches: pools.filter(p => p.status === PoolStatus.Completed).length, // Completed status
         reputationScore: reputation?.overall_score || 0,
       };
 

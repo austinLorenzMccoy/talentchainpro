@@ -4,12 +4,12 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  Menu, 
-  X, 
-  Zap, 
-  Shield, 
-  Users, 
+import {
+  Menu,
+  X,
+  Zap,
+  Shield,
+  Users,
   TrendingUp,
   ChevronDown,
   ExternalLink
@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NavbarBackground } from "@/components/ui/background-elements";
 import { Logo } from "@/components/ui/logo";
-import { WalletButton } from "@/components/wallet/wallet-button";
+import WalletButton from "@/components/wallet/wallet-button";
 import { MobileMenu } from "@/components/navigation/mobile-menu";
 import {
   DropdownMenu,
@@ -62,19 +62,18 @@ export function Navbar() {
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
-        className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-          isScrolled 
-            ? 'backdrop-blur-md bg-white/80 dark:bg-hedera-950/80 border-b border-gray-200/20 dark:border-hedera-800/30 shadow-lg' 
+        className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled
+            ? 'backdrop-blur-md bg-white/80 dark:bg-hedera-950/80 border-b border-gray-200/20 dark:border-hedera-800/30 shadow-lg'
             : 'backdrop-blur-sm bg-white/60 dark:bg-hedera-950/60 border-b border-transparent'
-        }`}
+          }`}
       >
         <NavbarBackground />
-        
+
         <div className="relative z-10">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16 sm:h-20">
               {/* Logo Section */}
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, x: -30 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: 0.2 }}
@@ -82,9 +81,9 @@ export function Navbar() {
               >
                 <Logo size="md" showText={true} />
               </motion.div>
-              
+
               {/* Desktop Navigation */}
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.4 }}
@@ -95,8 +94,8 @@ export function Navbar() {
                     {item.items ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             className="text-slate-700 dark:text-slate-300 hover:text-hedera-600 dark:hover:text-hedera-400 font-medium transition-all duration-200 hover:bg-hedera-50/50 dark:hover:bg-hedera-900/20"
                           >
@@ -104,12 +103,12 @@ export function Navbar() {
                             <ChevronDown className="w-4 h-4 ml-1 transition-transform group-data-[state=open]:rotate-180" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent 
+                        <DropdownMenuContent
                           align="center"
                           className="w-64 bg-white/95 dark:bg-hedera-950/95 backdrop-blur-xl border-gray-200/20 dark:border-hedera-800/30 shadow-2xl"
                         >
                           {item.items.map((subItem) => (
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               key={subItem.name}
                               className="flex items-start space-x-3 p-4 hover:bg-hedera-50/50 dark:hover:bg-hedera-900/30 cursor-pointer"
                             >
@@ -136,12 +135,11 @@ export function Navbar() {
                       </a>
                     ) : (
                       <Link href={item.href || '#'} className="inline-block">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
-                          className={`text-slate-700 dark:text-slate-300 hover:text-hedera-600 dark:hover:text-hedera-400 font-medium transition-all duration-200 hover:bg-hedera-50/50 dark:hover:bg-hedera-900/20 ${
-                            pathname === item.href ? 'bg-hedera-100/80 dark:bg-hedera-900/40 text-hedera-700 dark:text-hedera-300' : ''
-                          }`}
+                          className={`text-slate-700 dark:text-slate-300 hover:text-hedera-600 dark:hover:text-hedera-400 font-medium transition-all duration-200 hover:bg-hedera-50/50 dark:hover:bg-hedera-900/20 ${pathname === item.href ? 'bg-hedera-100/80 dark:bg-hedera-900/40 text-hedera-700 dark:text-hedera-300' : ''
+                            }`}
                         >
                           {item.name}
                         </Button>
@@ -152,7 +150,7 @@ export function Navbar() {
               </motion.div>
 
               {/* Right Section */}
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, x: 30 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.6, delay: 0.6 }}
@@ -169,7 +167,7 @@ export function Navbar() {
 
                 {/* Connect Wallet Button - Icon only on mobile */}
                 <div className="hidden sm:block">
-                  <WalletButton size="md" />
+                  <WalletButton />
                 </div>
                 <div className="block sm:hidden">
                   <WalletButton size="sm" className="px-2" />
@@ -195,9 +193,9 @@ export function Navbar() {
       </motion.nav>
 
       {/* Mobile Menu */}
-      <MobileMenu 
-        isOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
+      <MobileMenu
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
       />
     </>
   );

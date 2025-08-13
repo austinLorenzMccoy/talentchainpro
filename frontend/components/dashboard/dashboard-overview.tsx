@@ -12,7 +12,7 @@ import {
   ReputationStatsCard,
 } from "./stats-card";
 import { useDashboardData } from "@/hooks/useDashboardData";
-import { useHederaWallet } from "@/hooks/useHederaWallet";
+import { useAuth } from "@/hooks/useAuth";
 import { useRealTimeUpdates } from "@/hooks/useRealTimeUpdates";
 import { cn } from "@/lib/utils";
 
@@ -21,7 +21,7 @@ interface DashboardOverviewProps {
 }
 
 export function DashboardOverview({ className }: DashboardOverviewProps) {
-  const { wallet, isConnected } = useHederaWallet();
+  const { user, isConnected } = useAuth();
   const { stats, isLoading, error, refetch, lastUpdated } = useDashboardData();
   const { isConnected: realtimeConnected, connectionStatus } = useRealTimeUpdates();
 
@@ -124,7 +124,7 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
                   {connectionStatus === 'error' && 'Error'}
                 </span>
               </div>
-              
+
               {/* Last Updated */}
               {lastUpdated && (
                 <div className="flex items-center gap-2">
@@ -137,17 +137,17 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
 
         <div className="flex items-center gap-3">
           {/* Network Status */}
-          <Badge 
-            variant="outline" 
+          <Badge
+            variant="outline"
             className="bg-success-50/50 dark:bg-success-900/20 border-success-200/30 dark:border-success-800/30 text-success-700 dark:text-success-400"
           >
             <div className="w-2 h-2 bg-success-500 rounded-full animate-pulse mr-2" />
-            {wallet?.network} Network
+            Hedera Network
           </Badge>
 
           {/* Refresh Button */}
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={refetch}
             disabled={isLoading}
@@ -170,9 +170,9 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="text-red-700 dark:text-red-300">
               {error}
-              <Button 
-                variant="link" 
-                size="sm" 
+              <Button
+                variant="link"
+                size="sm"
                 onClick={refetch}
                 className="p-0 ml-2 h-auto text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100"
               >
@@ -186,16 +186,16 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
       {/* Stats Grid */}
       {stats && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <SkillTokensStatsCard 
+          <SkillTokensStatsCard
             value={stats.totalSkillTokens}
             trend={
-              stats.totalSkillTokens > 0 
+              stats.totalSkillTokens > 0
                 ? { value: 12, label: "vs last month", isPositive: true }
                 : undefined
             }
             delay={0.1}
           />
-          
+
           <ActiveApplicationsStatsCard
             value={stats.activeApplications}
             trend={
@@ -205,7 +205,7 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
             }
             delay={0.2}
           />
-          
+
           <CompletedMatchesStatsCard
             value={stats.completedMatches}
             trend={
@@ -215,16 +215,16 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
             }
             delay={0.3}
           />
-          
+
           <ReputationStatsCard
             value={Math.round(stats.reputationScore)}
             trend={
               stats.reputationScore > 0
-                ? { 
-                    value: Math.round(stats.reputationScore / 10), 
-                    label: "points this month", 
-                    isPositive: true 
-                  }
+                ? {
+                  value: Math.round(stats.reputationScore / 10),
+                  label: "points this month",
+                  isPositive: true
+                }
                 : undefined
             }
             delay={0.4}
@@ -266,7 +266,7 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
               Pro Tip: Maximize Your Reputation
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-              Regularly submit your work for AI evaluation to increase your skill levels and reputation score. 
+              Regularly submit your work for AI evaluation to increase your skill levels and reputation score.
               Higher reputation scores lead to better job matches and higher earning potential.
             </p>
           </div>

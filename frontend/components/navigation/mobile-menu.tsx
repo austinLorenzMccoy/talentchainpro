@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Zap, Shield, Users, TrendingUp, ExternalLink, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { WalletButton } from "@/components/wallet/wallet-button";
+import WalletButton from "@/components/wallet/wallet-button";
 import { Logo } from "@/components/ui/logo";
 
 interface MobileMenuProps {
@@ -93,7 +93,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
                           </span>
                           <ChevronRight className="w-4 h-4 text-slate-400" />
                         </div>
-                        
+
                         <div className="space-y-2 ml-4 border-l-2 border-hedera-200/30 dark:border-hedera-800/30 pl-4">
                           {item.items.map((subItem, subIndex) => (
                             <motion.div
@@ -155,7 +155,7 @@ export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
               {/* Footer with Wallet Button */}
               <div className="p-6 border-t border-gray-200/20 dark:border-slate-800/30 space-y-4">
                 <WalletButton size="lg" className="w-full" />
-                
+
                 {/* Network Status */}
                 <div className="flex items-center justify-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />

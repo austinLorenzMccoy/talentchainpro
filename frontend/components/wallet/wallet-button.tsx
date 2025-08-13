@@ -1,367 +1,297 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { Wallet, ChevronDown, Copy, ExternalLink, LogOut, AlertCircle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React, { useState } from 'react';
+import { Wallet, ChevronDown, Loader2, User, LogOut, ExternalLink, Sparkles, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogDescription
-} from "@/components/ui/dialog";
-import { useHederaWallet } from "@/hooks/useHederaWallet";
-import { WalletType } from "@/lib/types/wallet";
-import { getAccountExplorerUrl } from "@/lib/config/networks";
+} from '@/components/ui/dialog';
+import { useAuth } from '@/hooks/useAuth';
+import { WalletType } from '@/lib/wallet/wallet-connector';
+import { motion } from 'framer-motion';
 
 interface WalletButtonProps {
-  size?: "sm" | "md" | "lg";
+  variant?: 'default' | 'compact';
+  size?: 'sm' | 'lg';
   className?: string;
 }
 
-const WALLET_OPTIONS = [
-  {
-    type: 'hashpack' as WalletType,
-    name: 'HashPack',
-    description: 'Official Hedera wallet',
-    icon: '/icons/hashpack.svg',
-    recommended: true,
-  },
-  {
-    type: 'metamask' as WalletType,
-    name: 'MetaMask',
-    description: 'Popular Ethereum wallet',
-    icon: '/icons/metamask.svg',
-    recommended: false,
-  },
-];
-
-export function WalletButton({ size = "md", className = "" }: WalletButtonProps) {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+const WalletButton: React.FC<WalletButtonProps> = ({
+  variant = 'default',
+  size = 'lg',
+  className = ''
+}) => {
   const {
-    wallet,
-    isConnecting,
-    error,
-    connect,
-    disconnect,
+    user,
     isConnected,
-    isHashPackAvailable,
-    isMetaMaskAvailable
-  } = useHederaWallet();
+    isLoading,
+    connectWallet,
+    disconnectWallet,
+    getAvailableWallets
+  } = useAuth();
 
-  const sizeConfig = {
-    sm: { button: "h-9 px-3 text-sm", icon: "w-4 h-4" },
-    md: { button: "h-10 px-4 text-sm", icon: "w-4 h-4" },
-    lg: { button: "h-12 px-6 text-base", icon: "w-5 h-5" }
-  };
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const isMobileMode = className.includes("px-2");
-  const config = {
-    ...sizeConfig[size],
-    button: isMobileMode ? "h-9 px-2 text-sm" : sizeConfig[size].button
-  };
+  const walletOptions = [
 
-  const handleConnect = async (walletType: WalletType) => {
+    {
+      name: 'MetaMask',
+      id: WalletType.METAMASK,
+      description: 'EVM compatible wallet',
+      icon: '🦊',
+      color: 'from-orange-500 to-orange-600',
+      installUrl: 'https://metamask.io',
+      recommended: false
+    },
+    {
+      name: 'WalletConnect',
+      id: WalletType.WALLETCONNECT,
+      description: 'Multi-wallet support',
+      icon: '🔌',
+      color: 'from-blue-500 to-blue-600',
+      installUrl: 'https://walletconnect.com',
+      recommended: false
+    }
+  ];
+
+  const availableWallets = getAvailableWallets();
+
+  const handleWalletAction = async (wallet: typeof walletOptions[0]) => {
+    const isInstalled = availableWallets.includes(wallet.id);
+
+    if (!isInstalled) {
+      // Redirect to installation page
+      window.open(wallet.installUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    // Try to connect to installed wallet
     try {
-      // Check if wallet is available before attempting connection
-      const isAvailable = getWalletAvailability(walletType);
-      if (!isAvailable) {
-        const walletName = walletType === 'hashpack' ? 'HashPack' : 'MetaMask';
-        throw new Error(`${walletName} is not installed. Please install the extension first.`);
-      }
-
-      await connect(walletType);
+      console.log(`Attempting to connect to ${wallet.id}...`);
+      await connectWallet(wallet.id);
+      console.log(`Successfully connected to ${wallet.id}!`);
       setIsDialogOpen(false);
     } catch (error) {
-      console.error('Connection failed:', error);
-      // Error will be handled by the useHederaWallet hook
+      console.error(`Failed to connect to ${wallet.id}:`, error);
+      alert(`Failed to connect to ${wallet.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
-  const handleDisconnect = async () => {
-    try {
-      await disconnect();
-    } catch (error) {
-      console.error('Disconnect failed:', error);
-    }
+  const handleDisconnect = () => {
+    disconnectWallet();
   };
 
-  const copyAddress = () => {
-    if (wallet?.accountId) {
-      navigator.clipboard.writeText(wallet.accountId);
-      // You could add a toast notification here
-    }
+  // Format address for display
+  const formatAddress = (addr: string) => {
+    if (!addr) return '';
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
-  const getWalletAvailability = (type: WalletType) => {
-    switch (type) {
-      case 'hashpack':
-        return isHashPackAvailable;
-      case 'metamask':
-        return isMetaMaskAvailable;
+  // Get wallet icon based on type
+  const getWalletIcon = (walletType: WalletType) => {
+    switch (walletType) {
+      case WalletType.HASHPACK:
+        return '🔗';
+      case WalletType.METAMASK:
+        return '🦊';
+      case WalletType.WALLETCONNECT:
+        return '🔌';
       default:
-        return false;
+        return '💼';
     }
   };
 
-  const formatAddress = (address: string) => {
-    if (address.startsWith('0.0.')) {
-      return address;
-    }
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  if (isConnected && wallet) {
+  // If connected, show user info dropdown
+  if (isConnected && user) {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size={size === "md" ? "default" : size}
-            className={`relative group bg-white/90 dark:bg-slate-900/90 border-pink-200/50 dark:border-pink-800/50 hover:border-pink-300 dark:hover:border-pink-700 hover:bg-pink-50/50 dark:hover:bg-pink-950/50 transition-all duration-300 ${config.button} ${className}`}
-          >
-            {/* Subtle glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-pink-500/10 to-hedera-500/10 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
-            <div className={`relative z-10 flex items-center ${isMobileMode ? 'space-x-1' : 'space-x-2'}`}>
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              {!isMobileMode ? (
-                <span className="font-medium text-slate-700 dark:text-slate-300">
-                  {formatAddress(wallet.accountId)}
-                </span>
-              ) : (
-                <Wallet className={`${config.icon} text-slate-700 dark:text-slate-300`} />
-              )}
-              <ChevronDown className={`${config.icon} text-slate-500 dark:text-slate-400 transition-transform group-data-[state=open]:rotate-180`} />
+          <Button variant="outline" size={size} className={`flex items-center space-x-2 ${className}`}>
+            <div className="flex items-center space-x-2">
+              <span className="text-lg">{getWalletIcon(user.walletType)}</span>
+              <span className="hidden sm:inline-block">
+                {formatAddress(user.walletAddress)}
+              </span>
+              <span className="hidden lg:inline-block text-xs text-muted-foreground">
+                {user.balance} HBAR
+              </span>
             </div>
+            <ChevronDown className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-
-        <DropdownMenuContent
-          align="end"
-          className="w-64 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-pink-200/20 dark:border-pink-800/30 shadow-2xl"
-        >
-          <div className="p-4">
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-pink-600 rounded-full flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <div className="font-medium text-slate-900 dark:text-white">
-                  {wallet.metadata?.name || wallet.walletType}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400">Connected</div>
+        <DropdownMenuContent align="end" className="w-56">
+          <div className="p-2">
+            <div className="flex items-center space-x-2 p-2">
+              <User className="h-4 w-4" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {user.profile.name || 'Anonymous User'}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {formatAddress(user.walletAddress)}
+                </p>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600 dark:text-slate-400">Balance:</span>
-                <span className="font-medium text-slate-900 dark:text-white">{wallet.balance} HBAR</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-slate-600 dark:text-slate-400">Network:</span>
-                <div className="flex items-center space-x-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span className="text-sm text-slate-900 dark:text-white capitalize">{wallet.network}</span>
-                </div>
-              </div>
+            <div className="flex items-center justify-between p-2 text-xs">
+              <span className="text-muted-foreground">Balance:</span>
+              <span className="font-medium">{user.balance} HBAR</span>
+            </div>
+            <div className="flex items-center justify-between p-2 text-xs">
+              <span className="text-muted-foreground">Wallet:</span>
+              <span className="font-medium capitalize">{user.walletType}</span>
             </div>
           </div>
-
-          <DropdownMenuSeparator className="bg-pink-200/30 dark:bg-pink-800/30" />
-
-          <DropdownMenuItem
-            onClick={copyAddress}
-            className="flex items-center space-x-3 p-3 hover:bg-pink-50/50 dark:hover:bg-pink-950/50 cursor-pointer"
-          >
-            <Copy className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-            <span className="text-slate-900 dark:text-white">Copy Address</span>
-          </DropdownMenuItem>
-
-          <DropdownMenuItem
-            onClick={() => window.open(getAccountExplorerUrl(wallet.accountId, wallet.network), '_blank')}
-            className="flex items-center space-x-3 p-3 hover:bg-pink-50/50 dark:hover:bg-pink-950/50 cursor-pointer"
-          >
-            <ExternalLink className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-            <span className="text-slate-900 dark:text-white">View on Explorer</span>
-          </DropdownMenuItem>
-
-          <DropdownMenuSeparator className="bg-pink-200/30 dark:bg-pink-800/30" />
-
-          <DropdownMenuItem
-            onClick={handleDisconnect}
-            className="flex items-center space-x-3 p-3 hover:bg-red-50/50 dark:hover:bg-red-950/50 cursor-pointer text-red-600 dark:text-red-400"
-          >
-            <LogOut className="w-4 h-4" />
-            <span>Disconnect</span>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleDisconnect} className="text-red-600">
+            <LogOut className="mr-2 h-4 w-4" />
+            Disconnect
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     );
   }
 
+  // If not connected, show connect button
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogTrigger asChild>
-        <motion.div
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className={className}
+        <Button
+          variant="default"
+          size={size}
+          className={`bg-gradient-to-r from-hedera-500 to-hedera-600 hover:from-hedera-600 hover:to-hedera-700 text-white ${className}`}
+          disabled={isLoading}
         >
-          <Button
-            disabled={isConnecting}
-            className={`relative group bg-hedera-600 hover:bg-hedera-700 text-white shadow-lg shadow-hedera-500/25 hover:shadow-hedera-600/30 transition-all duration-300 font-medium ${config.button}`}
-          >
-            {/* Subtle inner glow */}
-            <div className="absolute inset-0 bg-hedera-500 rounded-md blur opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
-
-            <div className={`relative z-10 flex items-center ${isMobileMode ? 'justify-center' : 'space-x-2'}`}>
-              {isConnecting ? (
-                <Loader2 className={`${config.icon} animate-spin`} />
-              ) : (
-                <Wallet className={`${config.icon}`} />
-              )}
-              {!isMobileMode && (
-                <span>{isConnecting ? 'Connecting...' : 'Connect'}</span>
-              )}
-            </div>
-
-            {/* Animated border */}
-            <motion.div
-              className="absolute inset-0 border-2 border-hedera-400/50 rounded-md"
-              initial={{ opacity: 0, scale: 1 }}
-              whileHover={{
-                opacity: [0, 1, 0],
-                scale: [1, 1.05, 1],
-                transition: { duration: 1.5, repeat: Infinity }
-              }}
-            />
-          </Button>
-        </motion.div>
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Connecting...
+            </>
+          ) : (
+            <>
+              <Wallet className="mr-2 h-4 w-4" />
+              Connect Wallet
+            </>
+          )}
+        </Button>
       </DialogTrigger>
-
       <DialogContent className="sm:max-w-md bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-slate-200/50 dark:border-slate-700/50 shadow-2xl">
-        <DialogHeader className="space-y-3">
-          <DialogTitle className="text-2xl font-bold text-slate-900 dark:text-white">
-            Connect Wallet
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-hedera-500 to-hedera-600 bg-clip-text text-transparent">
+            Connect Your Wallet
           </DialogTitle>
-          <DialogDescription className="text-slate-600 dark:text-slate-400 text-base">
-            Choose a wallet to connect to TalentChain Pro
+          <DialogDescription className="text-slate-600 dark:text-slate-400">
+            Choose your preferred wallet to connect to TalentChain Pro
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 mt-6">
-          {WALLET_OPTIONS.map((option) => {
-            const isAvailable = getWalletAvailability(option.type);
+          {walletOptions.map((option) => {
+            const isAvailable = availableWallets.includes(option.id);
 
             return (
-              <motion.button
-                key={option.type}
-                onClick={() => handleConnect(option.type)}
-                disabled={!isAvailable || isConnecting}
-                whileHover={isAvailable ? { scale: 1.02 } : {}}
-                whileTap={isAvailable ? { scale: 0.98 } : {}}
-                className={`w-full p-5 border-2 rounded-xl text-left transition-all duration-300 ${isAvailable
-                  ? 'border-slate-200 dark:border-slate-700 hover:border-hedera-400 dark:hover:border-hedera-500 hover:bg-hedera-50/50 dark:hover:bg-hedera-950/50 bg-white/50 dark:bg-slate-800/50'
-                  : 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 cursor-not-allowed opacity-60'
-                  }`}
+              <motion.div
+                key={option.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isAvailable
-                      ? 'bg-gradient-to-br from-hedera-500 to-hedera-600 dark:from-hedera-400 dark:to-hedera-500'
-                      : 'bg-slate-200 dark:bg-slate-700'
-                      }`}>
-                      <span className="text-lg font-bold text-white dark:text-white">
-                        {option.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-1">
-                        <span className="font-semibold text-slate-900 dark:text-white text-lg">
-                          {option.name}
-                        </span>
-                        {option.recommended && (
-                          <span className="px-3 py-1 bg-gradient-to-r from-hedera-500 to-hedera-600 text-white text-xs font-medium rounded-full">
-                            Recommended
-                          </span>
-                        )}
+                <motion.button
+                  onClick={() => handleWalletAction(option)}
+                  disabled={!isAvailable}
+                  whileHover={isAvailable ? { scale: 1.02 } : {}}
+                  whileTap={isAvailable ? { scale: 0.98 } : {}}
+                  className={`w-full p-5 border-2 rounded-xl text-left transition-all duration-300 ${isAvailable
+                    ? 'border-slate-200 dark:border-slate-700 hover:border-hedera-400 dark:hover:border-hedera-500 hover:bg-hedera-50/50 dark:hover:bg-hedera-950/50 bg-white/50 dark:bg-slate-800/50'
+                    : 'border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 cursor-not-allowed opacity-60'
+                    }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <span className="text-2xl">{option.icon}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h3 className="font-semibold text-slate-900 dark:text-slate-100">
+                            {option.name}
+                          </h3>
+                          {option.recommended && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-hedera-100 text-hedera-800 dark:bg-hedera-900/30 dark:text-hedera-300">
+                              <Sparkles className="w-3 h-3 mr-1" />
+                              Recommended
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                          {option.description}
+                        </p>
                       </div>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
-                        {option.description}
-                      </p>
                     </div>
+
+                    {isAvailable ? (
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span className="text-xs text-green-600 dark:text-green-400">Available</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                        <span className="text-xs text-red-600 dark:text-red-400">Not Installed</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    {!isAvailable && (
-                      <AlertCircle className="w-5 h-5 text-slate-400 dark:text-slate-500" />
-                    )}
-                    {isConnecting && (
-                      <Loader2 className="w-5 h-5 text-hedera-500 animate-spin" />
-                    )}
-                  </div>
-                </div>
-
-                {!isAvailable && (
-                  <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400" />
-                      <p className="text-sm text-red-600 dark:text-red-400">
-                        {option.name} is not installed.
-                        <a
-                          href={option.type === 'hashpack' ? 'https://hashpack.com' : 'https://metamask.io'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="underline ml-1 hover:text-red-700 dark:hover:text-red-300"
-                        >
-                          Install now
-                        </a>
-                      </p>
+                  {!isAvailable && (
+                    <div className="mt-3 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400" />
+                        <p className="text-sm text-red-600 dark:text-red-400">
+                          {option.name} is not installed.
+                          <a
+                            href={option.installUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline ml-1 hover:text-red-700 dark:hover:text-red-300"
+                          >
+                            Install now
+                          </a>
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </motion.button>
+                  )}
+                </motion.button>
+              </motion.div>
             );
           })}
         </div>
 
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg"
-          >
-            <div className="flex items-center space-x-3">
-              <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0" />
-              <p className="text-sm text-red-600 dark:text-red-400 font-medium">{error}</p>
+        <div className="mt-6 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+          <div className="flex items-start space-x-3">
+            <div className="w-2 h-2 bg-hedera-500 rounded-full mt-2"></div>
+            <div className="flex-1">
+              <h4 className="font-medium text-slate-900 dark:text-slate-100 mb-1">
+                Why Connect a Wallet?
+              </h4>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Connect your wallet to access your skill tokens, manage your reputation,
+                and participate in the decentralized talent ecosystem on Hedera.
+              </p>
             </div>
-          </motion.div>
-        )}
-
-        <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-          <p className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed">
-            By connecting a wallet, you agree to our{' '}
-            <a href="/terms" className="underline hover:text-slate-700 dark:hover:text-slate-300">
-              Terms of Service
-            </a>{' '}
-            and{' '}
-            <a href="/privacy" className="underline hover:text-slate-700 dark:hover:text-slate-300">
-              Privacy Policy
-            </a>
-          </p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
-}
+};
+
+export default WalletButton;

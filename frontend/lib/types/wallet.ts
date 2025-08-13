@@ -2,44 +2,115 @@
  * Wallet and Hedera integration types for TalentChain Pro
  */
 
-export type HederaNetwork = 'testnet' | 'mainnet' | 'previewnet';
+// Wallet Types
+export enum WalletType {
+  HASHPACK = 'hashpack',
+  METAMASK = 'metamask',
+  WALLETCONNECT = 'walletconnect'
+}
 
-export type WalletType = 'hashpack' | 'metamask' | 'blade' | 'walletconnect';
-
+// Wallet Connection Interface
 export interface WalletConnection {
-  walletType: WalletType;
-  isConnected: boolean;
+  type: WalletType;
   accountId: string;
-  evmAddress?: string;
-  balance: string;
-  network: HederaNetwork;
-  publicKey?: string;
-  metadata?: {
-    name?: string;
-    icon?: string;
+  address: string;
+  signer?: any;
+  provider?: any;
+  balance?: string;
+  network?: string;
+  chainId?: number;
+}
+
+// Hedera Network Names (union type for keys)
+export type HederaNetworkName = 'testnet' | 'mainnet' | 'previewnet';
+
+// Hedera Network Configuration
+export interface HederaNetwork {
+  name: string;
+  chainId: number;
+  rpcUrl: string;
+  explorerUrl: string;
+  currency: {
+    name: string;
+    symbol: string;
+    decimals: number;
   };
 }
 
-export interface UseWalletReturn {
-  wallet: WalletConnection | null;
-  isConnecting: boolean;
-  error: string | null;
-  connect: (walletType?: WalletType) => Promise<void>;
-  disconnect: () => Promise<void>;
-  isConnected: boolean;
-  isHashPackAvailable: boolean;
-  isMetaMaskAvailable: boolean;
-  isBladeAvailable: boolean;
-  switchNetwork: (network: HederaNetwork) => Promise<void>;
+// Network Config (for compatibility with existing code)
+export interface NetworkConfig {
+  chainId: number;
+  name: string;
+  rpcUrl: string;
+  explorerUrl: string;
+  mirrorNodeUrl: string;
+  currency: {
+    name: string;
+    symbol: string;
+    decimals: number;
+  };
+  blockExplorerUrl: string;
 }
 
-export interface ContractCallResult {
+// Network Configurations
+export const HEDERA_NETWORKS: Record<string, HederaNetwork> = {
+  testnet: {
+    name: 'Hedera Testnet',
+    chainId: 296,
+    rpcUrl: 'https://testnet.hashio.io/api',
+    explorerUrl: 'https://hashscan.io/testnet',
+    currency: {
+      name: 'HBAR',
+      symbol: 'HBAR',
+      decimals: 18
+    }
+  },
+  mainnet: {
+    name: 'Hedera Mainnet',
+    chainId: 295,
+    rpcUrl: 'https://mainnet.hashio.io/api',
+    explorerUrl: 'https://hashscan.io/mainnet',
+    currency: {
+      name: 'HBAR',
+      symbol: 'HBAR',
+      decimals: 18
+    }
+  }
+};
+
+// Transaction Result
+export interface TransactionResult {
   success: boolean;
-  data?: any;
-  error?: string;
   transactionId?: string;
+  receipt?: any;
+  error?: string;
 }
 
+// API Response Types
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+// Skill Token Types
+export interface SkillToken {
+  id: string;
+  owner: string;
+  skill: string;
+  level: number;
+  metadata: {
+    name: string;
+    description: string;
+    image?: string;
+    attributes?: Record<string, any>;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Skill Token Info (for dashboard components)
 export interface SkillTokenInfo {
   tokenId: number;
   category: string;
@@ -48,97 +119,46 @@ export interface SkillTokenInfo {
   owner: string;
 }
 
+// Talent Pool Types
+export interface TalentPool {
+  id: string;
+  name: string;
+  description: string;
+  requirements: string[];
+  budget: {
+    min: number;
+    max: number;
+    currency: string;
+  };
+  duration: number;
+  status: 'open' | 'closed' | 'in-progress';
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Job Pool Info (for dashboard components)
 export interface JobPoolInfo {
   id: number;
   company: string;
   description: string;
   requiredSkills: number[];
-  stakeAmount: string;
   salary: string;
+  duration: number;
+  stakeAmount: string;
   status: PoolStatus;
   applicants: string[];
-  selectedCandidate: string;
   createdAt: number;
-  deadline: number;
 }
 
+// Pool Status Enum
 export enum PoolStatus {
-  Active = 0,
-  Paused = 1,
-  Completed = 2,
-  Cancelled = 3
+  Active = 'active',
+  Completed = 'completed',
+  Paused = 'paused',
+  Cancelled = 'cancelled'
 }
 
-export interface TransactionResult {
-  success: boolean;
-  transactionId?: string;
-  receipt?: any;
-  error?: string;
-}
-
-export interface NetworkConfig {
-  name: string;
-  chainId: number;
-  rpcUrl: string;
-  explorerUrl: string;
-  mirrorNodeUrl: string;
-}
-
-export interface WalletError extends Error {
-  code?: string;
-  data?: any;
-}
-
-// Smart Contract Interaction Types
-export interface ContractFunction {
-  name: string;
-  parameters?: any[];
-  gasLimit?: number;
-  payableAmount?: string;
-}
-
-export interface SmartContractCall {
-  contractId: string;
-  functionName: string;
-  parameters?: any[];
-  gasLimit?: number;
-  maxTransactionFee?: string;
-}
-
-// Skill Token specific types
-export interface CreateSkillTokenRequest {
-  to: string;
-  skillCategory: string;
-  level: number;
-  uri: string;
-}
-
-export interface UpdateSkillLevelRequest {
-  tokenId: number;
-  newLevel: number;
-  newUri: string;
-}
-
-// Job Pool specific types
-export interface CreateJobPoolRequest {
-  description: string;
-  requiredSkills: number[];
-  salary: string;
-  duration: number; // in seconds
-  stakeAmount: string; // in HBAR
-}
-
-export interface ApplyToPoolRequest {
-  poolId: number;
-  skillTokenIds: number[];
-}
-
-export interface MakeMatchRequest {
-  poolId: number;
-  candidate: string;
-}
-
-// Dashboard Types
+// Dashboard Stats
 export interface DashboardStats {
   totalSkillTokens: number;
   totalJobPools: number;
@@ -147,55 +167,49 @@ export interface DashboardStats {
   reputationScore: number;
 }
 
+// User Profile Types
 export interface UserProfile {
-  accountId: string;
-  evmAddress?: string;
+  id: string;
+  walletAddress: string;
   name?: string;
-  avatar?: string;
-  skillTokens: SkillTokenInfo[];
-  applications: number[];
-  matches: number[];
+  email?: string;
+  skills: string[];
+  experience: number;
   reputation: number;
-  createdAt: number;
+  completedProjects: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface CompanyProfile {
-  accountId: string;
-  evmAddress?: string;
-  name: string;
-  logo?: string;
-  description?: string;
-  jobPools: number[];
-  totalMatches: number;
-  reputation: number;
-  createdAt: number;
+// Dashboard Data Types
+export interface DashboardData {
+  user: UserProfile;
+  skillTokens: SkillToken[];
+  activeApplications: any[];
+  completedMatches: any[];
+  reputationScore: number;
+  totalEarnings: number;
 }
 
-// API Response types
-export interface ApiResponse<T> {
+// Contract Interaction Types
+export interface ContractCall {
+  functionName: string;
+  parameters: any[];
+  value?: string;
+  gasLimit?: number;
+}
+
+export interface ContractCallResult {
   success: boolean;
-  data?: T;
+  transactionId?: string;
+  gasUsed?: number;
   error?: string;
-  message?: string;
+  data?: any;
 }
 
-// Event types for real-time updates
-export interface SkillTokenEvent {
-  eventType: 'mint' | 'update' | 'transfer';
-  tokenId: number;
-  from?: string;
-  to?: string;
-  data: any;
-  blockNumber: number;
-  transactionId: string;
-}
-
-export interface JobPoolEvent {
-  eventType: 'created' | 'applied' | 'matched' | 'completed' | 'cancelled';
-  poolId: number;
-  company?: string;
-  candidate?: string;
-  data: any;
-  blockNumber: number;
-  transactionId: string;
+// Wallet Event Types
+export interface WalletEvent {
+  type: 'connected' | 'disconnected' | 'accountChanged' | 'networkChanged';
+  data?: any;
+  timestamp: number;
 }

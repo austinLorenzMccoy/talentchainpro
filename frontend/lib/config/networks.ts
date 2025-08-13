@@ -2,15 +2,21 @@
  * Network configuration for Hedera networks
  */
 
-import { HederaNetwork, NetworkConfig } from '../types/wallet';
+import { HederaNetworkName, NetworkConfig } from '../types/wallet';
 
-export const NETWORK_CONFIGS: Record<HederaNetwork, NetworkConfig> = {
+export const NETWORK_CONFIGS: Record<HederaNetworkName, NetworkConfig> = {
   testnet: {
     name: 'Hedera Testnet',
     chainId: 296,
     rpcUrl: 'https://testnet.hashio.io/api',
     explorerUrl: 'https://hashscan.io/testnet',
     mirrorNodeUrl: 'https://testnet.mirrornode.hedera.com',
+    currency: {
+      name: 'HBAR',
+      symbol: 'HBAR',
+      decimals: 18,
+    },
+    blockExplorerUrl: 'https://hashscan.io/testnet',
   },
   mainnet: {
     name: 'Hedera Mainnet',
@@ -18,6 +24,12 @@ export const NETWORK_CONFIGS: Record<HederaNetwork, NetworkConfig> = {
     rpcUrl: 'https://mainnet.hashio.io/api',
     explorerUrl: 'https://hashscan.io/mainnet',
     mirrorNodeUrl: 'https://mainnet-public.mirrornode.hedera.com',
+    currency: {
+      name: 'HBAR',
+      symbol: 'HBAR',
+      decimals: 18,
+    },
+    blockExplorerUrl: 'https://hashscan.io/mainnet',
   },
   previewnet: {
     name: 'Hedera Previewnet',
@@ -25,11 +37,17 @@ export const NETWORK_CONFIGS: Record<HederaNetwork, NetworkConfig> = {
     rpcUrl: 'https://previewnet.hashio.io/api',
     explorerUrl: 'https://hashscan.io/previewnet',
     mirrorNodeUrl: 'https://previewnet.mirrornode.hedera.com',
+    currency: {
+      name: 'HBAR',
+      symbol: 'HBAR',
+      decimals: 18,
+    },
+    blockExplorerUrl: 'https://hashscan.io/previewnet',
   },
 };
 
-export const DEFAULT_NETWORK: HederaNetwork = 
-  (process.env.NEXT_PUBLIC_HEDERA_NETWORK as HederaNetwork) || 'testnet';
+export const DEFAULT_NETWORK: HederaNetworkName = 
+  (process.env.NEXT_PUBLIC_HEDERA_NETWORK as HederaNetworkName) || 'testnet';
 
 export const CONTRACT_ADDRESSES = {
   SKILL_TOKEN: process.env.NEXT_PUBLIC_CONTRACT_SKILLTOKEN || '',
@@ -96,12 +114,12 @@ export const API_ENDPOINTS = {
 };
 
 // Utility functions
-export const getNetworkConfig = (network: HederaNetwork): NetworkConfig => {
+export const getNetworkConfig = (network: HederaNetworkName): NetworkConfig => {
   return NETWORK_CONFIGS[network];
 };
 
-export const isValidNetwork = (network: string): network is HederaNetwork => {
-  return Object.keys(NETWORK_CONFIGS).includes(network as HederaNetwork);
+export const isValidNetwork = (network: string): network is HederaNetworkName => {
+  return Object.keys(NETWORK_CONFIGS).includes(network as HederaNetworkName);
 };
 
 export const formatAccountId = (accountId: string): string => {
@@ -113,17 +131,17 @@ export const formatAccountId = (accountId: string): string => {
   return accountId;
 };
 
-export const getContractExplorerUrl = (contractId: string, network: HederaNetwork = DEFAULT_NETWORK): string => {
+export const getContractExplorerUrl = (contractId: string, network: HederaNetworkName = DEFAULT_NETWORK): string => {
   const config = getNetworkConfig(network);
   return `${config.explorerUrl}/contract/${contractId}`;
 };
 
-export const getTransactionExplorerUrl = (transactionId: string, network: HederaNetwork = DEFAULT_NETWORK): string => {
+export const getTransactionExplorerUrl = (transactionId: string, network: HederaNetworkName = DEFAULT_NETWORK): string => {
   const config = getNetworkConfig(network);
   return `${config.explorerUrl}/transaction/${transactionId}`;
 };
 
-export const getAccountExplorerUrl = (accountId: string, network: HederaNetwork = DEFAULT_NETWORK): string => {
+export const getAccountExplorerUrl = (accountId: string, network: HederaNetworkName = DEFAULT_NETWORK): string => {
   const config = getNetworkConfig(network);
   return `${config.explorerUrl}/account/${accountId}`;
 };

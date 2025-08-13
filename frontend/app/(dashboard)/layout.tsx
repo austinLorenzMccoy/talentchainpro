@@ -19,8 +19,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { WalletButton } from "@/components/wallet/wallet-button";
-import { useWallet } from "@/hooks/useWallet";
+import WalletButton from "@/components/wallet/wallet-button";
+import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -70,10 +70,10 @@ const navigation = [
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const { wallet, disconnect } = useWallet();
+  const { user, disconnectWallet } = useAuth();
 
   const handleSignOut = async () => {
-    await disconnect();
+    disconnectWallet();
   };
 
   return (
@@ -146,10 +146,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                  {wallet?.accountId || 'Not connected'}
+                  {user?.accountId || 'Not connected'}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {wallet?.balance || '0'} ℏ
+                  {user?.balance || '0'} ℏ
                 </p>
               </div>
             </div>
@@ -211,10 +211,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-3 py-2">
                   <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {wallet?.accountId || 'Not connected'}
+                    {user?.accountId || 'Not connected'}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {wallet?.balance || '0'} ℏ
+                    {user?.balance || '0'} ℏ
                   </p>
                 </div>
                 <DropdownMenuSeparator />

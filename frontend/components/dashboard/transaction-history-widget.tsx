@@ -34,7 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DashboardWidget } from "./dashboard-widget";
-import { useHederaWallet } from "@/hooks/useHederaWallet";
+import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 interface TransactionHistoryWidgetProps {
@@ -119,7 +119,7 @@ const mockTransactions: Transaction[] = [
 ];
 
 export function TransactionHistoryWidget({ className }: TransactionHistoryWidgetProps) {
-  const { wallet, isConnected } = useHederaWallet();
+  const { user, isConnected } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -132,10 +132,10 @@ export function TransactionHistoryWidget({ className }: TransactionHistoryWidget
 
   // Load transaction history
   useEffect(() => {
-    if (isConnected && wallet) {
+    if (isConnected && user) {
       fetchTransactionHistory();
     }
-  }, [isConnected, wallet]);
+  }, [isConnected, user]);
 
   // Filter and sort transactions
   useEffect(() => {
@@ -170,7 +170,7 @@ export function TransactionHistoryWidget({ className }: TransactionHistoryWidget
 
     try {
       // TODO: Replace with real Hedera Mirror Node API call
-      // const response = await fetch(`https://testnet.mirrornode.hedera.com/api/v1/accounts/${wallet.accountId}/transactions`);
+              // const response = await fetch(`https://testnet.mirrornode.hedera.com/api/v1/accounts/${user.accountId}/transactions`);
       // const data = await response.json();
       
       // Mock API delay
@@ -223,7 +223,7 @@ export function TransactionHistoryWidget({ className }: TransactionHistoryWidget
   };
 
   const openInExplorer = (transactionId: string) => {
-    const network = wallet?.network === 'mainnet' ? '' : 'testnet.';
+    const network = process.env.NEXT_PUBLIC_HEDERA_NETWORK === 'mainnet' ? '' : 'testnet.';
     window.open(`https://${network}hashscan.io/transaction/${transactionId}`, '_blank');
   };
 

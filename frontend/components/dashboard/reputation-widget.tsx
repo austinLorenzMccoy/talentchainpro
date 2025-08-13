@@ -45,7 +45,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { DashboardWidget } from "./dashboard-widget";
 import { useReputation, useSkillTokens } from "@/hooks/useDashboardData";
-import { useHederaWallet } from "@/hooks/useHederaWallet";
+import { useAuth } from "@/hooks/useAuth";
 import { dashboardApi } from "@/lib/api/dashboard-service";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +54,7 @@ interface ReputationWidgetProps {
 }
 
 export function ReputationWidget({ className }: ReputationWidgetProps) {
-  const { wallet } = useHederaWallet();
+  const { user } = useAuth();
   const { reputation, history, isLoading, error, refetch } = useReputation();
   const { skillTokens } = useSkillTokens();
   
@@ -103,7 +103,7 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
       if (!selectedSkill) throw new Error("Selected skill token not found");
 
       const result = await dashboardApi.submitWorkEvaluation({
-        user_id: wallet?.accountId || "",
+        user_id: user?.accountId || "",
         skill_token_id: parseInt(workSubmission.skillTokenId),
         work_description: workSubmission.workDescription,
         artifacts: workSubmission.artifacts,

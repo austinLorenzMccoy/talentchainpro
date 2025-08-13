@@ -10,18 +10,15 @@ import {
   ContractExecuteTransaction,
   ContractFunctionParameters,
   Hbar,
-  TransactionId,
-  TransactionReceipt,
-  Status,
 } from '@hashgraph/sdk';
 
-import { HederaNetwork, ContractCallResult, TransactionResult } from '../types/wallet';
+import { HederaNetworkName, ContractCallResult, TransactionResult } from '../types/wallet';
 import { getNetworkConfig, APP_CONFIG, CONTRACT_CONSTANTS } from '../config/networks';
 
 /**
  * Create a Hedera client for the specified network
  */
-export const createHederaClient = (network: HederaNetwork = APP_CONFIG.network): Client => {
+export const createHederaClient = (network: HederaNetworkName = APP_CONFIG.network): Client => {
   switch (network) {
     case 'mainnet':
       return Client.forMainnet();
@@ -40,7 +37,7 @@ export const queryContract = async (
   contractId: string,
   functionName: string,
   parameters?: ContractFunctionParameters,
-  network: HederaNetwork = APP_CONFIG.network
+  network: HederaNetworkName = APP_CONFIG.network
 ): Promise<ContractCallResult> => {
   console.log(`🔍 Querying contract ${contractId} function ${functionName} on ${network}`);
   const client = createHederaClient(network);
@@ -131,7 +128,7 @@ export const executeContractWithWallet = async (
 export const getSkillTokenInfo = async (
   tokenId: number,
   contractId: string = APP_CONFIG.contracts.SKILL_TOKEN,
-  network: HederaNetwork = APP_CONFIG.network
+  network: HederaNetworkName = APP_CONFIG.network
 ) => {
   const parameters = new ContractFunctionParameters().addUint256(tokenId);
   const result = await queryContract(contractId, 'getSkillInfo', parameters, network);
@@ -161,7 +158,7 @@ export const getSkillTokenInfo = async (
 export const getJobPoolInfo = async (
   poolId: number,
   contractId: string = APP_CONFIG.contracts.TALENT_POOL,
-  network: HederaNetwork = APP_CONFIG.network
+  network: HederaNetworkName = APP_CONFIG.network
 ) => {
   const parameters = new ContractFunctionParameters().addUint256(poolId);
   const result = await queryContract(contractId, 'getPool', parameters, network);
@@ -197,7 +194,7 @@ export const getJobPoolInfo = async (
  */
 export const getPoolCount = async (
   contractId: string = APP_CONFIG.contracts.TALENT_POOL,
-  network: HederaNetwork = APP_CONFIG.network
+  network: HederaNetworkName = APP_CONFIG.network
 ): Promise<number | null> => {
   const result = await queryContract(contractId, 'getPoolCount', undefined, network);
   
@@ -219,7 +216,7 @@ export const getPoolCount = async (
 export const getUserApplications = async (
   userAddress: string,
   contractId: string = APP_CONFIG.contracts.TALENT_POOL,
-  network: HederaNetwork = APP_CONFIG.network
+  network: HederaNetworkName = APP_CONFIG.network
 ) => {
   const parameters = new ContractFunctionParameters().addAddress(userAddress);
   const result = await queryContract(contractId, 'getUserApplications', parameters, network);
