@@ -24,6 +24,9 @@ import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/useAuth";
 import { SkillTokenInfo } from "@/lib/types/wallet";
 import { CreateSkillTokenDialog } from "@/components/skills/create-skill-token-dialog";
+import { UpdateSkillTokenDialog } from "@/components/skills/update-skill-token-dialog";
+import { ViewSkillTokenDialog } from "@/components/skills/view-skill-token-dialog";
+import { WalletConnectionPrompt } from "@/components/dashboard/wallet-connection-prompt";
 import {
   Select,
   SelectContent,
@@ -103,6 +106,15 @@ export default function SkillsPage() {
       fetchUserSkills();
     }
   }, [isConnected, user]);
+
+  if (!isConnected) {
+    return (
+      <WalletConnectionPrompt
+        title="Connect to Manage Skills"
+        description="Connect your Hedera wallet to create and manage your skill tokens."
+      />
+    );
+  }
 
   const fetchUserSkills = async () => {
     setIsLoading(true);
@@ -299,14 +311,15 @@ export default function SkillsPage() {
                     </div>
 
                     <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                      <Button variant="ghost" size="sm" className="flex-1">
-                        <Edit3 className="w-4 h-4 mr-2" />
-                        Update
-                      </Button>
-                      <Button variant="ghost" size="sm" className="flex-1">
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        View
-                      </Button>
+                      <UpdateSkillTokenDialog 
+                        skill={skill}
+                        onSkillUpdated={(updatedSkill) => {
+                          setSkills(prev => prev.map(s => 
+                            s.tokenId === updatedSkill.tokenId ? updatedSkill : s
+                          ));
+                        }}
+                      />
+                      <ViewSkillTokenDialog skill={skill} />
                     </div>
                   </CardContent>
                 </Card>

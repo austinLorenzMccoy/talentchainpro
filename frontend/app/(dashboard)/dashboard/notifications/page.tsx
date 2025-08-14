@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { WalletConnectionPrompt } from "@/components/dashboard/wallet-connection-prompt";
 
 // Mock notification data - replace with real data from your backend
 const notifications = [
@@ -77,9 +79,19 @@ const categories = [
 ];
 
 export default function NotificationsPage() {
+    const { isConnected } = useAuth();
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedNotifications, setSelectedNotifications] = useState<number[]>([]);
+
+    if (!isConnected) {
+        return (
+            <WalletConnectionPrompt
+                title="Connect to View Notifications"
+                description="Connect your Hedera wallet to view your notifications and stay updated on your professional activities."
+            />
+        );
+    }
 
     const filteredNotifications = notifications.filter(notification => {
         const matchesCategory = selectedCategory === 'all' || notification.category === selectedCategory;

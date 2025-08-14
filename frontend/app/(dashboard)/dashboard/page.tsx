@@ -60,8 +60,9 @@ export default function DashboardPage({ }: DashboardPageProps) {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8"
             >
+
               {/* AI Reputation Tracking */}
-              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+              <div className="bg-white dark:bg-slate-800 h-fit rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <ReputationWidget />
               </div>
 
@@ -69,6 +70,7 @@ export default function DashboardPage({ }: DashboardPageProps) {
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <TransactionHistoryWidget />
               </div>
+
             </motion.div>
 
           </div>
