@@ -74,11 +74,15 @@ class Settings(BaseSettings):
     hedera_network: str = Field(default="testnet", env="HEDERA_NETWORK")
     hedera_account_id: str = Field(default="0.0.YOUR_ACCOUNT_ID", env="HEDERA_ACCOUNT_ID")
     hedera_private_key: str = Field(default="YOUR_PRIVATE_KEY", env="HEDERA_PRIVATE_KEY")
-    hedera_public_key: Optional[str] = Field(None, env="HEDERA_PUBLIC_KEY")
+    hedera_public_key: Optional[str] = Field(None, env="HEDERA_PRIVATE_KEY")
     hedera_mirror_node_url: str = Field(
         default="https://testnet.mirrornode.hedera.com", 
         env="HEDERA_MIRROR_NODE_URL"
     )
+    
+    # Hedera Transaction Settings
+    max_transaction_fee: int = Field(default=100, env="MAX_TRANSACTION_FEE")
+    max_query_payment: int = Field(default=50, env="MAX_QUERY_PAYMENT")
     
     # Smart Contract Addresses (All 4 main contracts)
     # Placeholders until deployment - will be updated by deployment script
