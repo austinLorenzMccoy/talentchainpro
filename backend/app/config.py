@@ -22,6 +22,8 @@ from functools import lru_cache
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
     
+    model_config = {"extra": "allow"}  # Allow extra fields from environment variables
+    
     # Application Settings
     app_name: str = Field(default="TalentChain Pro API", env="APP_NAME")
     app_version: str = Field(default="1.0.0", env="APP_VERSION")
@@ -118,9 +120,11 @@ class Settings(BaseSettings):
             raise ValueError('Contract address must be a valid Hedera address starting with 0.0.')
         return v
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "extra": "allow",  # Allow extra fields from environment variables
+        "env_file": ".env",
+        "case_sensitive": False
+    }
 
 
 @lru_cache()
@@ -131,40 +135,60 @@ def get_settings() -> Settings:
 
 def load_contract_abis() -> Dict[str, List[Dict[str, Any]]]:
     """
-    Load all contract ABIs from the contracts/abis directory.
+    Load all contract ABIs from the contracts.json file.
     
     Returns:
         Dictionary mapping contract names to their ABIs
     """
-    settings = get_settings()
-    abi_path = settings.contract_abi_path
-    
-    contract_abis = {}
-    
-    # Define the contracts we expect
-    expected_contracts = [
-        'SkillToken',
-        'TalentPool', 
-        'Governance',
-        'ReputationOracle'
-    ]
-    
-    for contract_name in expected_contracts:
-        abi_file_path = os.path.join(abi_path, f"{contract_name}.json")
+    try:
+        # Try to load from contracts.json first (existing approach)
+        contracts_file_path = os.path.join(os.path.dirname(__file__), '..', 'contracts.json')
         
-        try:
-            if os.path.exists(abi_file_path):
-                with open(abi_file_path, 'r') as f:
-                    contract_abis[contract_name] = json.load(f)
-                print(f"✅ Loaded ABI for {contract_name}")
-            else:
-                print(f"⚠️  ABI file not found for {contract_name}: {abi_file_path}")
+        if os.path.exists(contracts_file_path):
+            with open(contracts_file_path, 'r') as f:
+                contracts_data = json.load(f)
+            
+            contract_abis = {}
+            for contract_name, contract_info in contracts_data.get('contracts', {}).items():
+                contract_abis[contract_name] = contract_info.get('abi', [])
+                print(f"✅ Loaded ABI for {contract_name} from contracts.json")
+            
+            return contract_abis
+        
+        # Fallback to individual ABI files
+        settings = get_settings()
+        abi_path = settings.contract_abi_path
+        
+        contract_abis = {}
+        
+        # Define the contracts we expect
+        expected_contracts = [
+            'SkillToken',
+            'TalentPool', 
+            'Governance',
+            'ReputationOracle'
+        ]
+        
+        for contract_name in expected_contracts:
+            abi_file_path = os.path.join(abi_path, f"{contract_name}.json")
+            
+            try:
+                if os.path.exists(abi_file_path):
+                    with open(abi_file_path, 'r') as f:
+                        contract_abis[contract_name] = json.load(f)
+                    print(f"✅ Loaded ABI for {contract_name} from {abi_file_path}")
+                else:
+                    print(f"⚠️  ABI file not found for {contract_name}: {abi_file_path}")
+                    contract_abis[contract_name] = []
+            except Exception as e:
+                print(f"❌ Error loading ABI for {contract_name}: {str(e)}")
                 contract_abis[contract_name] = []
-        except Exception as e:
-            print(f"❌ Error loading ABI for {contract_name}: {str(e)}")
-            contract_abis[contract_name] = []
-    
-    return contract_abis
+        
+        return contract_abis
+        
+    except Exception as e:
+        print(f"❌ Error loading contract ABIs: {str(e)}")
+        return {}
 
 
 def get_contract_abi(contract_name: str) -> List[Dict[str, Any]]:
@@ -191,16 +215,32 @@ def get_contract_address(contract_name: str) -> str:
     Returns:
         Contract address as a string
     """
-    settings = get_settings()
-    
-    contract_addresses = {
-        'SkillToken': settings.contract_skill_token,
-        'TalentPool': settings.contract_talent_pool,
-        'Governance': settings.contract_governance,
-        'ReputationOracle': settings.contract_reputation_oracle
-    }
-    
-    return contract_addresses.get(contract_name, "")
+    try:
+        # Try to load from contracts.json first
+        contracts_file_path = os.path.join(os.path.dirname(__file__), '..', 'contracts.json')
+        
+        if os.path.exists(contracts_file_path):
+            with open(contracts_file_path, 'r') as f:
+                contracts_data = json.load(f)
+            
+            contract_info = contracts_data.get('contracts', {}).get(contract_name, {})
+            return contract_info.get('address', '')
+        
+        # Fallback to environment variables
+        settings = get_settings()
+        
+        contract_addresses = {
+            'SkillToken': settings.contract_skill_token,
+            'TalentPool': settings.contract_talent_pool,
+            'Governance': settings.contract_governance,
+            'ReputationOracle': settings.contract_reputation_oracle
+        }
+        
+        return contract_addresses.get(contract_name, "")
+        
+    except Exception as e:
+        # logger.error(f"Failed to get contract address for {contract_name}: {str(e)}") # Original code had this line commented out
+        return ""
 
 
 def validate_contract_deployments() -> Dict[str, bool]:
@@ -210,20 +250,56 @@ def validate_contract_deployments() -> Dict[str, bool]:
     Returns:
         Dictionary mapping contract names to deployment status
     """
-    settings = get_settings()
-    
-    contracts = {
-        'SkillToken': settings.contract_skill_token,
-        'TalentPool': settings.contract_talent_pool,
-        'Governance': settings.contract_governance,
-        'ReputationOracle': settings.contract_reputation_oracle
-    }
-    
-    deployment_status = {}
-    for name, address in contracts.items():
-        deployment_status[name] = bool(address and address.startswith('0.0.'))
-    
-    return deployment_status
+    try:
+        # Try to load from contracts.json first
+        contracts_file_path = os.path.join(os.path.dirname(__file__), '..', 'contracts.json')
+        
+        if os.path.exists(contracts_file_path):
+            with open(contracts_file_path, 'r') as f:
+                contracts_data = json.load(f)
+            
+            deployment_status = {}
+            for name, contract_info in contracts_data.get('contracts', {}).items():
+                address = contract_info.get('address', '')
+                abi = contract_info.get('abi', [])
+                
+                # Check if contract is deployed and has ABI
+                is_deployed = bool(address and address.startswith('0.0.'))
+                has_abi = len(abi) > 0
+                
+                deployment_status[name] = {
+                    'deployed': is_deployed,
+                    'address': address,
+                    'has_abi': has_abi,
+                    'ready': is_deployed and has_abi
+                }
+            
+            return deployment_status
+        
+        # Fallback to environment variables
+        settings = get_settings()
+        
+        contracts = {
+            'SkillToken': settings.contract_skill_token,
+            'TalentPool': settings.contract_talent_pool,
+            'Governance': settings.contract_governance,
+            'ReputationOracle': settings.contract_reputation_oracle
+        }
+        
+        deployment_status = {}
+        for name, address in contracts.items():
+            deployment_status[name] = {
+                'deployed': bool(address and address.startswith('0.0.')),
+                'address': address,
+                'has_abi': False,  # No ABI info from env vars
+                'ready': bool(address and address.startswith('0.0.'))
+            }
+        
+        return deployment_status
+        
+    except Exception as e:
+        # logger.error(f"Failed to validate contract deployments: {str(e)}") # Original code had this line commented out
+        return {}
 
 
 def get_network_config() -> Dict[str, Any]:
@@ -275,13 +351,43 @@ def get_contract_config() -> Dict[str, Dict[str, Any]]:
     Returns:
         Dictionary mapping contract names to their configuration
     """
-    contract_config = {}
-    
-    for contract_name in ['SkillToken', 'TalentPool', 'Governance', 'ReputationOracle']:
-        contract_config[contract_name] = {
-            'address': get_contract_address(contract_name),
-            'abi': get_contract_abi(contract_name),
-            'deployed': bool(get_contract_address(contract_name))
-        }
-    
-    return contract_config
+    try:
+        # Try to load from contracts.json first
+        contracts_file_path = os.path.join(os.path.dirname(__file__), '..', 'contracts.json')
+        
+        if os.path.exists(contracts_file_path):
+            with open(contracts_file_path, 'r') as f:
+                contracts_data = json.load(f)
+            
+            contract_config = {}
+            for contract_name, contract_info in contracts_data.get('contracts', {}).items():
+                address = contract_info.get('address', '')
+                abi = contract_info.get('abi', [])
+                
+                contract_config[contract_name] = {
+                    'address': address,
+                    'abi': abi,
+                    'deployed': bool(address and address.startswith('0.0.')),
+                    'deployed_at': contract_info.get('deployed_at', ''),
+                    'ready': bool(address and address.startswith('0.0.') and len(abi) > 0)
+                }
+            
+            return contract_config
+        
+        # Fallback to environment variables
+        contract_config = {}
+        
+        for contract_name in ['SkillToken', 'TalentPool', 'Governance', 'ReputationOracle']:
+            contract_config[contract_name] = {
+                'address': get_contract_address(contract_name),
+                'abi': get_contract_abi(contract_name),
+                'deployed': bool(get_contract_address(contract_name)),
+                'deployed_at': '',
+                'ready': bool(get_contract_address(contract_name))
+            }
+        
+        return contract_config
+        
+    except Exception as e:
+        # logger.error(f"Failed to get contract configuration: {str(e)}") # Original code had this line commented out
+        return {}

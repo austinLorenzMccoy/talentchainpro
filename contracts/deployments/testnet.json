@@ -25,8 +25,12 @@
       "success": true
     },
     "governance": {
-      "success": false,
-      "error": "This value must be a String, Number, or BigNumber to be converted."
+      "success": true,
+      "error": "This value must be a String, Number, or BigNumber to be converted.",
+      "contractId": "0.0.6545002",
+      "transactionId": "0.0.6514439@1754859402.743531706",
+      "contractAddress": "000000000000000000000000000000000063de56",
+      "explorerUrl": "https://hashscan.io/testnet/contract/0.0.6545002"
     }
   },
   "networkInfo": {
