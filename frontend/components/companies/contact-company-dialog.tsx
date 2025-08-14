@@ -76,7 +76,7 @@ export function ContactCompanyDialog({
     const { user, isConnected } = useAuth();
     const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    
+
     const [contactForm, setContactForm] = useState({
         reason: "",
         urgency: "Low - General inquiry",
@@ -232,9 +232,9 @@ export function ContactCompanyDialog({
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Globe className="w-4 h-4 text-hedera-600" />
-                                        <a 
-                                            href={company.website} 
-                                            target="_blank" 
+                                        <a
+                                            href={company.website}
+                                            target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-sm text-hedera-600 hover:text-hedera-700 dark:text-hedera-400 dark:hover:text-hedera-300 underline"
                                         >
@@ -258,13 +258,13 @@ export function ContactCompanyDialog({
                                 <MessageSquare className="w-5 h-5 text-hedera-600" />
                                 Contact Form
                             </h3>
-                            
+
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <Label htmlFor="reason">Reason for Contact *</Label>
-                                        <Select 
-                                            value={contactForm.reason} 
+                                        <Select
+                                            value={contactForm.reason}
                                             onValueChange={(value) => setContactForm({ ...contactForm, reason: value })}
                                         >
                                             <SelectTrigger className="mt-1">
@@ -281,8 +281,8 @@ export function ContactCompanyDialog({
                                     </div>
                                     <div>
                                         <Label htmlFor="urgency">Urgency Level *</Label>
-                                        <Select 
-                                            value={contactForm.urgency} 
+                                        <Select
+                                            value={contactForm.urgency}
                                             onValueChange={(value) => setContactForm({ ...contactForm, urgency: value })}
                                         >
                                             <SelectTrigger className="mt-1">
@@ -377,8 +377,8 @@ export function ContactCompanyDialog({
                                     </div>
                                     <div>
                                         <Label htmlFor="preferredContactMethod">Preferred Contact Method</Label>
-                                        <Select 
-                                            value={contactForm.preferredContactMethod} 
+                                        <Select
+                                            value={contactForm.preferredContactMethod}
                                             onValueChange={(value) => setContactForm({ ...contactForm, preferredContactMethod: value })}
                                         >
                                             <SelectTrigger className="mt-1">

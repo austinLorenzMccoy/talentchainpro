@@ -48,6 +48,7 @@ import { useJobPools, useSkillTokens } from "@/hooks/useDashboardData";
 import { useAuth } from "@/hooks/useAuth";
 import { JobPoolInfo, PoolStatus } from "@/lib/types/wallet";
 import { cn } from "@/lib/utils";
+import { CreateJobPoolDialog } from "./create-job-pool-dialog";
 
 interface JobPoolsWidgetProps {
   className?: string;
@@ -68,6 +69,8 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
   const [selectedSkillTokens, setSelectedSkillTokens] = useState<number[]>([]);
   const [isApplying, setIsApplying] = useState(false);
   const [applicationError, setApplicationError] = useState<string | null>(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [newlyCreatedPool, setNewlyCreatedPool] = useState<JobPoolInfo | null>(null);
 
   // Filter and sort job pools
   const filteredAndSortedPools = useMemo(() => {
@@ -221,16 +224,34 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
           </Button>
 
           {/* Create Pool Button */}
-          <Button
-            size="sm"
-            className="bg-gradient-to-r from-hedera-600 to-hedera-700 hover:from-hedera-700 hover:to-hedera-800 text-white shadow-sm"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">Create Pool</span>
-          </Button>
+          <CreateJobPoolDialog
+            onPoolCreated={(pool) => {
+              console.log('New pool created:', pool);
+              setNewlyCreatedPool(pool);
+              setShowSuccessMessage(true);
+              setTimeout(() => setShowSuccessMessage(false), 5000);
+              refetch(); // Refresh the pools list
+            }}
+          />
         </div>
       }
     >
+      {/* Success Message */}
+      {showSuccessMessage && newlyCreatedPool && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-6 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg"
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-green-500" />
+            <span className="text-green-700 dark:text-green-300 font-medium">
+              Job pool "{newlyCreatedPool.title}" created successfully! It's now visible to potential candidates.
+            </span>
+          </div>
+        </motion.div>
+      )}
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         {/* Search */}

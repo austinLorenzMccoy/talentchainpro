@@ -3,12 +3,12 @@
  * Integrates with FastAPI backend following the established patterns
  */
 
-import { 
-  DashboardStats, 
-  SkillTokenInfo, 
-  JobPoolInfo, 
+import {
+  DashboardStats,
+  SkillTokenInfo,
+  JobPoolInfo,
   PoolStatus,
-  ApiResponse 
+  ApiResponse
 } from '../types/wallet';
 
 // API Configuration
@@ -26,7 +26,7 @@ class DashboardApiService {
    * Generic API request handler with error handling
    */
   private async request<T>(
-    endpoint: string, 
+    endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
@@ -126,8 +126,8 @@ class DashboardApiService {
   }
 
   async getReputationHistory(
-    userId: string, 
-    page: number = 0, 
+    userId: string,
+    page: number = 0,
     size: number = 10
   ): Promise<ApiResponse<{
     items: Array<{
@@ -167,7 +167,7 @@ class DashboardApiService {
         }
       });
     }
-    
+
     const queryString = params.toString() ? `?${params.toString()}` : '';
     return this.request(`/pools${queryString}`);
   }
@@ -177,11 +177,23 @@ class DashboardApiService {
   }
 
   async createJobPool(request: {
+    title: string;
+    company: string;
     description: string;
     required_skills: number[];
     salary: string;
     duration: number;
     stake_amount: string;
+    job_type?: string;
+    experience_level?: string;
+    location?: string;
+    remote?: boolean;
+    hybrid?: boolean;
+    max_applicants?: number;
+    pool_type?: string;
+    urgency?: string;
+    budget?: string;
+    application_deadline?: string;
   }): Promise<ApiResponse<{ transaction_id: string; pool_id: number }>> {
     return this.request(`/pools`, {
       method: 'POST',
@@ -298,11 +310,11 @@ class DashboardApiService {
       const reputation = reputationResponse.success ? reputationResponse.data : null;
 
       // Calculate active applications (pools user has applied to)
-      const activeApplicationsResponse = await this.getJobPools({ 
-        page: 0, 
+      const activeApplicationsResponse = await this.getJobPools({
+        page: 0,
         size: 100 // Get more to filter properly
       });
-      
+
       let activeApplications = 0;
       if (activeApplicationsResponse.success && activeApplicationsResponse.data) {
         // This would need backend support to filter by applicant

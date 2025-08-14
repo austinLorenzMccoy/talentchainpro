@@ -3,10 +3,10 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  DashboardStats, 
-  SkillTokenInfo, 
-  JobPoolInfo, 
+import {
+  DashboardStats,
+  SkillTokenInfo,
+  JobPoolInfo,
   ApiResponse,
   TransactionResult
 } from '@/lib/types/wallet';
@@ -227,7 +227,7 @@ export function useSkillTokens(): UseSkillTokensReturn {
   }, [user?.accountId]);
 
   const updateSkillLevel = useCallback(async (
-    tokenId: number, 
+    tokenId: number,
     data: { new_level: number; new_uri: string; reasoning: string }
   ): Promise<TransactionResult> => {
     try {
@@ -235,9 +235,9 @@ export function useSkillTokens(): UseSkillTokensReturn {
 
       if (response.success && response.data) {
         // Optimistically update the local state
-        setSkillTokens(prev => 
-          prev.map(token => 
-            token.tokenId === tokenId 
+        setSkillTokens(prev =>
+          prev.map(token =>
+            token.tokenId === tokenId
               ? { ...token, level: data.new_level, uri: data.new_uri }
               : token
           )
@@ -308,11 +308,23 @@ export function useJobPools(): UseJobPoolsReturn {
   }, []);
 
   const createJobPool = useCallback(async (data: {
+    title: string;
+    company: string;
     description: string;
     required_skills: number[];
     salary: string;
     duration: number;
     stake_amount: string;
+    job_type?: string;
+    experience_level?: string;
+    location?: string;
+    remote?: boolean;
+    hybrid?: boolean;
+    max_applicants?: number;
+    pool_type?: string;
+    urgency?: string;
+    budget?: string;
+    application_deadline?: string;
   }): Promise<TransactionResult> => {
     try {
       const response = await dashboardApi.createJobPool(data);
@@ -340,7 +352,7 @@ export function useJobPools(): UseJobPoolsReturn {
   }, [fetchJobPools]);
 
   const applyToPool = useCallback(async (
-    poolId: number, 
+    poolId: number,
     skillTokenIds: number[]
   ): Promise<TransactionResult> => {
     try {
@@ -383,10 +395,10 @@ export function useJobPools(): UseJobPoolsReturn {
         setJobPools(prev =>
           prev.map(pool =>
             pool.id === poolId
-                              ? {
-                    ...pool,
-                    applicants: pool.applicants.filter(addr => addr !== user?.accountId),
-                  }
+              ? {
+                ...pool,
+                applicants: pool.applicants.filter(addr => addr !== user?.accountId),
+              }
               : pool
           )
         );
@@ -433,14 +445,14 @@ export function useJobPools(): UseJobPoolsReturn {
 export function useReputation(userId?: string) {
   const { user } = useAuth();
   const targetUserId = userId || user?.accountId;
-  
+
   const [reputation, setReputation] = useState<{
     overall_score: number;
     skill_scores: Record<string, number>;
     total_evaluations: number;
     last_updated: string;
   } | null>(null);
-  
+
   const [history, setHistory] = useState<Array<{
     evaluation_id: string;
     timestamp: string;
@@ -448,7 +460,7 @@ export function useReputation(userId?: string) {
     score: number;
     feedback: string;
   }>>([]);
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

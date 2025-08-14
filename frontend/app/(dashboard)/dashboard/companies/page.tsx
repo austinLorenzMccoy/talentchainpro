@@ -17,7 +17,8 @@ import {
     Award,
     Briefcase,
     Heart,
-    HeartOff
+    HeartOff,
+    CheckCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,8 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import { ContactCompanyDialog } from "@/components/companies/contact-company-dialog";
+import { ViewCompanyJobsDialog } from "@/components/companies/view-company-jobs-dialog";
 import { WalletConnectionPrompt } from "@/components/dashboard/wallet-connection-prompt";
 
 // Mock company data - will be replaced with real API calls
@@ -50,7 +53,16 @@ const mockCompanies = [
         skills: ["AI/ML", "Cloud Computing", "Data Science", "Software Engineering"],
         benefits: ["Health Insurance", "Remote Work", "Stock Options", "Flexible Hours"],
         featured: true,
-        verified: true
+        verified: true,
+        hiringStatus: "actively-hiring" as const,
+        departments: ["Engineering", "Product", "Design", "Sales", "Marketing", "Operations"],
+        contactInfo: {
+            email: "contact@techcorp.com",
+            phone: "+1 (555) 123-4567",
+            address: "123 Tech Street, San Francisco, CA 94105",
+            linkedin: "https://linkedin.com/company/techcorp",
+            twitter: "https://twitter.com/techcorp"
+        }
     },
     {
         id: 2,
@@ -67,7 +79,16 @@ const mockCompanies = [
         skills: ["Blockchain", "Smart Contracts", "Hedera", "Web3"],
         benefits: ["Remote Work", "Crypto Payments", "Flexible Hours", "Learning Budget"],
         featured: true,
-        verified: true
+        verified: true,
+        hiringStatus: "actively-hiring" as const,
+        departments: ["Engineering", "Research", "Business Development", "Community"],
+        contactInfo: {
+            email: "hello@hederalabs.com",
+            phone: "+1 (555) 987-6543",
+            address: "456 Blockchain Ave, Virtual Office",
+            linkedin: "https://linkedin.com/company/hedera-labs",
+            twitter: "https://twitter.com/hederalabs"
+        }
     },
     {
         id: 3,
@@ -84,7 +105,16 @@ const mockCompanies = [
         skills: ["UI/UX Design", "Graphic Design", "Branding", "Prototyping"],
         benefits: ["Health Insurance", "Creative Freedom", "Professional Development", "Team Events"],
         featured: false,
-        verified: true
+        verified: true,
+        hiringStatus: "selective-hiring" as const,
+        departments: ["Design", "Creative", "Strategy", "Client Services"],
+        contactInfo: {
+            email: "info@designstudiopro.com",
+            phone: "+1 (555) 456-7890",
+            address: "789 Design Lane, New York, NY 10001",
+            linkedin: "https://linkedin.com/company/design-studio-pro",
+            twitter: "https://twitter.com/designstudiopro"
+        }
     },
     {
         id: 4,
@@ -101,7 +131,16 @@ const mockCompanies = [
         skills: ["Cloud Computing", "DevOps", "Infrastructure", "Security"],
         benefits: ["Health Insurance", "Remote Work", "Competitive Salary", "401k"],
         featured: false,
-        verified: true
+        verified: true,
+        hiringStatus: "actively-hiring" as const,
+        departments: ["Engineering", "DevOps", "Sales", "Support", "Security"],
+        contactInfo: {
+            email: "contact@cloudsolutions.com",
+            phone: "+1 (555) 321-0987",
+            address: "321 Cloud Drive, Austin, TX 73301",
+            linkedin: "https://linkedin.com/company/cloud-solutions-ltd",
+            twitter: "https://twitter.com/cloudsolutions"
+        }
     },
     {
         id: 5,
@@ -118,7 +157,16 @@ const mockCompanies = [
         skills: ["Renewable Energy", "Engineering", "Sustainability", "Project Management"],
         benefits: ["Health Insurance", "Environmental Impact", "Professional Growth", "Competitive Benefits"],
         featured: true,
-        verified: true
+        verified: true,
+        hiringStatus: "selective-hiring" as const,
+        departments: ["Engineering", "Operations", "Research", "Sales", "Sustainability"],
+        contactInfo: {
+            email: "info@greenenergy.com",
+            phone: "+1 (555) 654-3210",
+            address: "654 Green Street, Denver, CO 80202",
+            linkedin: "https://linkedin.com/company/green-energy-co",
+            twitter: "https://twitter.com/greenenergyco"
+        }
     }
 ];
 
@@ -133,6 +181,8 @@ export default function CompaniesPage() {
     const [selectedSize, setSelectedSize] = useState("All Sizes");
     const [selectedLocation, setSelectedLocation] = useState("All Locations");
     const [favoriteCompanies, setFavoriteCompanies] = useState<number[]>([]);
+    const [contactSubmissions, setContactSubmissions] = useState<number[]>([]);
+    const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
     // Filter companies based on search and filters
     const filteredCompanies = mockCompanies.filter(company => {
@@ -195,6 +245,22 @@ export default function CompaniesPage() {
                         </div>
                     </div>
                 </motion.div>
+
+                {/* Success Message */}
+                {showSuccessMessage && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="mb-6 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg"
+                    >
+                        <div className="flex items-center gap-2">
+                            <CheckCircle className="w-5 h-4 text-green-500" />
+                            <span className="text-green-700 dark:text-green-300 font-medium">
+                                Contact message sent successfully! The company will get back to you soon.
+                            </span>
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Filters and Search */}
                 <motion.div
@@ -326,8 +392,8 @@ export default function CompaniesPage() {
                                             size="sm"
                                             onClick={() => toggleFavorite(company.id)}
                                             className={`h-8 w-8 p-0 ${favoriteCompanies.includes(company.id)
-                                                    ? 'text-red-500 hover:text-red-600'
-                                                    : 'text-slate-400 hover:text-slate-600'
+                                                ? 'text-red-500 hover:text-red-600'
+                                                : 'text-slate-400 hover:text-slate-600'
                                                 }`}
                                         >
                                             {favoriteCompanies.includes(company.id) ? (
@@ -409,14 +475,34 @@ export default function CompaniesPage() {
                                             Founded {company.founded}
                                         </div>
                                         <div className="flex gap-2">
-                                            <Button variant="outline" size="sm">
-                                                <Mail className="w-4 h-4 mr-2" />
-                                                Contact
-                                            </Button>
-                                            <Button size="sm" className="bg-hedera-600 hover:bg-hedera-700">
-                                                <ExternalLink className="w-4 h-4 mr-2" />
-                                                View Jobs
-                                            </Button>
+                                            {contactSubmissions.includes(company.id) ? (
+                                                <Button variant="outline" size="sm" className="text-green-600 border-green-600" disabled>
+                                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                                    Contacted
+                                                </Button>
+                                            ) : (
+                                                <>
+                                                    <ContactCompanyDialog
+                                                        company={company}
+                                                        onContactSubmitted={(contact) => {
+                                                            console.log('Contact submitted:', contact);
+                                                            setContactSubmissions(prev => [...prev, company.id]);
+                                                            setShowSuccessMessage(true);
+                                                            setTimeout(() => setShowSuccessMessage(false), 5000);
+                                                        }}
+                                                    />
+                                                    <ViewCompanyJobsDialog
+                                                        company={{
+                                                            ...company,
+                                                            jobs: [] // The modal will generate its own mock jobs
+                                                        }}
+                                                        onJobApplied={(jobId) => {
+                                                            console.log('Job applied:', jobId);
+                                                            // TODO: Handle job application
+                                                        }}
+                                                    />
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </CardContent>

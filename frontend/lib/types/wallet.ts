@@ -139,6 +139,7 @@ export interface TalentPool {
 // Job Pool Info (for dashboard components)
 export interface JobPoolInfo {
   id: number;
+  title: string;
   company: string;
   description: string;
   requiredSkills: number[];
