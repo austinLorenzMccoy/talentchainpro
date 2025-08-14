@@ -48,6 +48,8 @@ from hedera import (
     Status, PrecheckStatusException, ReceiptStatusException
 )
 
+from app.config import get_settings, get_contract_config, get_contract_abi, get_contract_address
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -100,1080 +102,576 @@ class ContractInfo:
     name: str
     abi: List[Dict[str, Any]]
     deployed_at: datetime
+    network: str
 
 
-@dataclass 
+@dataclass
 class SkillTokenData:
-    """Skill token metadata structure."""
-    token_id: int
-    owner_address: str
+    """Skill token data structure."""
+    token_id: str
     skill_name: str
     skill_category: SkillCategory
     level: int
-    experience_points: int
-    created_at: datetime
-    last_updated: datetime
-    metadata_uri: str
-    verified: bool = False
-
-
-@dataclass
-class JobPoolData:
-    """Job pool metadata structure."""
-    pool_id: int
-    creator_address: str
-    title: str
     description: str
-    required_skills: List[Dict[str, Any]]
-    stake_amount: float
-    expiry_date: datetime
-    status: str
-    candidates: List[str]
+    metadata_uri: str
+    owner_address: str
+    created_at: datetime
+    expiry_date: Optional[datetime] = None
 
 
 @dataclass
-class ContractCallResult:
-    """Result of a contract function call."""
+class TransactionResult:
+    """Transaction execution result."""
     success: bool
-    transaction_id: str
-    result: Optional[Any] = None
+    transaction_id: Optional[str] = None
     error: Optional[str] = None
     gas_used: Optional[int] = None
-
-
-@dataclass
-class EventLog:
-    """Blockchain event log data."""
-    transaction_id: str
-    contract_id: str
-    event_name: str
-    event_data: Dict[str, Any]
-    block_number: int
-    timestamp: datetime
-
-
-@dataclass
-class HCSMessage:
-    """HCS message structure."""
-    topic_id: str
-    message: str
-    sequence_number: int
-    timestamp: datetime
-    running_hash: str
+    contract_address: Optional[str] = None
 
 
 # =============================================================================
-# HEDERA MANAGER CLASS
+# GLOBAL VARIABLES
 # =============================================================================
 
-class HederaManager:
+# Global Hedera client instance
+_hedera_client: Optional[Client] = None
+
+# Contract configuration cache
+_contract_config: Optional[Dict[str, Dict[str, Any]]] = None
+
+# =============================================================================
+# CLIENT INITIALIZATION
+# =============================================================================
+
+def initialize_hedera_client() -> Client:
     """
-    Unified Hedera client manager for all blockchain operations.
+    Initialize and configure the Hedera client.
     
-    This class provides a single interface for all Hedera network interactions,
-    including smart contracts, tokens, consensus service, and account operations.
+    Returns:
+        Configured Hedera client instance
+        
+    Raises:
+        Exception: If client initialization fails
     """
+    global _hedera_client
     
-    def __init__(self, config: Optional[HederaConfig] = None):
-        """Initialize the Hedera manager."""
-        self.config = config or self._load_config_from_env()
-        self._client = None
-        self.contracts: Dict[str, ContractInfo] = {}
-        self._initialize_client()
-        self._load_contracts()
-        
-        logger.info(f"Initialized HederaManager for {self.config.network.value}")
+    if _hedera_client is not None:
+        return _hedera_client
     
-    def _load_config_from_env(self) -> HederaConfig:
-        """Load configuration from environment variables."""
-        network_name = os.getenv("HEDERA_NETWORK", "testnet").lower()
-        
-        try:
-            network = NetworkType(network_name)
-        except ValueError:
-            logger.warning(f"Invalid network '{network_name}', defaulting to testnet")
-            network = NetworkType.TESTNET
-        
-        return HederaConfig(
-            network=network,
-            operator_id=os.getenv("HEDERA_OPERATOR_ID", ""),
-            operator_key=os.getenv("HEDERA_OPERATOR_KEY", ""),
-            max_transaction_fee=int(os.getenv("HEDERA_MAX_TRANSACTION_FEE", "100")),
-            max_query_payment=int(os.getenv("HEDERA_MAX_QUERY_PAYMENT", "50"))
-        )
-    
-    def _initialize_client(self):
-        """Initialize the Hedera client."""
-        try:
-            if self.config.network == NetworkType.MAINNET:
-                self._client = Client.forMainnet()
-            elif self.config.network == NetworkType.PREVIEWNET:
-                self._client = Client.forPreviewnet()
-            else:  # Default to testnet
-                self._client = Client.forTestnet()
-            
-            # Set operator
-            if self.config.operator_id and self.config.operator_key:
-                operator_id = AccountId.fromString(self.config.operator_id)
-                operator_key = PrivateKey.fromString(self.config.operator_key)
-                self._client.setOperator(operator_id, operator_key)
-                
-                # Set default fees
-                self._client.setDefaultMaxTransactionFee(Hbar.fromTinybars(self.config.max_transaction_fee))
-                self._client.setDefaultMaxQueryPayment(Hbar.fromTinybars(self.config.max_query_payment))
-                
-                logger.info(f"Hedera client initialized with operator {self.config.operator_id}")
-            else:
-                logger.warning("No operator credentials provided")
-                
-        except Exception as e:
-            logger.error(f"Failed to initialize Hedera client: {str(e)}")
-            raise
-    
-    def _load_contracts(self):
-        """Load contract addresses and ABIs from configuration."""
-        try:
-            # Load contract addresses
-            contracts_file = os.getenv("CONTRACTS_FILE", "contracts.json")
-            if os.path.exists(contracts_file):
-                with open(contracts_file, 'r') as f:
-                    contract_data = json.load(f)
-                    
-                for name, info in contract_data.get("contracts", {}).items():
-                    self.contracts[name] = ContractInfo(
-                        contract_id=info.get("address", ""),
-                        name=name,
-                        abi=info.get("abi", []),
-                        deployed_at=datetime.fromisoformat(info.get("deployed_at", datetime.now().isoformat()))
-                    )
-                    
-                logger.info(f"Loaded {len(self.contracts)} contract definitions")
-            else:
-                logger.warning(f"Contracts file {contracts_file} not found")
-                
-        except Exception as e:
-            logger.error(f"Failed to load contracts: {str(e)}")
-    
-    @property
-    def client(self) -> Client:
-        """Get the Hedera client instance."""
-        if not self._client:
-            raise RuntimeError("Hedera client not initialized")
-        return self._client
-    
-    # =============================================================================
-    # CONTRACT OPERATIONS
-    # =============================================================================
-    
-    async def deploy_contract(
-        self,
-        contract_name: str,
-        bytecode: str,
-        constructor_params=None,
-        gas_limit: int = 100000
-    ) -> ContractCallResult:
-        """Deploy a smart contract to Hedera."""
-        try:
-            # Create contract
-            transaction = ContractCreateFlow().setBytecode(bytecode).setGas(gas_limit)
-            
-            if constructor_params:
-                transaction.setConstructorParameters(constructor_params)
-            
-            # Execute transaction
-            response = await transaction.execute(self.client)
-            receipt = await response.getReceipt(self.client)
-            
-            if receipt.status == Status.Success:
-                contract_id = receipt.contractId
-                
-                # Store contract info
-                self.contracts[contract_name] = ContractInfo(
-                    contract_id=str(contract_id),
-                    name=contract_name,
-                    abi=[],  # Would be loaded separately
-                    deployed_at=datetime.now(timezone.utc)
-                )
-                
-                return ContractCallResult(
-                    success=True,
-                    transaction_id=str(response.transactionId),
-                    result=str(contract_id)
-                )
-            else:
-                return ContractCallResult(
-                    success=False,
-                    transaction_id=str(response.transactionId),
-                    error=f"Contract deployment failed: {receipt.status}"
-                )
-                
-        except PrecheckStatusException as e:
-            logger.error(f"Contract deployment precheck failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Transaction precheck failed: {e.status}"
-            )
-        except ReceiptStatusException as e:
-            logger.error(f"Contract deployment receipt failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Transaction failed with status: {e.status}"
-            )
-        except Exception as e:
-            logger.error(f"Contract deployment error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    async def call_contract_function(
-        self,
-        contract_name: str,
-        function_name: str,
-        parameters=None,
-        gas_limit: int = 100000,
-        payable_amount=None
-    ) -> ContractCallResult:
-        """Execute a contract function that modifies state."""
-        try:
-            if contract_name not in self.contracts:
-                raise ValueError(f"Contract {contract_name} not found")
-            
-            contract_id = ContractId.fromString(self.contracts[contract_name].contract_id)
-            
-            # Build transaction
-            transaction = ContractExecuteTransaction().setContractId(contract_id).setFunction(function_name).setGas(gas_limit)
-            
-            if parameters:
-                transaction.setFunctionParameters(parameters)
-            
-            if payable_amount:
-                transaction.setPayableAmount(payable_amount)
-            
-            # Execute transaction
-            response = await transaction.execute(self.client)
-            receipt = await response.getReceipt(self.client)
-            
-            # Get transaction record for detailed results
-            record = await response.getRecord(self.client)
-            
-            if receipt.status == Status.Success:
-                result = None
-                if record.contractFunctionResult:
-                    result = record.contractFunctionResult
-                
-                return ContractCallResult(
-                    success=True,
-                    transaction_id=str(response.transactionId),
-                    result=result,
-                    gas_used=record.contractFunctionResult.gasUsed if record.contractFunctionResult else None
-                )
-            else:
-                return ContractCallResult(
-                    success=False,
-                    transaction_id=str(response.transactionId),
-                    error=f"Transaction failed: {receipt.status}"
-                )
-                
-        except PrecheckStatusException as e:
-            logger.error(f"Contract call precheck failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Transaction precheck failed: {e.status}"
-            )
-        except ReceiptStatusException as e:
-            logger.error(f"Contract call receipt failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Transaction failed with status: {e.status}"
-            )
-        except Exception as e:
-            logger.error(f"Contract call error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    async def query_contract_function(
-        self,
-        contract_name: str,
-        function_name: str,
-        parameters=None,
-        gas_limit: int = 100000
-    ) -> ContractCallResult:
-        """Query a contract function (read-only)."""
-        try:
-            if contract_name not in self.contracts:
-                raise ValueError(f"Contract {contract_name} not found")
-            
-            contract_id = ContractId.fromString(self.contracts[contract_name].contract_id)
-            
-            # Build query
-            query = ContractCallQuery().setContractId(contract_id).setFunction(function_name).setGas(gas_limit)
-            
-            if parameters:
-                query.setFunctionParameters(parameters)
-            
-            # Execute query
-            result = await query.execute(self.client)
-            
-            return ContractCallResult(
-                success=True,
-                transaction_id="",  # Queries don't have transaction IDs
-                result=result,
-                gas_used=result.gasUsed if hasattr(result, 'gasUsed') else None
-            )
-            
-        except PrecheckStatusException as e:
-            logger.error(f"Contract query precheck failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Query precheck failed: {e.status}"
-            )
-        except ReceiptStatusException as e:
-            logger.error(f"Contract query receipt failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Query failed with status: {e.status}"
-            )
-        except Exception as e:
-            logger.error(f"Contract query error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    # =============================================================================
-    # SKILL TOKEN OPERATIONS
-    # =============================================================================
-    
-    async def mint_skill_token(
-        self,
-        skill_name: str,
-        skill_category: SkillCategory,
-        initial_level: int = 1,
-        recipient_address: str = None
-    ) -> ContractCallResult:
-        """Mint a new skill token."""
-        try:
-            # Use recipient_address or operator as default
-            recipient = recipient_address or self.config.operator_id
-            
-            # Prepare parameters
-            params = ContractFunctionParameters().addString(skill_name).addString(skill_category.value).addUint256(initial_level).addString(recipient)
-            
-            return await self.call_contract_function(
-                contract_name="SkillToken",
-                function_name="createSkill",
-                parameters=params
-            )
-            
-        except Exception as e:
-            logger.error(f"Skill token minting error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    async def update_skill_level(
-        self,
-        token_id: int,
-        new_level: int,
-        experience_gained: int = 0
-    ) -> ContractCallResult:
-        """Update skill token level and experience."""
-        try:
-            params = ContractFunctionParameters().addUint256(token_id).addUint256(new_level).addUint256(experience_gained)
-            
-            return await self.call_contract_function(
-                contract_name="SkillToken",
-                function_name="updateSkillLevel",
-                parameters=params
-            )
-            
-        except PrecheckStatusException as e:
-            logger.error(f"Skill level update precheck failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Update precheck failed: {e.status}"
-            )
-        except ReceiptStatusException as e:
-            logger.error(f"Skill level update receipt failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Update failed with status: {e.status}"
-            )
-        except Exception as e:
-            logger.error(f"Skill level update error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    async def get_skill_metadata(
-        self,
-        token_id: int
-    ) -> ContractCallResult:
-        """Get skill token metadata."""
-        try:
-            params = ContractFunctionParameters().addUint256(token_id)
-            
-            return await self.query_contract_function(
-                contract_name="SkillToken",
-                function_name="getSkillMetadata",
-                parameters=params
-            )
-            
-        except PrecheckStatusException as e:
-            logger.error(f"Skill metadata query precheck failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Metadata query precheck failed: {e.status}"
-            )
-        except ReceiptStatusException as e:
-            logger.error(f"Skill metadata query receipt failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Metadata query failed with status: {e.status}"
-            )
-        except Exception as e:
-            logger.error(f"Skill metadata query error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    # =============================================================================
-    # TALENT POOL OPERATIONS  
-    # =============================================================================
-    
-    async def create_talent_pool(
-        self,
-        title: str,
-        description: str,
-        required_skills: List[Dict[str, Any]],
-        stake_amount: float,
-        duration_days: int
-    ) -> ContractCallResult:
-        """Create a new talent pool."""
-        try:
-            # Convert stake amount to tinybars
-            stake_tinybars = int(stake_amount * 100_000_000)  # HBAR to tinybars
-            
-            # Serialize required skills
-            skills_json = json.dumps(required_skills)
-            
-            params = ContractFunctionParameters().addString(title).addString(description).addString(skills_json).addUint256(stake_tinybars).addUint256(duration_days)
-            
-            return await self.call_contract_function(
-                contract_name="TalentPool",
-                function_name="createPool",
-                parameters=params,
-                payable_amount=Hbar.fromTinybars(stake_tinybars)
-            )
-            
-        except Exception as e:
-            logger.error(f"Talent pool creation error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    async def apply_to_pool(
-        self,
-        pool_id: int,
-        skill_token_ids: List[int],
-        cover_letter: str = ""
-    ) -> ContractCallResult:
-        """Apply to a talent pool."""
-        try:
-            # Convert skill token IDs to contract format
-            skill_ids_bytes = b"".join(id.to_bytes(32, byteorder='big') for id in skill_token_ids)
-            
-            params = ContractFunctionParameters().addUint256(pool_id).addBytes(skill_ids_bytes).addString(cover_letter)
-            
-            return await self.call_contract_function(
-                contract_name="TalentPool", 
-                function_name="applyToPool",
-                parameters=params
-            )
-            
-        except PrecheckStatusException as e:
-            logger.error(f"Pool application precheck failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Application precheck failed: {e.status}"
-            )
-        except ReceiptStatusException as e:
-            logger.error(f"Pool application receipt failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Application failed with status: {e.status}"
-            )
-        except Exception as e:
-            logger.error(f"Pool application error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    # =============================================================================
-    # HCS OPERATIONS
-    # =============================================================================
-    
-    async def create_topic(
-        self,
-        memo: str = "",
-        admin_key=None,
-        submit_key=None
-    ) -> ContractCallResult:
-        """Create a new HCS topic."""
-        try:
-            transaction = TopicCreateTransaction()
-            
-            if memo:
-                transaction.setTopicMemo(memo)
-            if admin_key:
-                transaction.setAdminKey(admin_key.publicKey)
-            if submit_key:
-                transaction.setSubmitKey(submit_key.publicKey)
-            
-            response = await transaction.execute(self.client)
-            receipt = await response.getReceipt(self.client)
-            
-            if receipt.status == Status.Success:
-                return ContractCallResult(
-                    success=True,
-                    transaction_id=str(response.transactionId),
-                    result=str(receipt.topicId)
-                )
-            else:
-                return ContractCallResult(
-                    success=False,
-                    transaction_id=str(response.transactionId),
-                    error=f"Topic creation failed: {receipt.status}"
-                )
-                
-        except PrecheckStatusException as e:
-            logger.error(f"Topic creation precheck failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Topic creation precheck failed: {e.status}"
-            )
-        except ReceiptStatusException as e:
-            logger.error(f"Topic creation receipt failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Topic creation failed with status: {e.status}"
-            )
-        except Exception as e:
-            logger.error(f"Topic creation error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    async def submit_hcs_message(
-        self,
-        topic_id: str,
-        message: str
-    ) -> ContractCallResult:
-        """Submit a message to HCS topic."""
-        try:
-            topic = TopicId.fromString(topic_id)
-            
-            transaction = TopicMessageSubmitTransaction().setTopicId(topic).setMessage(message)
-            
-            response = await transaction.execute(self.client)
-            receipt = await response.getReceipt(self.client)
-            
-            if receipt.status == Status.Success:
-                return ContractCallResult(
-                    success=True,
-                    transaction_id=str(response.transactionId),
-                    result={"sequence_number": receipt.topicSequenceNumber}
-                )
-            else:
-                return ContractCallResult(
-                    success=False,
-                    transaction_id=str(response.transactionId),
-                    error=f"Message submission failed: {receipt.status}"
-                )
-                
-        except PrecheckStatusException as e:
-            logger.error(f"HCS message submission precheck failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Message submission precheck failed: {e.status}"
-            )
-        except ReceiptStatusException as e:
-            logger.error(f"HCS message submission receipt failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"Message submission failed with status: {e.status}"
-            )
-        except Exception as e:
-            logger.error(f"HCS message submission error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    # =============================================================================
-    # TOKEN OPERATIONS (HTS)
-    # =============================================================================
-    
-    async def create_nft_token(
-        self,
-        name: str,
-        symbol: str,
-        metadata: Dict[str, Any]
-    ) -> ContractCallResult:
-        """Create a new NFT token."""
-        try:
-            transaction = (TokenCreateTransaction()
-                         .setTokenName(name)
-                         .setTokenSymbol(symbol)
-                         .setTokenType(TokenType.NON_FUNGIBLE_UNIQUE)
-                         .setSupplyType(TokenSupplyType.FINITE)
-                         .setMaxSupply(1000000)  # Max 1M tokens
-                         .setTreasuryAccountId(AccountId.fromString(self.config.operator_id))
-                         .setSupplyKey(PrivateKey.fromString(self.config.operator_key).publicKey)
-                         .setAdminKey(PrivateKey.fromString(self.config.operator_key).publicKey))
-            
-            response = await transaction.execute(self.client)
-            receipt = await response.getReceipt(self.client)
-            
-            if receipt.status == Status.Success:
-                return ContractCallResult(
-                    success=True,
-                    transaction_id=str(response.transactionId),
-                    result=str(receipt.tokenId)
-                )
-            else:
-                return ContractCallResult(
-                    success=False,
-                    transaction_id=str(response.transactionId),
-                    error=f"Token creation failed: {receipt.status}"
-                )
-                
-        except Exception as e:
-            logger.error(f"NFT token creation error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    async def mint_nft(
-        self,
-        token_id: str,
-        metadata_uri: str,
-        recipient_id: str
-    ) -> ContractCallResult:
-        """Mint an NFT to a recipient."""
-        try:
-            token = TokenId.fromString(token_id)
-            recipient = AccountId.fromString(recipient_id)
-            
-            # Metadata as bytes
-            metadata_bytes = metadata_uri.encode('utf-8')
-            
-            transaction = (TokenMintTransaction()
-                         .setTokenId(token)
-                         .addMetadata(metadata_bytes))
-            
-            response = await transaction.execute(self.client)
-            receipt = await response.getReceipt(self.client)
-            
-            if receipt.status == Status.Success:
-                # Transfer to recipient if different from treasury
-                if recipient_id != self.config.operator_id:
-                    serial_number = receipt.serials[0]
-                    
-                    transfer_tx = (TransferTransaction()
-                                 .addNftTransfer(token.nft(serial_number), 
-                                               AccountId.fromString(self.config.operator_id), 
-                                               recipient))
-                    
-                    transfer_response = await transfer_tx.execute(self.client)
-                    transfer_receipt = await transfer_response.getReceipt(self.client)
-                    
-                    if transfer_receipt.status != Status.Success:
-                        logger.warning(f"NFT minted but transfer failed: {transfer_receipt.status}")
-                
-                return ContractCallResult(
-                    success=True,
-                    transaction_id=str(response.transactionId),
-                    result={"serial_number": receipt.serials[0]}
-                )
-            else:
-                return ContractCallResult(
-                    success=False,
-                    transaction_id=str(response.transactionId),
-                    error=f"NFT minting failed: {receipt.status}"
-                )
-                
-        except PrecheckStatusException as e:
-            logger.error(f"NFT minting precheck failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"NFT minting precheck failed: {e.status}"
-            )
-        except ReceiptStatusException as e:
-            logger.error(f"NFT minting receipt failed: {e.status}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=f"NFT minting failed with status: {e.status}"
-            )
-        except Exception as e:
-            logger.error(f"NFT minting error: {str(e)}")
-            return ContractCallResult(
-                success=False,
-                transaction_id="",
-                error=str(e)
-            )
-    
-    # =============================================================================
-    # UTILITY METHODS
-    # =============================================================================
-    
-    async def get_account_balance(self, account_id: str) -> Dict[str, Any]:
-        """Get account balance."""
-        try:
-            account = AccountId.fromString(account_id)
-            balance = await AccountBalanceQuery().setAccountId(account).execute(self.client)
-            
-            return {
-                "hbar_balance": balance.hbars.toTinybars(),
-                "tokens": {str(token_id): amount for token_id, amount in balance.tokens.items()}
-            }
-            
-        except Exception as e:
-            logger.error(f"Balance query error: {str(e)}")
-            return {"error": str(e)}
-    
-    async def check_connection(self) -> Dict[str, Any]:
-        """Check Hedera network connection."""
-        try:
-            # Try to get operator account balance as a health check
-            if self.config.operator_id:
-                balance_result = await self.get_account_balance(self.config.operator_id)
-                if "error" not in balance_result:
-                    return {
-                        "status": "connected",
-                        "network": self.config.network.value,
-                        "operator_id": self.config.operator_id,
-                        "balance": balance_result["hbar_balance"]
-                    }
-            
-            return {
-                "status": "error",
-                "message": "Failed to query operator balance"
-            }
-            
-        except Exception as e:
-            return {
-                "status": "error", 
-                "message": str(e)
-            }
-    
-    def validate_hedera_address(self, address: str) -> bool:
-        """Validate Hedera account address format."""
-        try:
-            AccountId.fromString(address)
-            return True
-        except:
-            return False
-
-
-# =============================================================================
-# GLOBAL MANAGER INSTANCE
-# =============================================================================
-
-# Global manager instance
-_hedera_manager: Optional[HederaManager] = None
-
-
-def initialize_hedera_client() -> None:
-    """Initialize the global Hedera manager instance."""
-    global _hedera_manager
     try:
-        _hedera_manager = HederaManager()
-        logger.info("Hedera client initialized successfully")
+        settings = get_settings()
+        
+        # Parse operator account ID
+        operator_id = AccountId.fromString(settings.hedera_account_id)
+        
+        # Parse operator private key
+        operator_key = PrivateKey.fromString(settings.hedera_private_key)
+        
+        # Create client based on network
+        if settings.hedera_network == "testnet":
+            client = Client.forTestnet()
+        elif settings.hedera_network == "mainnet":
+            client = Client.forMainnet()
+        elif settings.hedera_network == "previewnet":
+            client = Client.forPreviewnet()
+        else:
+            raise ValueError(f"Unsupported network: {settings.hedera_network}")
+        
+        # Set operator
+        client.setOperator(operator_id, operator_key)
+        
+        # Set default transaction fee
+        client.setDefaultMaxTransactionFee(Hbar(settings.max_transaction_fee))
+        client.setDefaultMaxQueryPayment(Hbar(settings.max_query_payment))
+        
+        _hedera_client = client
+        logger.info(f"Hedera client initialized for {settings.hedera_network}")
+        
+        return client
+        
     except Exception as e:
         logger.error(f"Failed to initialize Hedera client: {str(e)}")
-        raise
+        raise Exception(f"Hedera client initialization failed: {str(e)}")
 
 
-def get_client() -> Client:
-    """Get the Hedera client instance."""
-    if not _hedera_manager:
-        initialize_hedera_client()
-    return _hedera_manager.client
-
-
-def get_contract_manager() -> HederaManager:
-    """Get the global Hedera manager instance."""
-    if not _hedera_manager:
-        initialize_hedera_client()
-    return _hedera_manager
-
-
-def get_hedera_manager() -> HederaManager:
-    """Get the global Hedera manager instance (alias for get_contract_manager)."""
-    return get_contract_manager()
+def get_hedera_client() -> Client:
+    """
+    Get the initialized Hedera client instance.
+    
+    Returns:
+        Hedera client instance
+        
+    Raises:
+        Exception: If client is not initialized
+    """
+    if _hedera_client is None:
+        return initialize_hedera_client()
+    return _hedera_client
 
 
 # =============================================================================
-# CONVENIENCE FUNCTIONS (for backward compatibility)
+# SMART CONTRACT INTEGRATION
 # =============================================================================
+
+def get_contract_manager() -> Dict[str, Dict[str, Any]]:
+    """
+    Get the contract manager with all contract configurations.
+    
+    Returns:
+        Dictionary containing contract configurations
+    """
+    global _contract_config
+    
+    if _contract_config is None:
+        _contract_config = get_contract_config()
+    
+    return _contract_config
+
 
 async def create_skill_token(
+    recipient_address: str,
     skill_name: str,
-    skill_category: SkillCategory,
-    initial_level: int = 1,
-    recipient_address: str = None
-) -> ContractCallResult:
-    """Create a skill token (convenience function)."""
-    manager = get_hedera_manager()
-    return await manager.mint_skill_token(skill_name, skill_category, initial_level, recipient_address)
+    skill_category: str,
+    level: int = 1,
+    description: str = "",
+    metadata_uri: str = ""
+) -> TransactionResult:
+    """
+    Create a skill token using the SkillToken smart contract.
+    
+    Args:
+        recipient_address: Hedera account ID to receive the token
+        skill_name: Name of the skill
+        skill_category: Category of the skill
+        level: Initial skill level (1-10)
+        description: Description of the skill
+        metadata_uri: URI to metadata
+        
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get SkillToken contract info
+        skill_token_config = contract_config.get('SkillToken', {})
+        contract_address = skill_token_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="SkillToken contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters
+        params = ContractFunctionParameters()
+        params.addAddress(recipient_address)
+        params.addString(skill_name)
+        params.addString(skill_category)
+        params.addUint8(level)
+        params.addString(description)
+        params.addString(metadata_uri)
+        
+        # Execute contract function
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(300000)  # Adjust gas as needed
+        transaction.setFunction("mintSkillToken", params)
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            # Get the transaction record to extract token ID
+            record = response.getRecord(client)
+            
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=record.gasUsed,
+                contract_address=contract_address
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to create skill token: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
 
 
 async def update_skill_level(
-    token_id: int,
-    new_level: int,
-    experience_gained: int = 0
-) -> ContractCallResult:
-    """Update skill level (convenience function)."""
-    manager = get_hedera_manager()
-    return await manager.update_skill_level(token_id, new_level, experience_gained)
-
-
-async def add_skill_experience(
-    token_id: int,
-    experience_points: int
-) -> ContractCallResult:
-    """Add experience to skill token (convenience function).""" 
-    manager = get_hedera_manager()
-    # Get current skill data first, then update
-    current_result = await manager.get_skill_metadata(token_id)
-    if current_result.success and current_result.result:
-        # Extract current level and add experience
-        # This would need to parse the contract result properly
-        pass
-    return await manager.update_skill_level(token_id, 0, experience_points)  # Level 0 means don't change level
-
-
-async def get_skill_token_info(token_id: int) -> Dict[str, Any]:
-    """Get skill token information (convenience function)."""
-    manager = get_hedera_manager()
-    result = await manager.get_skill_metadata(token_id)
-    
-    if result.success:
-        return {
-            "success": True,
-            "token_id": token_id,
-            "metadata": result.result
-        }
-    else:
-        return {
-            "success": False,
-            "error": result.error
-        }
-
-
-async def get_user_skills(user_address: str) -> Dict[str, Any]:
-    """Get all skills for a user (convenience function)."""
-    manager = get_hedera_manager()
-    # This would require a contract query to get all user skills
-    # Implementation depends on how the smart contract stores this data
-    return {
-        "success": True,
-        "user_address": user_address,
-        "skills": []  # Would be populated from contract query
-    }
-
-
-async def create_job_pool(
-    title: str,
-    description: str,
-    required_skills: List[Dict[str, Any]],
-    stake_amount: float,
-    duration_days: int
-) -> ContractCallResult:
-    """Create a job pool (convenience function)."""
-    manager = get_hedera_manager()
-    return await manager.create_talent_pool(title, description, required_skills, stake_amount, duration_days)
-
-
-async def apply_to_pool(
-    pool_id: int,
-    skill_token_ids: List[int],
-    cover_letter: str = ""
-) -> ContractCallResult:
-    """Apply to a pool (convenience function)."""
-    manager = get_hedera_manager()
-    return await manager.apply_to_pool(pool_id, skill_token_ids, cover_letter)
-
-
-async def make_pool_match(
-    pool_id: int,
-    candidate_address: str,
-    match_score: int
-) -> ContractCallResult:
-    """Make a pool match (convenience function)."""
-    manager = get_hedera_manager()
-    # This would call a contract function to finalize the match
-    params = ContractFunctionParameters().addUint256(pool_id).addString(candidate_address).addUint256(match_score)
-    
-    return await manager.call_contract_function(
-        contract_name="TalentPool",
-        function_name="finalizeMatch",
-        parameters=params
-    )
-
-
-async def get_job_pool_info(pool_id: int) -> Dict[str, Any]:
-    """Get job pool information (convenience function)."""
-    manager = get_hedera_manager()
-    params = ContractFunctionParameters().addUint256(pool_id)
-    
-    result = await manager.query_contract_function(
-        contract_name="TalentPool",
-        function_name="getPoolInfo", 
-        parameters=params
-    )
-    
-    if result.success:
-        return {
-            "success": True,
-            "pool_id": pool_id,
-            "pool_data": result.result
-        }
-    else:
-        return {
-            "success": False,
-            "error": result.error
-        }
-
-
-async def create_nft_token(
-    name: str,
-    symbol: str,
-    metadata: Dict[str, Any]
-) -> str:
-    """Create NFT token (convenience function)."""
-    manager = get_hedera_manager()
-    result = await manager.create_nft_token(name, symbol, metadata)
-    
-    if result.success:
-        return result.result
-    else:
-        raise Exception(f"Failed to create NFT token: {result.error}")
-
-
-async def mint_nft(
     token_id: str,
-    metadata_uri: str,
-    recipient_id: str
-) -> str:
-    """Mint NFT (convenience function)."""
-    manager = get_hedera_manager()
-    result = await manager.mint_nft(token_id, metadata_uri, recipient_id)
+    new_level: int,
+    new_metadata_uri: str
+) -> TransactionResult:
+    """
+    Update skill token level using the SkillToken smart contract.
     
-    if result.success:
-        return result.transaction_id
-    else:
-        raise Exception(f"Failed to mint NFT: {result.error}")
-
-
-async def submit_hcs_message(topic_id: str, message: str) -> str:
-    """Submit HCS message (convenience function)."""
-    manager = get_hedera_manager()
-    result = await manager.submit_hcs_message(topic_id, message)
-    
-    if result.success:
-        return result.transaction_id
-    else:
-        raise Exception(f"Failed to submit HCS message: {result.error}")
-
-
-def validate_hedera_address(address: str) -> bool:
-    """Validate Hedera address (convenience function)."""
-    try:
-        manager = get_hedera_manager()
-        return manager.validate_hedera_address(address)
-    except:
-        # Fallback validation
-        try:
-            AccountId.fromString(address)
-            return True
-        except:
-            return False
-
-
-async def check_hedera_connection() -> Dict[str, Any]:
-    """Check Hedera connection (convenience function)."""
-    try:
-        manager = get_hedera_manager()
-        return await manager.check_connection()
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
-
-async def check_contract_deployments() -> Dict[str, Any]:
-    """Check contract deployment status (convenience function)."""
-    try:
-        manager = get_hedera_manager()
+    Args:
+        token_id: ID of the skill token to update
+        new_level: New skill level (1-10)
+        new_metadata_uri: New metadata URI
         
-        contracts_status = {}
-        for name, contract in manager.contracts.items():
-            contracts_status[name] = {
-                "deployed": bool(contract.contract_id),
-                "contract_id": contract.contract_id,
-                "deployed_at": contract.deployed_at.isoformat()
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get SkillToken contract info
+        skill_token_config = contract_config.get('SkillToken', {})
+        contract_address = skill_token_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="SkillToken contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters
+        params = ContractFunctionParameters()
+        params.addUint256(int(token_id))
+        params.addUint8(new_level)
+        params.addString(new_metadata_uri)
+        
+        # Execute contract function
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(200000)  # Adjust gas as needed
+        transaction.setFunction("updateSkillLevel", params)
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=receipt.gasUsed
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to update skill level: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
+
+
+async def get_skill_token_info(token_id: str) -> Optional[SkillTokenData]:
+    """
+    Get skill token information from the smart contract.
+    
+    Args:
+        token_id: ID of the skill token
+        
+    Returns:
+        SkillTokenData if found, None otherwise
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get SkillToken contract info
+        skill_token_config = contract_config.get('SkillToken', {})
+        contract_address = skill_token_config.get('address')
+        
+        if not contract_address:
+            logger.warning("SkillToken contract not deployed")
+            return None
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters
+        params = ContractFunctionParameters()
+        params.addUint256(int(token_id))
+        
+        # Query contract function
+        query = ContractCallQuery()
+        query.setContractId(contract_id)
+        query.setGas(100000)
+        query.setFunction("getSkillData", params)
+        
+        # Execute query
+        response = query.execute(client)
+        
+        if response.getFunctionResult():
+            # Parse the result (this would need to be implemented based on actual return structure)
+            # For now, return a placeholder
+            return SkillTokenData(
+                token_id=token_id,
+                skill_name="Unknown",
+                skill_category=SkillCategory.OTHER,
+                level=1,
+                description="",
+                metadata_uri="",
+                owner_address="",
+                created_at=datetime.now(timezone.utc)
+            )
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"Failed to get skill token info: {str(e)}")
+        return None
+
+
+async def get_user_skills(owner_address: str) -> List[SkillTokenData]:
+    """
+    Get all skill tokens owned by a user.
+    
+    Args:
+        owner_address: Hedera account ID of the owner
+        
+    Returns:
+        List of SkillTokenData
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get SkillToken contract info
+        skill_token_config = contract_config.get('SkillToken', {})
+        contract_address = skill_token_config.get('address')
+        
+        if not contract_address:
+            logger.warning("SkillToken contract not deployed")
+            return []
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters
+        params = ContractFunctionParameters()
+        params.addAddress(owner_address)
+        
+        # Query contract function
+        query = ContractCallQuery()
+        query.setContractId(contract_id)
+        query.setGas(100000)
+        query.setFunction("getTokensByOwner", params)
+        
+        # Execute query
+        response = query.execute(client)
+        
+        if response.getFunctionResult():
+            # Parse the result and get individual token info
+            # This would need to be implemented based on actual return structure
+            return []
+        
+        return []
+        
+    except Exception as e:
+        logger.error(f"Failed to get user skills: {str(e)}")
+        return []
+
+
+# =============================================================================
+# CONTRACT DEPLOYMENT AND VERIFICATION
+# =============================================================================
+
+async def check_contract_deployments() -> Dict[str, bool]:
+    """
+    Check the deployment status of all required contracts.
+    
+    Returns:
+        Dictionary mapping contract names to deployment status
+    """
+    try:
+        contract_config = get_contract_manager()
+        deployment_status = {}
+        
+        for contract_name, config in contract_config.items():
+            address = config.get('address', '')
+            abi = config.get('abi', [])
+            
+            # Check if contract is deployed and has ABI
+            is_deployed = bool(address and address.startswith('0.0.'))
+            has_abi = len(abi) > 0
+            
+            deployment_status[contract_name] = {
+                'deployed': is_deployed,
+                'address': address,
+                'has_abi': has_abi,
+                'ready': is_deployed and has_abi
             }
         
+        return deployment_status
+        
+    except Exception as e:
+        logger.error(f"Failed to check contract deployments: {str(e)}")
+        return {}
+
+
+async def verify_contract_functionality() -> Dict[str, Dict[str, Any]]:
+    """
+    Verify that deployed contracts are functioning correctly.
+    
+    Returns:
+        Dictionary with verification results for each contract
+    """
+    try:
+        contract_config = get_contract_manager()
+        verification_results = {}
+        
+        for contract_name, config in contract_config.items():
+            if not config.get('deployed'):
+                verification_results[contract_name] = {
+                    'status': 'not_deployed',
+                    'message': 'Contract not deployed'
+                }
+                continue
+            
+            # Try to call a basic view function to verify functionality
+            try:
+                if contract_name == 'SkillToken':
+                    # Try to get total supply or similar
+                    result = await get_skill_token_info("1")  # Test with token ID 1
+                    verification_results[contract_name] = {
+                        'status': 'functional' if result is not None else 'error',
+                        'message': 'Contract responding to queries' if result is not None else 'Query failed'
+                    }
+                else:
+                    verification_results[contract_name] = {
+                        'status': 'not_tested',
+                        'message': 'Verification not implemented for this contract type'
+                    }
+                    
+            except Exception as e:
+                verification_results[contract_name] = {
+                    'status': 'error',
+                    'message': f'Verification failed: {str(e)}'
+                }
+        
+        return verification_results
+        
+    except Exception as e:
+        logger.error(f"Failed to verify contract functionality: {str(e)}")
+        return {}
+
+
+# =============================================================================
+# HEALTH CHECK FUNCTIONS
+# =============================================================================
+
+async def check_hedera_connection() -> Dict[str, Any]:
+    """
+    Check Hedera network connection health.
+    
+    Returns:
+        Dictionary with connection status and details
+    """
+    try:
+        client = get_hedera_client()
+        
+        # Try to get account info to test connection
+        operator_id = client.getOperatorAccountId()
+        account_info = AccountInfoQuery().setAccountId(operator_id).execute(client)
+        
         return {
-            "status": "checked",
-            "contracts": contracts_status,
-            "total_contracts": len(manager.contracts)
+            'status': 'connected',
+            'network': str(client.getNetworkName()),
+            'operator_account': str(operator_id),
+            'account_balance': str(account_info.balance),
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         
     except Exception as e:
         return {
-            "status": "error", 
-            "message": str(e)
+            'status': 'disconnected',
+            'error': str(e),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+
+
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
+
+def validate_hedera_address(address: str) -> bool:
+    """
+    Validate Hedera account address format.
+    
+    Args:
+        address: Address string to validate
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    try:
+        if not address.startswith('0.0.'):
+            return False
+        
+        # Try to parse as AccountId
+        AccountId.fromString(address)
+        return True
+        
+    except Exception:
+        return False
+
+
+def format_hedera_address(address: str) -> str:
+    """
+    Format Hedera address for display.
+    
+    Args:
+        address: Raw Hedera address
+        
+    Returns:
+        Formatted address string
+    """
+    if not address:
+        return ""
+    
+    if len(address) > 10:
+        return f"{address[:6]}...{address[-4:]}"
+    
+    return address
+
+
+def get_network_info() -> Dict[str, Any]:
+    """
+    Get current network information.
+    
+    Returns:
+        Network configuration dictionary
+    """
+    try:
+        client = get_hedera_client()
+        settings = get_settings()
+        
+        return {
+            'name': settings.hedera_network,
+            'client_network': str(client.getNetworkName()),
+            'operator_account': str(client.getOperatorAccountId()),
+            'mirror_node': settings.hedera_mirror_node_url
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get network info: {str(e)}")
+        return {
+            'name': 'unknown',
+            'error': str(e)
         }

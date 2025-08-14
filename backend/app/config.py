@@ -12,7 +12,8 @@ Based on the complete contract analysis, this supports all 4 main contracts:
 """
 
 import os
-from typing import Optional, List
+import json
+from typing import Optional, List, Dict, Any
 from pydantic import Field, validator
 from pydantic_settings import BaseSettings
 from functools import lru_cache
@@ -84,6 +85,9 @@ class Settings(BaseSettings):
     contract_governance: str = Field(default="", env="CONTRACT_GOVERNANCE")
     contract_reputation_oracle: str = Field(default="", env="CONTRACT_REPUTATION_ORACLE")
     
+    # Contract ABI Paths
+    contract_abi_path: str = Field(default="./contracts/abis", env="CONTRACT_ABI_PATH")
+    
     # AI/ML Services
     groq_api_key: str = Field(default="your_groq_api_key_here", env="GROQ_API_KEY")
     groq_model: str = Field(default="mixtral-8x7b-32768", env="GROQ_MODEL")
@@ -100,203 +104,184 @@ class Settings(BaseSettings):
         default="https://ipfs.io/ipfs/",
         env="IPFS_GATEWAY_URL"
     )
-    ipfs_upload_url: str = Field(
-        default="https://api.pinata.cloud/pinning/pinFileToIPFS",
-        env="IPFS_UPLOAD_URL"
-    )
-    pinata_api_key: Optional[str] = Field(None, env="PINATA_API_KEY")
-    pinata_secret_key: Optional[str] = Field(None, env="PINATA_SECRET_KEY")
     
-    # Rate Limiting
-    rate_limit_requests: int = Field(default=100, env="RATE_LIMIT_REQUESTS")
-    rate_limit_window: int = Field(default=60, env="RATE_LIMIT_WINDOW")  # seconds
-    
-    # Monitoring & Logging
-    log_level: str = Field(default="INFO", env="LOG_LEVEL")
-    log_format: str = Field(default="json", env="LOG_FORMAT")
-    sentry_dsn: Optional[str] = Field(None, env="SENTRY_DSN")
-    enable_metrics: bool = Field(default=True, env="ENABLE_METRICS")
-    
-    # Background Jobs
-    celery_broker_url: str = Field(
-        default="redis://localhost:6379/1",
-        env="CELERY_BROKER_URL"
-    )
-    celery_result_backend: str = Field(
-        default="redis://localhost:6379/2",
-        env="CELERY_RESULT_BACKEND"
-    )
-    
-    # Cache Settings
-    cache_ttl_default: int = Field(default=300, env="CACHE_TTL")  # 5 minutes
-    cache_ttl_skill_tokens: int = Field(default=600, env="CACHE_TTL_SKILL_TOKENS")  # 10 minutes
-    cache_ttl_pools: int = Field(default=180, env="CACHE_TTL_POOLS")  # 3 minutes
-    cache_ttl_reputation: int = Field(default=900, env="CACHE_TTL_REPUTATION")  # 15 minutes
-    
-    # Performance Settings
-    max_connections: int = Field(default=100, env="MAX_CONNECTIONS")
-    keep_alive_timeout: int = Field(default=65, env="KEEP_ALIVE_TIMEOUT")
-    
-    # File Upload Settings
-    max_file_size: int = Field(default=10485760, env="MAX_FILE_SIZE")  # 10MB
-    upload_directory: str = Field(default="./uploads", env="UPLOAD_DIRECTORY")
-    
-    # Email Configuration
-    smtp_server: Optional[str] = Field(None, env="SMTP_SERVER")
-    smtp_port: int = Field(default=587, env="SMTP_PORT")
-    smtp_username: Optional[str] = Field(None, env="SMTP_USERNAME")
-    smtp_password: Optional[str] = Field(None, env="SMTP_PASSWORD")
-    email_from: str = Field(default="noreply@talentchainpro.io", env="EMAIL_FROM")
-    
-    # Webhook Configuration
-    webhook_secret: str = Field(default="your-webhook-secret-key", env="WEBHOOK_SECRET")
-    
-    # Testing Configuration
-    test_database_url: str = Field(
-        default="postgresql://test_user:test_pass@localhost:5432/test_talentchainpro", 
-        env="TEST_DATABASE_URL"
-    )
-    test_hedera_account_id: str = Field(default="0.0.TEST_ACCOUNT", env="TEST_HEDERA_ACCOUNT_ID")
-    test_hedera_private_key: str = Field(default="test_private_key", env="TEST_HEDERA_PRIVATE_KEY")
-    
-    def get_effective_database_url(self) -> str:
-        """
-        Get the effective database URL with automatic fallback to SQLite.
-        
-        Returns:
-            str: Database URL to use (PostgreSQL or SQLite fallback)
-        """
-        if not self.database_auto_fallback:
-            return self.database_url
-        
-        # If explicitly set to SQLite, use it
-        if self.database_url.startswith("sqlite://"):
-            return self.database_url
-        
-        # For PostgreSQL, test connection availability
-        if self.database_url.startswith("postgresql://"):
-            try:
-                # Try to test PostgreSQL connection
-                import psycopg2
-                from urllib.parse import urlparse
-                
-                parsed = urlparse(self.database_url)
-                test_conn = psycopg2.connect(
-                    host=parsed.hostname,
-                    port=parsed.port or 5432,
-                    user=parsed.username,
-                    password=parsed.password,
-                    database=parsed.path[1:] if parsed.path else '',
-                    connect_timeout=3
-                )
-                test_conn.close()
-                return self.database_url
-            except (ImportError, Exception):
-                # PostgreSQL not available, fallback to SQLite
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"PostgreSQL not available ({self.database_url}), "
-                    f"falling back to SQLite: {self.sqlite_database_url}"
-                )
-                return self.sqlite_database_url
-        
-        # Default fallback
-        return self.database_url
-    
-    @validator("cors_origins", pre=True)
-    def parse_cors_origins(cls, v):
-        """Parse CORS origins from string or list."""
-        if isinstance(v, str):
-            # Handle JSON string format
-            if v.startswith('[') and v.endswith(']'):
-                import json
-                try:
-                    return json.loads(v)
-                except json.JSONDecodeError:
-                    pass
-            # Handle comma-separated format
-            return [origin.strip() for origin in v.split(",")]
-        return v
-    
-    @validator("hedera_network")
+    # Validation
+    @validator('hedera_network')
     def validate_hedera_network(cls, v):
-        """Validate Hedera network selection."""
-        valid_networks = ["testnet", "mainnet", "previewnet"]
-        if v not in valid_networks:
-            raise ValueError(f"Invalid Hedera network. Must be one of: {valid_networks}")
+        if v not in ['testnet', 'mainnet', 'previewnet']:
+            raise ValueError('Hedera network must be testnet, mainnet, or previewnet')
         return v
     
-    @validator("environment")
-    def validate_environment(cls, v):
-        """Validate environment setting."""
-        valid_environments = ["development", "staging", "production"]
-        if v not in valid_environments:
-            raise ValueError(f"Invalid environment. Must be one of: {valid_environments}")
+    @validator('contract_skill_token', 'contract_talent_pool', 'contract_governance', 'contract_reputation_oracle')
+    def validate_contract_addresses(cls, v):
+        if v and not v.startswith('0.0.'):
+            raise ValueError('Contract address must be a valid Hedera address starting with 0.0.')
         return v
     
     class Config:
         env_file = ".env"
-        env_file_encoding = "utf-8"
         case_sensitive = False
-        extra = "ignore"  # Ignore extra environment variables
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Get cached application settings."""
+    """Get cached settings instance."""
     return Settings()
 
 
-# Environment-specific configurations
-class DevelopmentSettings(Settings):
-    """Development environment settings."""
-    debug: bool = True
-    log_level: str = "DEBUG"
-    cors_origins: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
-    development_mode: bool = True
-
-
-class ProductionSettings(Settings):
-    """Production environment settings."""
-    debug: bool = False
-    log_level: str = "WARNING"
-    development_mode: bool = False
+def load_contract_abis() -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Load all contract ABIs from the contracts/abis directory.
     
-    @validator("secret_key")
-    def validate_production_secret(cls, v):
-        """Ensure production secret key is not default."""
-        if v == "dev-secret-key-change-in-production":
-            raise ValueError("Production secret key must be changed from default")
-        return v
+    Returns:
+        Dictionary mapping contract names to their ABIs
+    """
+    settings = get_settings()
+    abi_path = settings.contract_abi_path
     
-    @validator("jwt_secret_key")
-    def validate_production_jwt_secret(cls, v):
-        """Ensure production JWT secret key is not default."""
-        if v == "your-super-secret-jwt-key-change-this-in-production":
-            raise ValueError("Production JWT secret key must be changed from default")
-        return v
-
-
-class TestingSettings(Settings):
-    """Testing environment settings."""
-    debug: bool = True
-    database_url: str = "postgresql://talentchain:password@localhost:5432/talentchain_test"
-    redis_url: str = "redis://localhost:6379/15"
-    development_mode: bool = True
-
-
-def get_environment_settings() -> Settings:
-    """Get settings based on current environment."""
-    env = os.getenv("ENVIRONMENT", "development").lower()
+    contract_abis = {}
     
-    if env == "production":
-        return ProductionSettings()
-    elif env == "testing":
-        return TestingSettings()
-    else:
-        return DevelopmentSettings()
+    # Define the contracts we expect
+    expected_contracts = [
+        'SkillToken',
+        'TalentPool', 
+        'Governance',
+        'ReputationOracle'
+    ]
+    
+    for contract_name in expected_contracts:
+        abi_file_path = os.path.join(abi_path, f"{contract_name}.json")
+        
+        try:
+            if os.path.exists(abi_file_path):
+                with open(abi_file_path, 'r') as f:
+                    contract_abis[contract_name] = json.load(f)
+                print(f"✅ Loaded ABI for {contract_name}")
+            else:
+                print(f"⚠️  ABI file not found for {contract_name}: {abi_file_path}")
+                contract_abis[contract_name] = []
+        except Exception as e:
+            print(f"❌ Error loading ABI for {contract_name}: {str(e)}")
+            contract_abis[contract_name] = []
+    
+    return contract_abis
 
 
-# Export the settings instance
-settings = get_environment_settings()
+def get_contract_abi(contract_name: str) -> List[Dict[str, Any]]:
+    """
+    Get ABI for a specific contract.
+    
+    Args:
+        contract_name: Name of the contract (e.g., 'SkillToken', 'TalentPool')
+        
+    Returns:
+        Contract ABI as a list of function/event definitions
+    """
+    contract_abis = load_contract_abis()
+    return contract_abis.get(contract_name, [])
+
+
+def get_contract_address(contract_name: str) -> str:
+    """
+    Get the deployed address for a specific contract.
+    
+    Args:
+        contract_name: Name of the contract (e.g., 'SkillToken', 'TalentPool')
+        
+    Returns:
+        Contract address as a string
+    """
+    settings = get_settings()
+    
+    contract_addresses = {
+        'SkillToken': settings.contract_skill_token,
+        'TalentPool': settings.contract_talent_pool,
+        'Governance': settings.contract_governance,
+        'ReputationOracle': settings.contract_reputation_oracle
+    }
+    
+    return contract_addresses.get(contract_name, "")
+
+
+def validate_contract_deployments() -> Dict[str, bool]:
+    """
+    Validate that all required contracts are deployed.
+    
+    Returns:
+        Dictionary mapping contract names to deployment status
+    """
+    settings = get_settings()
+    
+    contracts = {
+        'SkillToken': settings.contract_skill_token,
+        'TalentPool': settings.contract_talent_pool,
+        'Governance': settings.contract_governance,
+        'ReputationOracle': settings.contract_reputation_oracle
+    }
+    
+    deployment_status = {}
+    for name, address in contracts.items():
+        deployment_status[name] = bool(address and address.startswith('0.0.'))
+    
+    return deployment_status
+
+
+def get_network_config() -> Dict[str, Any]:
+    """
+    Get Hedera network configuration.
+    
+    Returns:
+        Network configuration dictionary
+    """
+    settings = get_settings()
+    
+    networks = {
+        'testnet': {
+            'name': 'Hedera Testnet',
+            'chainId': 296,
+            'rpcUrl': 'https://testnet.hashio.io',
+            'explorerUrl': 'https://testnet.dragonglass.me',
+            'mirrorNodeUrl': 'https://testnet.mirrornode.hedera.com',
+            'currency': 'HBAR',
+            'blockExplorerUrl': 'https://testnet.dragonglass.me'
+        },
+        'mainnet': {
+            'name': 'Hedera Mainnet',
+            'chainId': 295,
+            'rpcUrl': 'https://mainnet.hashio.io',
+            'explorerUrl': 'https://app.dragonglass.me',
+            'mirrorNodeUrl': 'https://mainnet.mirrornode.hedera.com',
+            'currency': 'HBAR',
+            'blockExplorerUrl': 'https://app.dragonglass.me'
+        },
+        'previewnet': {
+            'name': 'Hedera Previewnet',
+            'chainId': 297,
+            'rpcUrl': 'https://previewnet.hashio.io',
+            'explorerUrl': 'https://previewnet.dragonglass.me',
+            'mirrorNodeUrl': 'https://previewnet.mirrornode.hedera.com',
+            'currency': 'HBAR',
+            'blockExplorerUrl': 'https://previewnet.dragonglass.me'
+        }
+    }
+    
+    return networks.get(settings.hedera_network, networks['testnet'])
+
+
+def get_contract_config() -> Dict[str, Dict[str, Any]]:
+    """
+    Get complete contract configuration including addresses and ABIs.
+    
+    Returns:
+        Dictionary mapping contract names to their configuration
+    """
+    contract_config = {}
+    
+    for contract_name in ['SkillToken', 'TalentPool', 'Governance', 'ReputationOracle']:
+        contract_config[contract_name] = {
+            'address': get_contract_address(contract_name),
+            'abi': get_contract_abi(contract_name),
+            'deployed': bool(get_contract_address(contract_name))
+        }
+    
+    return contract_config
