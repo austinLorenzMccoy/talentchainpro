@@ -212,6 +212,27 @@ class GovernanceService:
                 except Exception as e:
                     logger.warning(f"AI analysis failed: {str(e)}")
             
+            # Create proposal on blockchain using the Governance contract
+            from app.utils.hedera import create_governance_proposal
+            
+            contract_result = await create_governance_proposal(
+                title=title,
+                description=description,
+                targets=targets,
+                values=values,
+                calldatas=calldatas,
+                ipfs_hash=ipfs_hash or ""
+            )
+            
+            if contract_result.success:
+                # Use the proposal ID from contract if available
+                proposal_id = contract_result.token_id or proposal_id
+                transaction_id = contract_result.transaction_id
+                logger.info(f"Created governance proposal {proposal_id} on blockchain: {transaction_id}")
+            else:
+                logger.warning(f"Failed to create proposal on blockchain: {contract_result.error}")
+                transaction_id = None
+            
             # Create proposal data
             proposal_data = {
                 "proposal_id": proposal_id,
@@ -231,6 +252,8 @@ class GovernanceService:
                 "against_votes": 0,
                 "abstain_votes": 0,
                 "created_at": current_time.isoformat(),
+                "transaction_id": transaction_id,
+                "blockchain_verified": contract_result.success if 'contract_result' in locals() else False,
                 "ai_analysis": ai_analysis
             }
             
@@ -387,6 +410,29 @@ class GovernanceService:
             if voting_power == 0:
                 raise ValueError("No voting power")
             
+            # Cast vote on blockchain using the Governance contract
+            from app.utils.hedera import cast_governance_vote
+            
+            # Convert vote type to integer (0=Against, 1=For, 2=Abstain)
+            vote_int = {
+                VoteType.AGAINST: 0,
+                VoteType.FOR: 1,
+                VoteType.ABSTAIN: 2
+            }.get(vote_type, 0)
+            
+            contract_result = await cast_governance_vote(
+                proposal_id=int(proposal_id.split('_')[1]) if '_' in proposal_id else int(proposal_id),
+                vote=vote_int,
+                reason=reason
+            )
+            
+            if contract_result.success:
+                transaction_id = contract_result.transaction_id
+                logger.info(f"Cast vote {vote_type.value} on proposal {proposal_id}: {transaction_id}")
+            else:
+                logger.warning(f"Failed to cast vote on blockchain: {contract_result.error}")
+                transaction_id = None
+            
             # Create vote record
             vote_id = str(uuid.uuid4())
             vote_data = {
@@ -397,6 +443,8 @@ class GovernanceService:
                 "voting_power": voting_power,
                 "reason": reason,
                 "signature": signature,
+                "transaction_id": transaction_id,
+                "blockchain_verified": contract_result.success if 'contract_result' in locals() else False,
                 "cast_at": current_time.isoformat()
             }
             

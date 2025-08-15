@@ -93,8 +93,7 @@ class SkillTokenService:
                 raise Exception(f"Blockchain transaction failed: {contract_result.error}")
             
             # Extract token ID from contract result
-            # Note: This would need to be implemented based on actual contract response
-            token_id = f"token_{hash(skill_name + recipient_id) % 100000}"
+            token_id = contract_result.token_id or f"token_{hash(skill_name + recipient_id) % 100000}"
             
             # Cache in database
             with get_db_session() as db:
@@ -270,9 +269,9 @@ class SkillTokenService:
             
             # Direct update on blockchain
             contract_result = await update_skill_level(
-                token_id=int(token_id.split('_')[1]) if '_' in token_id else int(token_id),
+                token_id=token_id,
                 new_level=new_level,
-                evidence_uri=evidence_uri
+                new_metadata_uri=evidence_uri
             )
             
             if not contract_result.success:

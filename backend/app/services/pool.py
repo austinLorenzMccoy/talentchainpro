@@ -162,7 +162,6 @@ class TalentPoolService:
                 title=title,
                 description=description,
                 required_skills=required_skills,
-                min_reputation=min_reputation,
                 stake_amount=stake_amount,
                 duration_days=duration_days
             )
@@ -171,8 +170,7 @@ class TalentPoolService:
                 raise Exception(f"Blockchain transaction failed: {contract_result.error}")
             
             # Generate pool ID and deadline
-            global _fallback_counter
-            pool_id = f"pool_{hash(title + creator_address) % 100000}"
+            pool_id = contract_result.pool_id or f"pool_{hash(title + creator_address) % 100000}"
             deadline = datetime.now(timezone.utc) + timedelta(days=duration_days)
             
             # Try to cache in database if available
@@ -215,12 +213,18 @@ class TalentPoolService:
                         db.add(initial_stake)
                         
                         # Add audit log
-                        audit_log = audit_log_class(
-                            action_type="CREATE_POOL",
-                            pool_id=pool_id,
-                            user_address=request.creator_address,
-                            success=False,
-                            error_message=str(e)
+                        audit_log = AuditLog(
+                            user_address=creator_address,
+                            action="create_pool",
+                            resource_type="job_pool",
+                            resource_id=pool_id,
+                            details={
+                                "title": title,
+                                "required_skills": required_skills,
+                                "stake_amount": stake_amount,
+                                "transaction_id": contract_result.transaction_id
+                            },
+                            success=True
                         )
                         db.add(audit_log)
                         

@@ -735,7 +735,7 @@ class ReputationService:
         work_content: str,
         evaluation_criteria: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Legacy function for backward compatibility."""
+        """Enhanced work evaluation using the actual ReputationOracle contract."""
         try:
             # Convert to new reputation update system
             evaluation_id = f"eval_{hash(user_id + work_description) % 100000}"
@@ -753,28 +753,50 @@ class ReputationService:
                     criteria=evaluation_criteria
                 )
                 
-                overall_score = evaluation_result.get("overall_score", 75.0)
+                overall_score = int(evaluation_result.get("overall_score", 75.0))
                 skill_scores = evaluation_result.get("skill_scores", {})
                 recommendation = evaluation_result.get("recommendation", "Good work! Keep improving.")
             else:
                 # Fallback scoring
-                overall_score = 75.0 + len(work_content) * 0.01  # Simple content-based scoring
+                overall_score = min(100, int(75.0 + len(work_content) * 0.01))  # Simple content-based scoring
                 skill_scores = {token_id: overall_score for token_id in skill_token_ids}
                 recommendation = "Work evaluated. Consider providing more detailed submissions for better scoring."
             
-            # Update reputation based on evaluation
-            if overall_score > 70:
-                await self.update_reputation(
-                    user_address=user_id,
-                    event_type=ReputationEventType.JOB_COMPLETION,
-                    impact_score=(overall_score - 50) * 0.5,  # Scale to -25 to +25
-                    context={
-                        "evaluation_id": evaluation_id,
-                        "work_description": work_description,
-                        "overall_score": overall_score,
-                        "skill_tokens": skill_token_ids
-                    }
-                )
+            # Convert skill_scores to list format for contract
+            skill_scores_list = [skill_scores.get(token_id, overall_score) for token_id in skill_token_ids]
+            
+            # Submit evaluation to the Oracle contract
+            from app.utils.hedera import submit_work_evaluation_to_oracle
+            
+            contract_result = await submit_work_evaluation_to_oracle(
+                user_address=user_id,
+                skill_token_ids=skill_token_ids,
+                work_description=work_description,
+                work_content=work_content,
+                overall_score=overall_score,
+                skill_scores=skill_scores_list,
+                feedback=recommendation,
+                ipfs_hash=""  # Could be populated with IPFS hash of work artifacts
+            )
+            
+            if contract_result.success:
+                evaluation_id = contract_result.token_id or evaluation_id
+                
+                # Update reputation based on evaluation
+                if overall_score > 70:
+                    await self.update_reputation(
+                        user_address=user_id,
+                        event_type=ReputationEventType.JOB_COMPLETION,
+                        impact_score=(overall_score - 50) * 0.5,  # Scale to -25 to +25
+                        context={
+                            "evaluation_id": evaluation_id,
+                            "work_description": work_description,
+                            "overall_score": overall_score,
+                            "skill_tokens": skill_token_ids,
+                            "transaction_id": contract_result.transaction_id
+                        },
+                        blockchain_evidence=contract_result.transaction_id
+                    )
             
             # Calculate level changes
             level_changes = {}
@@ -794,7 +816,9 @@ class ReputationService:
                 "skill_scores": skill_scores,
                 "recommendation": recommendation,
                 "level_changes": level_changes,
-                "timestamp": datetime.now(timezone.utc)
+                "timestamp": datetime.now(timezone.utc),
+                "transaction_id": contract_result.transaction_id if contract_result.success else None,
+                "blockchain_verified": contract_result.success
             }
         
         except Exception as e:
@@ -839,21 +863,45 @@ class ReputationService:
         self,
         user_id: str
     ) -> Dict[str, Any]:
-        """Legacy function for backward compatibility."""
+        """Get reputation score from blockchain oracle and cache."""
         try:
-            # Get comprehensive reputation score
+            # Get reputation from Oracle contract first
+            from app.utils.hedera import get_reputation_score_from_oracle
+            
+            oracle_reputation = await get_reputation_score_from_oracle(user_id)
+            
+            if oracle_reputation:
+                # Use blockchain data as primary source
+                return {
+                    "user_id": user_id,
+                    "overall_score": float(oracle_reputation["overall_score"]),
+                    "total_evaluations": oracle_reputation["total_evaluations"],
+                    "last_updated": datetime.fromtimestamp(oracle_reputation["last_updated"]).isoformat() if oracle_reputation["last_updated"] > 0 else datetime.now(timezone.utc).isoformat(),
+                    "is_active": oracle_reputation["is_active"],
+                    "source": "blockchain_oracle",
+                    "skill_scores": {
+                        "blockchain": float(oracle_reputation["overall_score"]) * 0.9,  # Slightly lower for specific skills
+                        "frontend": float(oracle_reputation["overall_score"]) * 0.8,
+                        "backend": float(oracle_reputation["overall_score"]) * 0.85
+                    }
+                }
+            
+            # Fallback to comprehensive reputation calculation
             reputation_data = await self.calculate_reputation_score(user_id)
             
             # Convert to legacy format
             return {
                 "user_id": user_id,
                 "overall_score": reputation_data.get("overall_score", 50.0),
+                "total_evaluations": 0,  # This would need to be tracked separately
+                "last_updated": reputation_data.get("calculated_at", datetime.now(timezone.utc).isoformat()),
+                "is_active": True,
+                "source": "calculated",
                 "skill_scores": {
                     "blockchain": reputation_data.get("category_scores", {}).get("technical_skill", 50.0),
                     "frontend": reputation_data.get("category_scores", {}).get("technical_skill", 50.0),
                     "backend": reputation_data.get("category_scores", {}).get("technical_skill", 50.0)
-                },
-                "last_updated": reputation_data.get("calculated_at", datetime.now(timezone.utc).isoformat())
+                }
             }
         
         except Exception as e:
@@ -861,8 +909,11 @@ class ReputationService:
             return {
                 "user_id": user_id,
                 "overall_score": 50.0,
-                "skill_scores": {"blockchain": 50.0, "frontend": 50.0, "backend": 50.0},
-                "last_updated": datetime.now(timezone.utc).isoformat()
+                "total_evaluations": 0,
+                "last_updated": datetime.now(timezone.utc).isoformat(),
+                "is_active": True,
+                "source": "fallback",
+                "skill_scores": {"blockchain": 50.0, "frontend": 50.0, "backend": 50.0}
             }
     
     # ============ HELPER FUNCTIONS ============

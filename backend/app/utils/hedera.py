@@ -127,6 +127,8 @@ class TransactionResult:
     error: Optional[str] = None
     gas_used: Optional[int] = None
     contract_address: Optional[str] = None
+    token_id: Optional[str] = None
+    pool_id: Optional[str] = None
 
 
 # =============================================================================
@@ -265,7 +267,7 @@ async def create_skill_token(
         contract_config = get_contract_manager()
         
         # Get SkillToken contract info
-        skill_token_config = contract_config.get('SkillToken', {})
+        skill_token_config = contract_config.get('contracts', {}).get('SkillToken', {})
         contract_address = skill_token_config.get('address')
         
         if not contract_address:
@@ -277,7 +279,8 @@ async def create_skill_token(
         # Create contract ID
         contract_id = ContractId.fromString(contract_address)
         
-        # Prepare function parameters
+        # Prepare function parameters - match the actual ABI signature
+        # mintSkillToken(address recipient, string skillName, string skillCategory, uint8 level, string description, string metadataUri)
         params = ContractFunctionParameters()
         params.addAddress(recipient_address)
         params.addString(skill_name)
@@ -297,14 +300,21 @@ async def create_skill_token(
         receipt = response.getReceipt(client)
         
         if receipt.status == Status.Success:
-            # Get the transaction record to extract token ID
+            # Get the transaction record to extract token ID from logs
             record = response.getRecord(client)
+            
+            # Extract token ID from contract function result
+            function_result = record.contractFunctionResult
+            token_id = None
+            if function_result and function_result.getUint256(0):
+                token_id = str(function_result.getUint256(0))
             
             return TransactionResult(
                 success=True,
                 transaction_id=response.transactionId.toString(),
                 gas_used=record.gasUsed,
-                contract_address=contract_address
+                contract_address=contract_address,
+                token_id=token_id
             )
         else:
             return TransactionResult(
@@ -356,7 +366,7 @@ async def add_skill_experience(
 async def update_skill_level(
     token_id: str,
     new_level: int,
-    new_metadata_uri: str
+    new_metadata_uri: str = ""
 ) -> TransactionResult:
     """
     Update skill token level using the SkillToken smart contract.
@@ -374,7 +384,7 @@ async def update_skill_level(
         contract_config = get_contract_manager()
         
         # Get SkillToken contract info
-        skill_token_config = contract_config.get('SkillToken', {})
+        skill_token_config = contract_config.get('contracts', {}).get('SkillToken', {})
         contract_address = skill_token_config.get('address')
         
         if not contract_address:
@@ -386,7 +396,8 @@ async def update_skill_level(
         # Create contract ID
         contract_id = ContractId.fromString(contract_address)
         
-        # Prepare function parameters
+        # Prepare function parameters - match the actual ABI signature
+        # updateSkillLevel(uint256 tokenId, uint8 newLevel, string newMetadataUri)
         params = ContractFunctionParameters()
         params.addUint256(int(token_id))
         params.addUint8(new_level)
@@ -403,10 +414,11 @@ async def update_skill_level(
         receipt = response.getReceipt(client)
         
         if receipt.status == Status.Success:
+            record = response.getRecord(client)
             return TransactionResult(
                 success=True,
                 transaction_id=response.transactionId.toString(),
-                gas_used=receipt.gasUsed
+                gas_used=record.gasUsed if record else 0
             )
         else:
             return TransactionResult(
@@ -447,7 +459,7 @@ async def create_job_pool(
         contract_config = get_contract_manager()
         
         # Get TalentPool contract info
-        talent_pool_config = contract_config.get('TalentPool', {})
+        talent_pool_config = contract_config.get('contracts', {}).get('TalentPool', {})
         contract_address = talent_pool_config.get('address')
         
         if not contract_address:
@@ -459,22 +471,35 @@ async def create_job_pool(
         # Create contract ID
         contract_id = ContractId.fromString(contract_address)
         
-        # Prepare function parameters
+        # Prepare JobPoolRequest struct according to the ABI
+        # struct JobPoolRequest {
+        #     string title;
+        #     string description;
+        #     uint256[] requiredSkills;
+        #     uint256 minReputation;
+        #     uint256 stakeAmount;
+        #     uint256 durationDays;
+        #     uint256 maxApplicants;
+        #     uint256 applicationDeadline;
+        # }
+        
+        # Convert required skills to skill IDs (simplified)
+        skill_ids = [hash(skill.get('name', '')) % 1000000 for skill in required_skills]
+        
+        # Calculate application deadline
+        application_deadline = int(datetime.now().timestamp()) + (duration_days * 24 * 60 * 60)
+        
         params = ContractFunctionParameters()
         
-        # Create JobPoolRequest struct
-        params.addString(title)
-        params.addString(description)
-        
-        # Convert required skills to uint256 array
-        skill_ids = [skill.get('id', 0) for skill in required_skills]
-        params.addUint256Array(skill_ids)
-        
-        params.addUint256(0)  # minReputation (placeholder)
+        # Add the JobPoolRequest struct as a tuple
+        params.addString(title)  # title
+        params.addString(description)  # description
+        params.addUint256Array(skill_ids)  # requiredSkills
+        params.addUint256(0)  # minReputation (default to 0)
         params.addUint256(int(stake_amount * 100_000_000))  # stakeAmount in tinybars
-        params.addUint256(duration_days)
-        params.addUint256(100)  # maxApplicants (placeholder)
-        params.addUint256(int(datetime.now().timestamp()) + (duration_days * 24 * 60 * 60))  # applicationDeadline
+        params.addUint256(duration_days)  # durationDays
+        params.addUint256(100)  # maxApplicants (default to 100)
+        params.addUint256(application_deadline)  # applicationDeadline
         
         # Execute contract function
         transaction = ContractExecuteTransaction()
@@ -490,11 +515,21 @@ async def create_job_pool(
         receipt = response.getReceipt(client)
         
         if receipt.status == Status.Success:
+            # Get pool ID from contract function result
+            record = response.getRecord(client)
+            pool_id = None
+            if record and record.contractFunctionResult:
+                try:
+                    pool_id = str(record.contractFunctionResult.getUint256(0))
+                except:
+                    pool_id = f"pool_{int(datetime.now().timestamp())}"
+            
             return TransactionResult(
                 success=True,
                 transaction_id=response.transactionId.toString(),
-                gas_used=receipt.gasUsed,
-                contract_address=contract_address
+                gas_used=record.gasUsed if record else 0,
+                contract_address=contract_address,
+                pool_id=pool_id
             )
         else:
             return TransactionResult(
@@ -595,7 +630,7 @@ async def get_job_pool_info(pool_id: int) -> Optional[Dict[str, Any]]:
         contract_config = get_contract_manager()
         
         # Get TalentPool contract info
-        talent_pool_config = contract_config.get('TalentPool', {})
+        talent_pool_config = contract_config.get('contracts', {}).get('TalentPool', {})
         contract_address = talent_pool_config.get('address')
         
         if not contract_address:
@@ -605,30 +640,71 @@ async def get_job_pool_info(pool_id: int) -> Optional[Dict[str, Any]]:
         # Create contract ID
         contract_id = ContractId.fromString(contract_address)
         
-        # Prepare function parameters
+        # Prepare function parameters for getJobPool(uint256 poolId)
         params = ContractFunctionParameters()
         params.addUint256(pool_id)
         
         # Query contract function
         query = ContractCallQuery()
         query.setContractId(contract_id)
-        query.setGas(100000)
+        query.setGas(200000)
         query.setFunction("getJobPool", params)
         
         # Execute query
         response = query.execute(client)
+        result = response.getFunctionResult()
         
-        if response.getFunctionResult():
-            # Parse the result (this would need to be implemented based on actual return structure)
-            # For now, return a placeholder
-            return {
-                'id': pool_id,
-                'title': 'Sample Job Pool',
-                'description': 'Sample description',
-                'status': 'active',
-                'stake_amount': 100,
-                'duration_days': 30
-            }
+        if result:
+            # Parse the JobPool struct returned
+            # struct JobPool {
+            #     uint256 id;
+            #     address company;
+            #     string title;
+            #     string description;
+            #     uint256[] requiredSkills;
+            #     uint256 minReputation;
+            #     uint256 stakeAmount;
+            #     uint256 durationDays;
+            #     uint256 maxApplicants;
+            #     uint256 applicationDeadline;
+            #     enum PoolStatus status;
+            #     uint256 createdAt;
+            # }
+            
+            try:
+                id = result.getUint256(0)
+                company = result.getAddress(1)
+                title = result.getString(2)
+                description = result.getString(3)
+                # requiredSkills array would need special parsing
+                min_reputation = result.getUint256(5)
+                stake_amount = result.getUint256(6)
+                duration_days = result.getUint256(7)
+                max_applicants = result.getUint256(8)
+                application_deadline = result.getUint256(9)
+                status = result.getUint8(10)  # enum as uint8
+                created_at = result.getUint256(11)
+                
+                # Convert status enum
+                status_map = {0: "active", 1: "closed", 2: "completed", 3: "cancelled"}
+                status_str = status_map.get(status, "unknown")
+                
+                return {
+                    'id': pool_id,
+                    'company': company,
+                    'title': title,
+                    'description': description,
+                    'min_reputation': min_reputation,
+                    'stake_amount': float(stake_amount) / 100_000_000,  # Convert from tinybars to HBAR
+                    'duration_days': duration_days,
+                    'max_applicants': max_applicants,
+                    'application_deadline': application_deadline,
+                    'status': status_str,
+                    'created_at': created_at
+                }
+            except Exception as parse_error:
+                logger.error(f"Failed to parse job pool data: {parse_error}")
+                return None
         
         return None
         
@@ -806,7 +882,7 @@ async def get_skill_token_info(token_id: str) -> Optional[SkillTokenData]:
         contract_config = get_contract_manager()
         
         # Get SkillToken contract info
-        skill_token_config = contract_config.get('SkillToken', {})
+        skill_token_config = contract_config.get('contracts', {}).get('SkillToken', {})
         contract_address = skill_token_config.get('address')
         
         if not contract_address:
@@ -820,7 +896,7 @@ async def get_skill_token_info(token_id: str) -> Optional[SkillTokenData]:
         params = ContractFunctionParameters()
         params.addUint256(int(token_id))
         
-        # Query contract function
+        # Query contract function - getSkillData(uint256 tokenId)
         query = ContractCallQuery()
         query.setContractId(contract_id)
         query.setGas(100000)
@@ -828,19 +904,44 @@ async def get_skill_token_info(token_id: str) -> Optional[SkillTokenData]:
         
         # Execute query
         response = query.execute(client)
+        result = response.getFunctionResult()
         
-        if response.getFunctionResult():
-            # Parse the result (this would need to be implemented based on actual return structure)
-            # For now, return a placeholder
+        if result:
+            # Parse the SkillData struct returned
+            # struct SkillData {
+            #     string skillName;
+            #     string skillCategory;
+            #     uint8 level;
+            #     string description;
+            #     string metadataUri;
+            #     uint64 createdAt;
+            #     uint64 expiryDate;
+            # }
+            
+            skill_name = result.getString(0)
+            skill_category = result.getString(1)
+            level = result.getUint8(2)
+            description = result.getString(3)
+            metadata_uri = result.getString(4)
+            created_at = result.getUint64(5)
+            expiry_date = result.getUint64(6)
+            
+            # Convert category string to enum
+            try:
+                category_enum = SkillCategory(skill_category.lower())
+            except ValueError:
+                category_enum = SkillCategory.OTHER
+            
             return SkillTokenData(
                 token_id=token_id,
-                skill_name="Unknown",
-                skill_category=SkillCategory.OTHER,
-                level=1,
-                description="",
-                metadata_uri="",
-                owner_address="",
-                created_at=datetime.now(timezone.utc)
+                skill_name=skill_name,
+                skill_category=category_enum,
+                level=level,
+                description=description,
+                metadata_uri=metadata_uri,
+                owner_address="",  # We'd need to call ownerOf separately
+                created_at=datetime.fromtimestamp(created_at, timezone.utc),
+                expiry_date=datetime.fromtimestamp(expiry_date, timezone.utc) if expiry_date > 0 else None
             )
         
         return None
@@ -865,7 +966,7 @@ async def get_user_skills(owner_address: str) -> List[SkillTokenData]:
         contract_config = get_contract_manager()
         
         # Get SkillToken contract info
-        skill_token_config = contract_config.get('SkillToken', {})
+        skill_token_config = contract_config.get('contracts', {}).get('SkillToken', {})
         contract_address = skill_token_config.get('address')
         
         if not contract_address:
@@ -875,29 +976,372 @@ async def get_user_skills(owner_address: str) -> List[SkillTokenData]:
         # Create contract ID
         contract_id = ContractId.fromString(contract_address)
         
-        # Prepare function parameters
+        # Prepare function parameters for getTokensByOwner(address owner)
         params = ContractFunctionParameters()
         params.addAddress(owner_address)
         
         # Query contract function
         query = ContractCallQuery()
         query.setContractId(contract_id)
-        query.setGas(100000)
+        query.setGas(200000)
         query.setFunction("getTokensByOwner", params)
         
         # Execute query
         response = query.execute(client)
+        result = response.getFunctionResult()
         
-        if response.getFunctionResult():
-            # Parse the result and get individual token info
-            # This would need to be implemented based on actual return structure
-            return []
+        if result:
+            # Get array of token IDs
+            token_ids = []
+            try:
+                # Parse uint256 array result
+                array_size = result.getUint256(0)  # First element is array length
+                for i in range(1, int(array_size) + 1):
+                    token_ids.append(str(result.getUint256(i)))
+            except Exception as parse_error:
+                logger.warning(f"Could not parse token IDs array: {parse_error}")
+                return []
+            
+            # Get detailed info for each token
+            skills = []
+            for token_id in token_ids:
+                skill_info = await get_skill_token_info(token_id)
+                if skill_info:
+                    skill_info.owner_address = owner_address
+                    skills.append(skill_info)
+            
+            return skills
         
         return []
         
     except Exception as e:
         logger.error(f"Failed to get user skills: {str(e)}")
         return []
+
+
+async def submit_work_evaluation_to_oracle(
+    user_address: str,
+    skill_token_ids: List[str],
+    work_description: str,
+    work_content: str,
+    overall_score: int,
+    skill_scores: List[int],
+    feedback: str,
+    ipfs_hash: str = ""
+) -> TransactionResult:
+    """
+    Submit work evaluation to the ReputationOracle contract.
+    
+    Args:
+        user_address: User being evaluated
+        skill_token_ids: List of skill token IDs
+        work_description: Description of the work
+        work_content: Work content or artifacts
+        overall_score: Overall score (0-100)
+        skill_scores: Individual skill scores
+        feedback: Evaluation feedback
+        ipfs_hash: IPFS hash for additional data
+        
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get ReputationOracle contract info
+        oracle_config = contract_config.get('contracts', {}).get('ReputationOracle', {})
+        contract_address = oracle_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="ReputationOracle contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters for submitWorkEvaluation
+        # submitWorkEvaluation(address user, uint256[] skillTokenIds, string workDescription, 
+        #                     string workContent, uint256 overallScore, uint256[] skillScores, 
+        #                     string feedback, string ipfsHash)
+        params = ContractFunctionParameters()
+        params.addAddress(user_address)
+        params.addUint256Array([int(token_id) for token_id in skill_token_ids])
+        params.addString(work_description)
+        params.addString(work_content)
+        params.addUint256(overall_score)
+        params.addUint256Array(skill_scores)
+        params.addString(feedback)
+        params.addString(ipfs_hash)
+        
+        # Execute contract function
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(400000)
+        transaction.setFunction("submitWorkEvaluation", params)
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            # Get evaluation ID from contract function result
+            record = response.getRecord(client)
+            evaluation_id = None
+            if record and record.contractFunctionResult:
+                try:
+                    evaluation_id = str(record.contractFunctionResult.getUint256(0))
+                except:
+                    evaluation_id = f"eval_{int(datetime.now().timestamp())}"
+            
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=record.gasUsed if record else 0,
+                contract_address=contract_address,
+                token_id=evaluation_id  # Reuse token_id field for evaluation_id
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to submit work evaluation to oracle: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
+
+
+async def get_reputation_score_from_oracle(user_address: str) -> Optional[Dict[str, Any]]:
+    """
+    Get reputation score from the ReputationOracle contract.
+    
+    Args:
+        user_address: User's Hedera account address
+        
+    Returns:
+        Reputation data if found, None otherwise
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get ReputationOracle contract info
+        oracle_config = contract_config.get('contracts', {}).get('ReputationOracle', {})
+        contract_address = oracle_config.get('address')
+        
+        if not contract_address:
+            logger.warning("ReputationOracle contract not deployed")
+            return None
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters for getReputationScore(address user)
+        params = ContractFunctionParameters()
+        params.addAddress(user_address)
+        
+        # Query contract function
+        query = ContractCallQuery()
+        query.setContractId(contract_id)
+        query.setGas(100000)
+        query.setFunction("getReputationScore", params)
+        
+        # Execute query
+        response = query.execute(client)
+        result = response.getFunctionResult()
+        
+        if result:
+            # Parse the return values:
+            # returns (uint256 overallScore, uint256 totalEvaluations, uint64 lastUpdated, bool isActive)
+            overall_score = result.getUint256(0)
+            total_evaluations = result.getUint256(1)
+            last_updated = result.getUint64(2)
+            is_active = result.getBool(3)
+            
+            return {
+                'user_address': user_address,
+                'overall_score': overall_score,
+                'total_evaluations': total_evaluations,
+                'last_updated': last_updated,
+                'is_active': is_active
+            }
+        
+        return None
+        
+    except Exception as e:
+        logger.error(f"Failed to get reputation score from oracle: {str(e)}")
+        return None
+
+
+async def create_governance_proposal(
+    title: str,
+    description: str,
+    targets: List[str] = None,
+    values: List[int] = None,
+    calldatas: List[str] = None,
+    ipfs_hash: str = ""
+) -> TransactionResult:
+    """
+    Create a governance proposal.
+    
+    Args:
+        title: Proposal title
+        description: Proposal description
+        targets: Target contract addresses
+        values: Values to send with calls
+        calldatas: Call data for each target
+        ipfs_hash: IPFS hash for additional proposal data
+        
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get Governance contract info
+        governance_config = contract_config.get('contracts', {}).get('Governance', {})
+        contract_address = governance_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="Governance contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Default empty arrays if not provided
+        targets = targets or []
+        values = values or []
+        calldatas = calldatas or []
+        
+        # Prepare function parameters for createProposal
+        params = ContractFunctionParameters()
+        params.addString(title)
+        params.addString(description)
+        params.addAddressArray(targets)
+        params.addUint256Array(values)
+        params.addBytesArray([bytes(data, 'utf-8') for data in calldatas])
+        params.addString(ipfs_hash)
+        
+        # Execute contract function
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(300000)
+        transaction.setFunction("createProposal", params)
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            # Get proposal ID from contract function result
+            record = response.getRecord(client)
+            proposal_id = None
+            if record and record.contractFunctionResult:
+                try:
+                    proposal_id = str(record.contractFunctionResult.getUint256(0))
+                except:
+                    proposal_id = f"proposal_{int(datetime.now().timestamp())}"
+            
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=record.gasUsed if record else 0,
+                contract_address=contract_address,
+                token_id=proposal_id  # Reuse token_id field for proposal_id
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to create governance proposal: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
+
+
+async def cast_governance_vote(
+    proposal_id: int,
+    vote: int,  # 0 = Against, 1 = For, 2 = Abstain
+    reason: str = ""
+) -> TransactionResult:
+    """
+    Cast a vote on a governance proposal.
+    
+    Args:
+        proposal_id: ID of the proposal
+        vote: Vote choice (0=Against, 1=For, 2=Abstain)
+        reason: Reason for the vote
+        
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get Governance contract info
+        governance_config = contract_config.get('contracts', {}).get('Governance', {})
+        contract_address = governance_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="Governance contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters for castVote
+        params = ContractFunctionParameters()
+        params.addUint256(proposal_id)
+        params.addUint8(vote)
+        params.addString(reason)
+        
+        # Execute contract function
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(200000)
+        transaction.setFunction("castVote", params)
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            record = response.getRecord(client)
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=record.gasUsed if record else 0,
+                contract_address=contract_address
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to cast governance vote: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
 
 
 # =============================================================================
