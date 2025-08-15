@@ -3,7 +3,17 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "_skillToken",
+        "name": "_skillTokenAddress",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_initialFeeCollector",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "_initialAdmin",
         "type": "address"
       }
     ],
@@ -27,12 +37,24 @@
       },
       {
         "indexed": false,
-        "internalType": "string",
-        "name": "title",
-        "type": "string"
+        "internalType": "uint8",
+        "name": "jobType",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "stakeAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "salaryRange",
+        "type": "uint256"
       }
     ],
-    "name": "JobPoolCreated",
+    "name": "PoolCreated",
     "type": "event"
   },
   {
@@ -55,9 +77,15 @@
         "internalType": "uint256[]",
         "name": "skillTokenIds",
         "type": "uint256[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "stakeAmount",
+        "type": "uint256"
       }
     ],
-    "name": "CandidateJoined",
+    "name": "ApplicationSubmitted",
     "type": "event"
   },
   {
@@ -72,11 +100,23 @@
       {
         "indexed": true,
         "internalType": "address",
+        "name": "company",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "candidate",
         "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "matchScore",
+        "type": "uint256"
       }
     ],
-    "name": "CandidateLeft",
+    "name": "MatchMade",
     "type": "event"
   },
   {
@@ -97,68 +137,261 @@
       {
         "indexed": false,
         "internalType": "uint256",
-        "name": "matchScore",
+        "name": "amount",
         "type": "uint256"
       }
     ],
-    "name": "MatchCreated",
+    "name": "PoolCompleted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "candidate",
+        "type": "address"
+      }
+    ],
+    "name": "ApplicationWithdrawn",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldFee",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newFee",
+        "type": "uint256"
+      }
+    ],
+    "name": "PlatformFeeUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "oldCollector",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "newCollector",
+        "type": "address"
+      }
+    ],
+    "name": "FeeCollectorUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "oldStake",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newStake",
+        "type": "uint256"
+      }
+    ],
+    "name": "MinimumStakeUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
+      }
+    ],
+    "name": "PoolExpired",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "previousAdminRole",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "newAdminRole",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RoleAdminChanged",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      }
+    ],
+    "name": "RoleGranted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "sender",
+        "type": "address"
+      }
+    ],
+    "name": "RoleRevoked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "Paused",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "Unpaused",
     "type": "event"
   },
   {
     "inputs": [
       {
-        "components": [
-          {
-            "internalType": "string",
-            "name": "title",
-            "type": "string"
-          },
-          {
-            "internalType": "string",
-            "name": "description",
-            "type": "string"
-          },
-          {
-            "internalType": "uint256[]",
-            "name": "requiredSkills",
-            "type": "uint256[]"
-          },
-          {
-            "internalType": "uint256",
-            "name": "minReputation",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "stakeAmount",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "durationDays",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "maxApplicants",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "applicationDeadline",
-            "type": "uint256"
-          }
-        ],
-        "internalType": "struct TalentPool.JobPoolRequest",
-        "name": "request",
-        "type": "tuple"
+        "internalType": "string",
+        "name": "title",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "description",
+        "type": "string"
+      },
+      {
+        "internalType": "uint8",
+        "name": "jobType",
+        "type": "uint8"
+      },
+      {
+        "internalType": "string[]",
+        "name": "requiredSkills",
+        "type": "string[]"
+      },
+      {
+        "internalType": "uint8[]",
+        "name": "minimumLevels",
+        "type": "uint8[]"
+      },
+      {
+        "internalType": "uint256",
+        "name": "salaryMin",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "salaryMax",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64",
+        "name": "deadline",
+        "type": "uint64"
+      },
+      {
+        "internalType": "string",
+        "name": "location",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "isRemote",
+        "type": "bool"
       }
     ],
-    "name": "createJobPool",
+    "name": "createPool",
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "poolId",
         "type": "uint256"
       }
     ],
@@ -176,24 +409,21 @@
         "internalType": "uint256[]",
         "name": "skillTokenIds",
         "type": "uint256[]"
-      }
-    ],
-    "name": "joinPool",
-    "outputs": [],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
+      },
       {
-        "internalType": "uint256",
-        "name": "poolId",
-        "type": "uint256"
+        "internalType": "string",
+        "name": "coverLetter",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "portfolio",
+        "type": "string"
       }
     ],
-    "name": "leavePool",
+    "name": "submitApplication",
     "outputs": [],
-    "stateMutability": "nonpayable",
+    "stateMutability": "payable",
     "type": "function"
   },
   {
@@ -209,7 +439,7 @@
         "type": "address"
       }
     ],
-    "name": "makeMatch",
+    "name": "selectCandidate",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -222,7 +452,46 @@
         "type": "uint256"
       }
     ],
-    "name": "getJobPool",
+    "name": "completePool",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawApplication",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
+      }
+    ],
+    "name": "closePool",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getPool",
     "outputs": [
       {
         "components": [
@@ -247,13 +516,28 @@
             "type": "string"
           },
           {
-            "internalType": "uint256[]",
+            "internalType": "uint8",
+            "name": "jobType",
+            "type": "uint8"
+          },
+          {
+            "internalType": "string[]",
             "name": "requiredSkills",
-            "type": "uint256[]"
+            "type": "string[]"
+          },
+          {
+            "internalType": "uint8[]",
+            "name": "minimumLevels",
+            "type": "uint8[]"
           },
           {
             "internalType": "uint256",
-            "name": "minReputation",
+            "name": "salaryMin",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "salaryMax",
             "type": "uint256"
           },
           {
@@ -262,53 +546,44 @@
             "type": "uint256"
           },
           {
-            "internalType": "uint256",
-            "name": "durationDays",
-            "type": "uint256"
+            "internalType": "uint64",
+            "name": "deadline",
+            "type": "uint64"
           },
           {
-            "internalType": "uint256",
-            "name": "maxApplicants",
-            "type": "uint256"
+            "internalType": "uint64",
+            "name": "createdAt",
+            "type": "uint64"
           },
           {
-            "internalType": "uint256",
-            "name": "applicationDeadline",
-            "type": "uint256"
-          },
-          {
-            "internalType": "enum TalentPool.PoolStatus",
+            "internalType": "uint8",
             "name": "status",
             "type": "uint8"
           },
           {
+            "internalType": "address",
+            "name": "selectedCandidate",
+            "type": "address"
+          },
+          {
             "internalType": "uint256",
-            "name": "createdAt",
+            "name": "totalApplications",
             "type": "uint256"
+          },
+          {
+            "internalType": "string",
+            "name": "location",
+            "type": "string"
+          },
+          {
+            "internalType": "bool",
+            "name": "isRemote",
+            "type": "bool"
           }
         ],
-        "internalType": "struct TalentPool.JobPool",
+        "internalType": "struct ITalentPool.JobPool",
         "name": "",
         "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "poolId",
-        "type": "uint256"
-      }
-    ],
-    "name": "getPoolApplicants",
-    "outputs": [
-      {
-        "internalType": "address[]",
-        "name": "",
-        "type": "address[]"
       }
     ],
     "stateMutability": "view",
@@ -343,18 +618,99 @@
           },
           {
             "internalType": "uint256",
-            "name": "appliedAt",
+            "name": "stakeAmount",
             "type": "uint256"
+          },
+          {
+            "internalType": "uint64",
+            "name": "appliedAt",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint8",
+            "name": "status",
+            "type": "uint8"
           },
           {
             "internalType": "uint256",
             "name": "matchScore",
             "type": "uint256"
+          },
+          {
+            "internalType": "string",
+            "name": "coverLetter",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "portfolio",
+            "type": "string"
           }
         ],
-        "internalType": "struct TalentPool.Application",
+        "internalType": "struct ITalentPool.Application",
         "name": "",
         "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getPoolApplications",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "candidate",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "skillTokenIds",
+            "type": "uint256[]"
+          },
+          {
+            "internalType": "uint256",
+            "name": "stakeAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint64",
+            "name": "appliedAt",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint8",
+            "name": "status",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint256",
+            "name": "matchScore",
+            "type": "uint256"
+          },
+          {
+            "internalType": "string",
+            "name": "coverLetter",
+            "type": "string"
+          },
+          {
+            "internalType": "string",
+            "name": "portfolio",
+            "type": "string"
+          }
+        ],
+        "internalType": "struct ITalentPool.Application[]",
+        "name": "applications",
+        "type": "tuple[]"
       }
     ],
     "stateMutability": "view",
@@ -399,8 +755,60 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "getTotalPoolsCreated",
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getPoolMetrics",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "uint256",
+            "name": "totalStaked",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "averageMatchScore",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "completionRate",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "averageTimeToFill",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct ITalentPool.PoolMetrics",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "poolId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "candidate",
+        "type": "address"
+      }
+    ],
+    "name": "calculateMatchScore",
     "outputs": [
       {
         "internalType": "uint256",
@@ -413,7 +821,7 @@
   },
   {
     "inputs": [],
-    "name": "getTotalApplicationsSubmitted",
+    "name": "getActivePoolsCount",
     "outputs": [
       {
         "internalType": "uint256",
@@ -426,7 +834,7 @@
   },
   {
     "inputs": [],
-    "name": "getTotalMatches",
+    "name": "getTotalPoolsCount",
     "outputs": [
       {
         "internalType": "uint256",
@@ -438,16 +846,42 @@
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "getTotalStakedAmount",
-    "outputs": [
+    "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "newFeeRate",
         "type": "uint256"
       }
     ],
-    "stateMutability": "view",
+    "name": "setPlatformFeeRate",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newFeeCollector",
+        "type": "address"
+      }
+    ],
+    "name": "setFeeCollector",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "newMinimumStake",
+        "type": "uint256"
+      }
+    ],
+    "name": "setMinimumStake",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -465,6 +899,19 @@
   },
   {
     "inputs": [],
+    "name": "getFeeCollector",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "getMinimumStake",
     "outputs": [
       {
@@ -474,6 +921,184 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getGlobalStats",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "totalPools",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalApplications",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalMatches",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalStaked",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      }
+    ],
+    "name": "getRoleAdmin",
+    "outputs": [
+      {
+        "internalType": "bytes32",
+        "name": "",
+        "type": "bytes32"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "grantRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "hasRole",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "renounceRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "revokeRole",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes4",
+        "name": "interfaceId",
+        "type": "bytes4"
+      }
+    ],
+    "name": "supportsInterface",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "pause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "unpause",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "paused",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "emergencyWithdraw",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   }
 ]

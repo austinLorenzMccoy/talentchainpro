@@ -1,0 +1,143 @@
+{
+  "timestamp": "2025-08-15T04:17:43.342695",
+  "overall_status": "\u274c SOME TESTS FAILED",
+  "summary": {
+    "total_tests": 8,
+    "passed_tests": 4,
+    "failed_tests": 2,
+    "warning_tests": 1,
+    "skipped_tests": 1
+  },
+  "results": {
+    "configuration": {
+      "status": "passed",
+      "settings_loaded": true,
+      "contract_abis_loaded": true,
+      "contract_config_loaded": true,
+      "details": {
+        "hedera_network": "testnet",
+        "api_port": 8000,
+        "contracts_found": [
+          "SkillToken",
+          "TalentPool",
+          "ReputationOracle",
+          "Governance"
+        ],
+        "contracts_configured": [
+          "SkillToken",
+          "TalentPool",
+          "ReputationOracle",
+          "Governance"
+        ]
+      }
+    },
+    "database": {
+      "status": "skipped",
+      "message": "Database components not available"
+    },
+    "hedera": {
+      "status": "passed",
+      "client_initialized": true,
+      "connection_healthy": true,
+      "details": {
+        "status": "connected",
+        "network": "<com.hedera.hashgraph.sdk.NetworkName at 0x10b4569e0 jclass=com/hedera/hashgraph/sdk/NetworkName jself=<LocalRef obj=0x7fd267767068 at 0x10a1db6f0>>",
+        "operator_account": "<com.hedera.hashgraph.sdk.AccountId at 0x10a2fcbe0 jclass=com/hedera/hashgraph/sdk/AccountId jself=<LocalRef obj=0x7fd2662f9c10 at 0x109e021d0>>",
+        "account_balance": "<com.hedera.hashgraph.sdk.Hbar at 0x10b493610 jclass=com/hedera/hashgraph/sdk/Hbar jself=<LocalRef obj=0x7fd267767068 at 0x10a1db6f0>>",
+        "timestamp": "2025-08-15T03:17:43.332221+00:00"
+      }
+    },
+    "contract_deployments": {
+      "status": "passed",
+      "total_contracts": 4,
+      "ready_contracts": 4,
+      "deployment_ratio": "4/4",
+      "details": {
+        "SkillToken": {
+          "deployed": true,
+          "address": "0.0.6544974",
+          "has_abi": true,
+          "ready": true
+        },
+        "TalentPool": {
+          "deployed": true,
+          "address": "0.0.6544980",
+          "has_abi": true,
+          "ready": true
+        },
+        "ReputationOracle": {
+          "deployed": true,
+          "address": "0.0.6544976",
+          "has_abi": true,
+          "ready": true
+        },
+        "Governance": {
+          "deployed": true,
+          "address": "0.0.6545002",
+          "has_abi": true,
+          "ready": true
+        }
+      }
+    },
+    "contract_functionality": {
+      "status": "warning",
+      "total_contracts": 4,
+      "functional_contracts": 0,
+      "functionality_ratio": "0/4",
+      "details": {
+        "SkillToken": {
+          "status": "error",
+          "message": "Query failed"
+        },
+        "TalentPool": {
+          "status": "not_tested",
+          "message": "Verification not implemented for this contract type"
+        },
+        "ReputationOracle": {
+          "status": "not_tested",
+          "message": "Verification not implemented for this contract type"
+        },
+        "Governance": {
+          "status": "not_tested",
+          "message": "Verification not implemented for this contract type"
+        }
+      }
+    },
+    "backend_api": {
+      "status": "failed",
+      "error": "Request failed: HTTPConnectionPool(host='0.0.0.0', port=8000): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x139db7350>: Failed to establish a new connection: [Errno 61] Connection refused'))"
+    },
+    "frontend_api_compatibility": {
+      "status": "failed",
+      "error": "Request failed: HTTPConnectionPool(host='0.0.0.0', port=8000): Max retries exceeded with url: /api/v1/skills (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x139db7920>: Failed to establish a new connection: [Errno 61] Connection refused'))"
+    },
+    "smart_contract_integration": {
+      "status": "passed",
+      "total_contracts": 4,
+      "ready_contracts": 4,
+      "integration_ratio": "4/4",
+      "details": {
+        "SkillToken": {
+          "status": "ready",
+          "address": "0.0.6544974",
+          "abi_functions": 4
+        },
+        "TalentPool": {
+          "status": "ready",
+          "address": "0.0.6544980",
+          "abi_functions": 2
+        },
+        "ReputationOracle": {
+          "status": "ready",
+          "address": "0.0.6544976",
+          "abi_functions": 2
+        },
+        "Governance": {
+          "status": "ready",
+          "address": "0.0.6545002",
+          "abi_functions": 2
+        }
+      }
+    }
+  }
+}
