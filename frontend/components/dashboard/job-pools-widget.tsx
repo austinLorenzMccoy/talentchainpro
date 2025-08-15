@@ -48,7 +48,7 @@ import { useJobPools, useSkillTokens } from "@/hooks/useDashboardData";
 import { useAuth } from "@/hooks/useAuth";
 import { JobPoolInfo, PoolStatus } from "@/lib/types/wallet";
 import { cn } from "@/lib/utils";
-import { CreateJobPoolDialog } from "./create-job-pool-dialog";
+import { ContractCreateJobPoolDialog } from "@/components/jobs/contract-create-job-pool-dialog";
 
 interface JobPoolsWidgetProps {
   className?: string;
@@ -224,10 +224,24 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
           </Button>
 
           {/* Create Pool Button */}
-          <CreateJobPoolDialog
-            onPoolCreated={(pool) => {
-              console.log('New pool created:', pool);
-              setNewlyCreatedPool(pool);
+          <ContractCreateJobPoolDialog
+            onPoolCreated={(poolData) => {
+              console.log('New pool created:', poolData);
+              // Convert contract data to JobPoolInfo format for display
+              const mockJobPoolInfo: JobPoolInfo = {
+                id: Date.now(), // Mock ID
+                title: poolData.title,
+                company: poolData.title, // Using title as company for display
+                description: poolData.description,
+                salary: `${(poolData.salaryMin / 100_000_000).toFixed(1)} - ${(poolData.salaryMax / 100_000_000).toFixed(1)} HBAR`,
+                duration: Math.floor((poolData.deadline - Date.now() / 1000) / (24 * 60 * 60)), // Days until deadline
+                stakeAmount: `${(poolData.stakeAmount / 100_000_000).toFixed(2)} HBAR`,
+                applicants: [],
+                requiredSkills: poolData.requiredSkills.map((_, idx) => idx + 1),
+                status: PoolStatus.Active,
+                createdAt: Math.floor(Date.now() / 1000)
+              };
+              setNewlyCreatedPool(mockJobPoolInfo);
               setShowSuccessMessage(true);
               setTimeout(() => setShowSuccessMessage(false), 5000);
               refetch(); // Refresh the pools list

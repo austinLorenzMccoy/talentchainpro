@@ -29,9 +29,9 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
-import { CreateSkillTokenDialog } from "@/components/skills/create-skill-token-dialog";
+import { ContractCreateSkillDialog } from "@/components/skills/contract-create-skill-dialog";
 import { ViewJobDetailsDialog } from "@/components/jobs/view-job-details-dialog";
-import { ApplyWithSkillsDialog } from "@/components/jobs/apply-with-skills-dialog";
+import { ContractApplyToJobDialog } from "@/components/jobs/contract-apply-to-job-dialog";
 import { WalletConnectionPrompt } from "@/components/dashboard/wallet-connection-prompt";
 
 // Mock job data - will be replaced with real API calls
@@ -523,14 +523,32 @@ export default function JobsPage() {
                                                     Applied
                                                 </Button>
                                             ) : (
-                                                <ApplyWithSkillsDialog
-                                                    job={job}
+                                                <ContractApplyToJobDialog
+                                                    jobPool={{
+                                                        id: job.id,
+                                                        title: job.title,
+                                                        company: job.company,
+                                                        jobType: job.type === "Full-time" ? 0 : job.type === "Part-time" ? 1 : job.type === "Contract" ? 2 : 3,
+                                                        requiredSkills: job.skills,
+                                                        minimumLevels: job.skills.map(() => 5), // Default to level 5
+                                                        salaryMin: 500000000, // Mock tinybar value
+                                                        salaryMax: 1000000000, // Mock tinybar value
+                                                        deadline: Math.floor((Date.now() + 30 * 24 * 60 * 60 * 1000) / 1000),
+                                                        location: job.location,
+                                                        isRemote: job.remote,
+                                                        description: job.description
+                                                    }}
                                                     onApplicationSubmitted={(application) => {
                                                         console.log('Application submitted:', application);
                                                         setSubmittedApplications(prev => [...prev, job.id]);
                                                         setShowSuccessMessage(true);
                                                         setTimeout(() => setShowSuccessMessage(false), 5000);
                                                     }}
+                                                    triggerButton={
+                                                        <Button size="sm" className="bg-hedera-600 hover:bg-hedera-700">
+                                                            Apply Now
+                                                        </Button>
+                                                    }
                                                 />
                                             )}
                                         </div>

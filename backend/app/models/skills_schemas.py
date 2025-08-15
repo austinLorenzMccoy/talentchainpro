@@ -14,13 +14,11 @@ from app.utils.hedera import validate_hedera_address
 # ============ REQUEST MODELS ============
 
 class SkillTokenCreateRequest(BaseModel):
-    """Enhanced request model for skill token creation."""
+    """Request model for skill token creation - matches SkillToken.sol mintSkillToken function."""
     recipient_address: str = Field(..., description="Recipient's Hedera account address")
-    skill_name: str = Field(..., min_length=2, max_length=100, description="Name of the skill")
-    skill_category: str = Field(..., description="Category of the skill")
+    category: str = Field(..., min_length=2, max_length=100, description="Skill category")
     level: int = Field(..., ge=1, le=10, description="Initial skill level (1-10)")
-    description: Optional[str] = Field(None, max_length=500, description="Skill description")
-    metadata_uri: Optional[str] = Field(None, description="URI to additional metadata")
+    uri: str = Field(..., description="URI to additional metadata (IPFS hash)")
     
     @validator('recipient_address')
     def validate_address(cls, v):

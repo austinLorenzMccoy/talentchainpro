@@ -35,7 +35,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DashboardWidget } from "./dashboard-widget";
-import { CreateSkillTokenDialog } from "@/components/skills/create-skill-token-dialog";
+import { ContractCreateSkillDialog } from "@/components/skills/contract-create-skill-dialog";
 import { useSkillTokens } from "@/hooks/useDashboardData";
 import { SkillTokenInfo } from "@/lib/types/wallet";
 import { cn } from "@/lib/utils";
@@ -158,13 +158,17 @@ export function SkillTokensWidget({ className }: SkillTokensWidgetProps) {
           </div>
 
           {/* Create Skill Button */}
-          <CreateSkillTokenDialog
+          <ContractCreateSkillDialog
             triggerButton={
               <Button size="sm" className="bg-gradient-to-r from-hedera-600 to-hedera-700 hover:from-hedera-700 hover:to-hedera-800 text-white shadow-sm">
                 <Plus className="w-4 h-4 mr-2" />
                 <span className="hidden sm:inline">Create Skill</span>
               </Button>
             }
+            onSkillCreated={(skillData) => {
+              console.log('New skill created:', skillData);
+              refetch(); // Refresh the skills list
+            }}
           />
         </div>
       }

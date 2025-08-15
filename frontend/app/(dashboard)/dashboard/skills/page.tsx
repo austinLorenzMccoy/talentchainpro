@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/useAuth";
 import { SkillTokenInfo } from "@/lib/types/wallet";
-import { CreateSkillTokenDialog } from "@/components/skills/create-skill-token-dialog";
+import { ContractCreateSkillDialog } from "@/components/skills/contract-create-skill-dialog";
 import { UpdateSkillTokenDialog } from "@/components/skills/update-skill-token-dialog";
 import { ViewSkillTokenDialog } from "@/components/skills/view-skill-token-dialog";
 import { WalletConnectionPrompt } from "@/components/dashboard/wallet-connection-prompt";
@@ -172,7 +172,7 @@ export default function SkillsPage() {
                 </p>
               </div>
 
-              <CreateSkillTokenDialog />
+              <ContractCreateSkillDialog />
             </div>
           </motion.div>
         </div>
@@ -341,13 +341,17 @@ export default function SkillsPage() {
               }
             </p>
             {!searchTerm && selectedCategory === "all" && (
-              <CreateSkillTokenDialog
+              <ContractCreateSkillDialog
                 triggerButton={
                   <Button className="bg-hedera-600 hover:bg-hedera-700">
                     <Plus className="w-4 h-4 mr-2" />
                     Create Your First Skill
                   </Button>
                 }
+                onSkillCreated={(skillData) => {
+                  console.log('New skill created:', skillData);
+                  // In a real app, this would refresh the skills list
+                }}
               />
             )}
           </div>

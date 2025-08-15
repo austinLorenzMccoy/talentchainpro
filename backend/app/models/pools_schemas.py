@@ -14,33 +14,43 @@ from app.utils.hedera import validate_hedera_address
 # ============ REQUEST MODELS ============
 
 class JobPoolCreateRequest(BaseModel):
-    """Enhanced request model for job pool creation."""
-    title: str = Field(..., min_length=5, max_length=200, description="Job title")
-    description: str = Field(..., min_length=20, max_length=2000, description="Job description")
-    required_skills: List[Dict[str, Any]] = Field(..., min_items=1, description="Required skills with levels")
-    min_reputation: int = Field(0, ge=0, le=100, description="Minimum reputation required")
-    stake_amount: float = Field(..., gt=0, description="Stake amount in HBAR")
-    duration_days: int = Field(..., ge=1, le=365, description="Pool duration in days")
-    max_applicants: Optional[int] = Field(100, ge=1, le=1000, description="Maximum number of applicants")
-    application_deadline: Optional[datetime] = Field(None, description="Application deadline")
+    """Request model for job pool creation - matches TalentPool.sol createPool function."""
+    title: str = Field(..., min_length=1, max_length=200, description="Job title")
+    description: str = Field(..., min_length=1, max_length=2000, description="Job description")
+    job_type: int = Field(..., ge=0, le=3, description="Job type enum: 0=FullTime, 1=PartTime, 2=Contract, 3=Freelance")
+    required_skills: List[str] = Field(..., min_items=1, description="Required skill categories (string array)")
+    minimum_levels: List[int] = Field(..., min_items=1, description="Minimum levels for each skill (uint8 array)")
+    salary_min: int = Field(..., ge=0, description="Minimum salary in smallest currency unit")
+    salary_max: int = Field(..., ge=0, description="Maximum salary in smallest currency unit")
+    deadline: int = Field(..., gt=0, description="Application deadline as Unix timestamp (uint64)")
+    location: str = Field(..., description="Job location")
+    is_remote: bool = Field(False, description="Whether job allows remote work")
+    stake_amount: int = Field(..., gt=0, description="Stake amount in tinybar (for msg.value)")
     
-    @validator('required_skills')
-    def validate_skills(cls, v):
-        for skill in v:
-            if not all(key in skill for key in ['name', 'level']):
-                raise ValueError('Each skill must have name and level')
-            if not isinstance(skill['level'], int) or not 1 <= skill['level'] <= 10:
-                raise ValueError('Skill level must be between 1 and 10')
+    @validator('minimum_levels')
+    def validate_levels_match_skills(cls, v, values):
+        if 'required_skills' in values and len(v) != len(values['required_skills']):
+            raise ValueError('minimum_levels array must have same length as required_skills array')
+        for level in v:
+            if not 1 <= level <= 10:
+                raise ValueError('Each minimum level must be between 1 and 10')
+        return v
+    
+    @validator('salary_max')
+    def validate_salary_range(cls, v, values):
+        if 'salary_min' in values and v < values['salary_min']:
+            raise ValueError('salary_max must be greater than or equal to salary_min')
         return v
 
 
 class PoolApplicationRequest(BaseModel):
-    """Request model for pool applications."""
-    pool_id: str = Field(..., description="Pool ID to apply to")
+    """Request model for pool applications - matches TalentPool.sol submitApplication function."""
+    pool_id: int = Field(..., ge=0, description="Pool ID to apply to")
+    skill_token_ids: List[int] = Field(..., min_items=1, description="Skill token IDs to submit (uint256 array)")
+    cover_letter: str = Field(..., min_length=1, max_length=1000, description="Cover letter")
+    portfolio: str = Field("", description="Portfolio URL or description")
+    stake_amount: int = Field(..., gt=0, description="Application stake amount in tinybar (for msg.value)")
     applicant_address: str = Field(..., description="Applicant's Hedera address")
-    skill_token_ids: List[str] = Field(..., min_items=1, description="Skill token IDs to submit")
-    cover_letter: Optional[str] = Field(None, max_length=1000, description="Cover letter")
-    proposed_rate: Optional[float] = Field(None, gt=0, description="Proposed hourly rate in HBAR")
     
     @validator('applicant_address')
     def validate_address(cls, v):
