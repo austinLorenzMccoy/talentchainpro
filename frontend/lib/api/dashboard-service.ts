@@ -290,6 +290,29 @@ class DashboardApiService {
   }
 
   /**
+   * Governance API Integration
+   */
+  async getGovernanceMetrics(): Promise<ApiResponse<{
+    totalProposals: number;
+    activeProposals: number;
+    totalVoters: number;
+    totalVotingPower: number;
+    averageParticipation: number;
+  }>> {
+    return this.request(`/governance/metrics`);
+  }
+
+  async getUserVotes(userAddress: string): Promise<ApiResponse<Array<{
+    proposalId: number;
+    vote: string;
+    votingPower: number;
+    reason?: string;
+    timestamp: string;
+  }>>> {
+    return this.request(`/governance/votes/${userAddress}`);
+  }
+
+  /**
    * Dashboard aggregated data
    */
   async getDashboardStats(accountId: string): Promise<ApiResponse<DashboardStats>> {
@@ -365,5 +388,7 @@ export const {
   searchTalents,
   evaluateMatch,
   queryMCP,
+  getGovernanceMetrics,
+  getUserVotes,
   getDashboardStats,
 } = dashboardApi;

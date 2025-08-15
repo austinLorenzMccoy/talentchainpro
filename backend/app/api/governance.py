@@ -9,7 +9,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body
+from fastapi import APIRouter, HTTPException, Depends, Query, Path, Body, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator, model_validator
 
@@ -33,7 +33,378 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter(tags=["governance"])
 
-# ============ REQUEST/RESPONSE MODELS ============
+# ============ CONTRACT-ALIGNED GOVERNANCE ENDPOINTS ============
+
+@router.post(
+    "/create-proposal",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def create_proposal(
+    proposer: str,
+    description: str,
+    targets: List[str],
+    values: List[int],
+    calldatas: List[str],
+    proposal_type: int = 0
+) -> Dict[str, Any]:
+    """
+    Create a new governance proposal - matches Governance.createProposal() exactly.
+    
+    Contract function: createProposal(address proposer, string description, 
+                                    address[] targets, uint256[] values, 
+                                    bytes[] calldatas, uint8 proposalType)
+    """
+    try:
+        governance_service = get_governance_service()
+        
+        result = await governance_service.create_proposal(
+            proposer=proposer,
+            description=description,
+            targets=targets,
+            values=values,
+            calldatas=calldatas,
+            proposal_type=proposal_type
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to create proposal")
+            )
+        
+        logger.info(f"Created proposal by {proposer}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error creating proposal: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/cast-vote",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def cast_vote(
+    proposal_id: int,
+    voter: str,
+    support: int,
+    reason: str = ""
+) -> Dict[str, Any]:
+    """
+    Cast a vote on a proposal - matches Governance.castVote() exactly.
+    
+    Contract function: castVote(uint256 proposalId, address voter, 
+                              uint8 support, string reason)
+    """
+    try:
+        governance_service = get_governance_service()
+        
+        result = await governance_service.cast_vote(
+            proposal_id=proposal_id,
+            voter=voter,
+            support=support,
+            reason=reason
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to cast vote")
+            )
+        
+        logger.info(f"Vote cast by {voter} on proposal {proposal_id}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error casting vote: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/cast-vote-with-signature",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def cast_vote_with_signature(
+    proposal_id: int,
+    voter: str,
+    support: int,
+    reason: str,
+    signature: str
+) -> Dict[str, Any]:
+    """
+    Cast a vote with signature - matches Governance.castVoteWithSignature() exactly.
+    
+    Contract function: castVoteWithSignature(uint256 proposalId, address voter, 
+                                           uint8 support, string reason, bytes signature)
+    """
+    try:
+        governance_service = get_governance_service()
+        
+        result = await governance_service.cast_vote_with_signature(
+            proposal_id=proposal_id,
+            voter=voter,
+            support=support,
+            reason=reason,
+            signature=signature
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to cast vote with signature")
+            )
+        
+        logger.info(f"Signature vote cast by {voter} on proposal {proposal_id}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error casting vote with signature: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/queue-proposal",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def queue_proposal(
+    proposal_id: int,
+    execution_time: int
+) -> Dict[str, Any]:
+    """
+    Queue a proposal for execution - matches Governance.queueProposal() exactly.
+    
+    Contract function: queueProposal(uint256 proposalId, uint256 executionTime)
+    """
+    try:
+        governance_service = get_governance_service()
+        
+        result = await governance_service.queue_proposal(
+            proposal_id=proposal_id,
+            execution_time=execution_time
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to queue proposal")
+            )
+        
+        logger.info(f"Queued proposal {proposal_id}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error queueing proposal: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/execute-proposal",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def execute_proposal(
+    proposal_id: int,
+    targets: List[str],
+    values: List[int],
+    calldatas: List[str]
+) -> Dict[str, Any]:
+    """
+    Execute a proposal - matches Governance.executeProposal() exactly.
+    
+    Contract function: executeProposal(uint256 proposalId, address[] targets, 
+                                     uint256[] values, bytes[] calldatas)
+    """
+    try:
+        governance_service = get_governance_service()
+        
+        result = await governance_service.execute_proposal(
+            proposal_id=proposal_id,
+            targets=targets,
+            values=values,
+            calldatas=calldatas
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to execute proposal")
+            )
+        
+        logger.info(f"Executed proposal {proposal_id}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error executing proposal: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/cancel-proposal",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def cancel_proposal(
+    proposal_id: int,
+    cancellation_reason: str
+) -> Dict[str, Any]:
+    """
+    Cancel a proposal - matches Governance.cancelProposal() exactly.
+    
+    Contract function: cancelProposal(uint256 proposalId, string cancellationReason)
+    """
+    try:
+        governance_service = get_governance_service()
+        
+        result = await governance_service.cancel_proposal(
+            proposal_id=proposal_id,
+            cancellation_reason=cancellation_reason
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to cancel proposal")
+            )
+        
+        logger.info(f"Cancelled proposal {proposal_id}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error cancelling proposal: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/delegate",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def delegate_votes(
+    delegator: str,
+    delegatee: str
+) -> Dict[str, Any]:
+    """
+    Delegate voting power - matches Governance.delegate() exactly.
+    
+    Contract function: delegate(address delegator, address delegatee)
+    """
+    try:
+        governance_service = get_governance_service()
+        
+        result = await governance_service.delegate_votes(
+            delegator=delegator,
+            delegatee=delegatee
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to delegate votes")
+            )
+        
+        logger.info(f"Delegated votes from {delegator} to {delegatee}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error delegating votes: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/undelegate",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def undelegate_votes(
+    delegator: str
+) -> Dict[str, Any]:
+    """
+    Undelegate voting power - matches Governance.undelegate() exactly.
+    
+    Contract function: undelegate(address delegator)
+    """
+    try:
+        governance_service = get_governance_service()
+        
+        result = await governance_service.undelegate_votes(
+            delegator=delegator
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to undelegate votes")
+            )
+        
+        logger.info(f"Undelegated votes for {delegator}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error undelegating votes: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+# ============ LEGACY ENDPOINTS ============
 
 class CreateProposalRequest(BaseModel):
     """Request model for creating a governance proposal."""

@@ -1,0 +1,427 @@
+/**
+ * Extended types to match all smart contract functions and backend schemas exactly
+ */
+
+// ============ GOVERNANCE TYPES ============
+
+// Governance types aligned with backend schemas
+export interface GovernanceProposal {
+  id: number;
+  title: string;
+  description: string;
+  creator: string;
+  targets: string[];
+  values: number[];
+  calldatas: string[];
+  status: string; // 'ACTIVE' | 'SUCCEEDED' | 'DEFEATED' | 'EXECUTED' | 'EXPIRED'
+  proposalType: 'STANDARD' | 'EMERGENCY';
+  forVotes: number;
+  againstVotes: number;
+  abstainVotes: number;
+  startBlock: number;
+  endBlock: number;
+  deadline: string;
+  createdAt: string;
+  executedAt?: string;
+}
+
+// Emergency proposals extend governance proposals
+export interface EmergencyProposal extends GovernanceProposal {
+  proposalType: 'EMERGENCY';
+  urgencyLevel: 'HIGH' | 'CRITICAL';
+  requiredQuorum: number;
+}
+
+// Vote record for user voting history
+export interface VoteRecord {
+  proposalId: number;
+  voter: string;
+  vote: 'FOR' | 'AGAINST' | 'ABSTAIN';
+  votingPower: number;
+  reason?: string;
+  timestamp: string;
+}
+
+// Governance metrics for dashboard
+export interface GovernanceMetrics {
+  totalProposals: number;
+  activeProposals: number;
+  totalVoters: number;
+  totalVotingPower: number;
+  averageParticipation: number;
+}
+
+export enum ProposalStatus {
+  Pending = 0,
+  Active = 1,
+  Succeeded = 2,
+  Defeated = 3,
+  Queued = 4,
+  Executed = 5,
+  Cancelled = 6
+}
+
+export enum VoteType {
+  Against = 0,
+  For = 1,
+  Abstain = 2
+}
+
+export interface VoteReceipt {
+  hasVoted: boolean;
+  vote: VoteType;
+  weight: number;
+  reason: string;
+}
+
+export interface GovernanceSettings {
+  votingDelay: number;
+  votingPeriod: number;
+  proposalThreshold: number;
+  quorum: number;
+  executionDelay: number;
+  emergencyQuorum: number;
+  emergencyVotingPeriod: number;
+}
+
+export interface CreateProposalRequest {
+  title: string;
+  description: string;
+  targets: string[];
+  values: number[];
+  calldatas: string[];
+  ipfsHash: string;
+}
+
+export interface CreateEmergencyProposalRequest extends CreateProposalRequest {
+  justification: string;
+}
+
+export interface CastVoteRequest {
+  proposalId: number;
+  vote: VoteType;
+  reason: string;
+}
+
+export interface DelegateVotingPowerRequest {
+  delegatee: string;
+}
+
+// ============ REPUTATION ORACLE TYPES ============
+
+export interface OracleInfo {
+  oracle: string;
+  name: string;
+  specializations: string[];
+  evaluationsCompleted: number;
+  averageScore: number;
+  registeredAt: number;
+  isActive: boolean;
+  stake: number;
+}
+
+export interface WorkEvaluation {
+  id: number;
+  user: string;
+  skillTokenIds: number[];
+  workDescription: string;
+  workContent: string;
+  overallScore: number;
+  feedback: string;
+  evaluatedBy: string;
+  timestamp: number;
+  ipfsHash: string;
+}
+
+export interface ReputationScore {
+  overallScore: number;
+  totalEvaluations: number;
+  lastUpdated: number;
+  isActive: boolean;
+}
+
+export interface CategoryScore {
+  category: string;
+  score: number;
+}
+
+export interface Challenge {
+  id: number;
+  evaluationId: number;
+  challenger: string;
+  reason: string;
+  stake: number;
+  createdAt: number;
+  resolutionDeadline: number;
+  isResolved: boolean;
+  upholdOriginal: boolean;
+  resolution: string;
+  resolver: string;
+}
+
+export interface RegisterOracleRequest {
+  name: string;
+  specializations: string[];
+  stakeAmount: number;
+}
+
+export interface SubmitWorkEvaluationRequest {
+  userAddress: string;
+  skillTokenIds: number[];
+  workDescription: string;
+  workContent: string;
+  overallScore: number;
+  skillScores: number[];
+  feedback: string;
+  ipfsHash: string;
+}
+
+export interface UpdateReputationScoreRequest {
+  userAddress: string;
+  category: string;
+  newScore: number;
+  evidence: string;
+}
+
+export interface ChallengeEvaluationRequest {
+  evaluationId: number;
+  reason: string;
+  stakeAmount: number;
+}
+
+export interface ResolveChallengeRequest {
+  challengeId: number;
+  upholdOriginal: boolean;
+  resolution: string;
+}
+
+// ============ ENHANCED SKILL TOKEN TYPES ============
+
+export interface BatchSkillTokenRequest {
+  recipientAddress: string;
+  categories: string[];
+  subcategories: string[];
+  levels: number[];
+  expiryDates: number[];
+  metadataArray: string[];
+  tokenUris: string[];
+}
+
+export interface UpdateSkillLevelRequest {
+  tokenId: number;
+  newLevel: number;
+  evidence: string;
+}
+
+export interface RevokeSkillTokenRequest {
+  tokenId: number;
+  reason: string;
+}
+
+export interface EndorseSkillTokenRequest {
+  tokenId: number;
+  endorsementData: string;
+}
+
+export interface EndorseSkillTokenWithSignatureRequest {
+  tokenId: number;
+  endorsementData: string;
+  deadline: number;
+  signature: string;
+}
+
+export interface RenewSkillTokenRequest {
+  tokenId: number;
+  newExpiryDate: number;
+}
+
+// ============ ENHANCED TALENT POOL TYPES ============
+
+export interface SelectCandidateRequest {
+  poolId: number;
+  candidateAddress: string;
+}
+
+export interface CompletePoolRequest {
+  poolId: number;
+}
+
+export interface ClosePoolRequest {
+  poolId: number;
+}
+
+export interface WithdrawApplicationRequest {
+  poolId: number;
+}
+
+// ============ CONTRACT-PERFECT JOB POOL CREATE REQUEST ============
+
+export interface ContractJobPoolCreateRequest {
+  title: string;
+  description: string;
+  jobType: JobType; // 0=FullTime, 1=PartTime, 2=Contract, 3=Freelance
+  requiredSkills: string[];
+  minimumLevels: number[];
+  salaryMin: number; // in tinybar
+  salaryMax: number; // in tinybar
+  deadline: number; // Unix timestamp
+  location: string;
+  isRemote: boolean;
+  stakeAmount: number; // in tinybar
+}
+
+export enum JobType {
+  FullTime = 0,
+  PartTime = 1,
+  Contract = 2,
+  Freelance = 3
+}
+
+// ============ CONTRACT-PERFECT SKILL TOKEN CREATE REQUEST ============
+
+export interface ContractSkillTokenCreateRequest {
+  recipientAddress: string;
+  category: string;
+  subcategory: string;
+  level: number; // 1-10
+  expiryDate: number; // Unix timestamp, 0 for default
+  metadata: string;
+  tokenURIData: string;
+}
+
+// ============ CONTRACT-PERFECT APPLICATION REQUEST ============
+
+export interface ContractPoolApplicationRequest {
+  poolId: number;
+  skillTokenIds: number[];
+  coverLetter: string;
+  portfolio: string;
+  stakeAmount: number; // in tinybar
+}
+
+// ============ ENHANCED DASHBOARD TYPES ============
+
+export interface ExtendedDashboardStats extends DashboardStats {
+  governanceProposals: number;
+  votingPower: number;
+  reputationEvaluations: number;
+  oracleRegistrations: number;
+  activeChallenges: number;
+}
+
+export interface GovernanceDashboardData {
+  proposals: GovernanceProposal[];
+  myProposals: GovernanceProposal[];
+  myVotes: Array<{
+    proposalId: number;
+    vote: VoteType;
+    weight: number;
+    timestamp: number;
+  }>;
+  votingPower: number;
+  delegatedTo: string | null;
+  delegationsReceived: Array<{
+    delegator: string;
+    amount: number;
+  }>;
+}
+
+export interface ReputationDashboardData {
+  isOracle: boolean;
+  oracleInfo?: OracleInfo;
+  myEvaluations: WorkEvaluation[];
+  evaluationsReceived: WorkEvaluation[];
+  activeChallenges: Challenge[];
+  reputationHistory: Array<{
+    timestamp: number;
+    category: string;
+    oldScore: number;
+    newScore: number;
+    evaluatedBy: string;
+  }>;
+}
+
+// ============ API RESPONSE TYPES ============
+
+export interface ContractCallResponse {
+  success: boolean;
+  transactionId?: string;
+  contractAddress?: string;
+  functionName?: string;
+  gasUsed?: number;
+  error?: string;
+  data?: any;
+}
+
+export interface PaginatedApiResponse<T> {
+  success: boolean;
+  data?: {
+    items: T[];
+    total: number;
+    page: number;
+    size: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  };
+  error?: string;
+}
+
+// ============ FORM VALIDATION TYPES ============
+
+export interface ValidationError {
+  field: string;
+  message: string;
+}
+
+export interface FormState<T> {
+  data: T;
+  errors: ValidationError[];
+  isValid: boolean;
+  isSubmitting: boolean;
+  isDirty: boolean;
+}
+
+// ============ COMPONENT PROP TYPES ============
+
+export interface DashboardWidgetProps {
+  title: string;
+  description?: string;
+  icon?: React.ComponentType<any>;
+  className?: string;
+  children: React.ReactNode;
+  headerActions?: React.ReactNode;
+  actions?: Array<{
+    label: string;
+    onClick: () => void;
+    icon?: React.ComponentType<any>;
+  }>;
+}
+
+export interface ContractInteractionProps {
+  onSuccess?: (result: ContractCallResponse) => void;
+  onError?: (error: string) => void;
+  disabled?: boolean;
+  className?: string;
+}
+
+// ============ WALLET INTEGRATION TYPES ============
+
+export interface ContractFunction {
+  name: string;
+  inputs: Array<{
+    name: string;
+    type: string;
+    value: any;
+  }>;
+  value?: number; // for payable functions
+  gasLimit?: number;
+}
+
+export interface SmartContractCall {
+  contractAddress: string;
+  function: ContractFunction;
+  signer: any;
+}
+
+// Export all existing types from the original file
+export * from './wallet';

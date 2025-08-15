@@ -14,10 +14,13 @@ from app.utils.hedera import validate_hedera_address
 # ============ REQUEST MODELS ============
 
 class SkillTokenCreateRequest(BaseModel):
-    """Request model for skill token creation - matches SkillToken.sol mintSkillToken function."""
+    """Request model for skill token creation - matches SkillToken.sol mintSkillToken function exactly."""
     recipient_address: str = Field(..., description="Recipient's Hedera account address")
-    category: str = Field(..., min_length=2, max_length=100, description="Skill category")
+    category: str = Field(..., min_length=2, max_length=100, description="Main skill category")
+    subcategory: str = Field(..., min_length=2, max_length=100, description="Specific skill subcategory")
     level: int = Field(..., ge=1, le=10, description="Initial skill level (1-10)")
+    expiry_date: int = Field(0, ge=0, description="Expiry date as Unix timestamp (0 for default)")
+    metadata: str = Field("", description="Additional metadata for the skill")
     uri: str = Field(..., description="URI to additional metadata (IPFS hash)")
     
     @validator('recipient_address')
@@ -25,6 +28,39 @@ class SkillTokenCreateRequest(BaseModel):
         if not validate_hedera_address(v):
             raise ValueError('Invalid Hedera address format')
         return v
+
+
+class EndorseSkillTokenRequest(BaseModel):
+    """Request model for skill token endorsement - matches SkillToken.sol endorseSkillToken function exactly."""
+    token_id: int = Field(..., description="Skill token ID to endorse")
+    endorsement_data: str = Field(..., description="Endorsement data/message")
+
+
+class EndorseSkillTokenWithSignatureRequest(BaseModel):
+    """Request model for skill token endorsement with signature - matches SkillToken.sol function exactly."""
+    token_id: int = Field(..., description="Skill token ID to endorse")
+    endorsement_data: str = Field(..., description="Endorsement data/message")
+    deadline: int = Field(..., description="Signature deadline as Unix timestamp")
+    signature: str = Field(..., description="EIP712 signature bytes")
+
+
+class RenewSkillTokenRequest(BaseModel):
+    """Request model for skill token renewal - matches SkillToken.sol renewSkillToken function exactly."""
+    token_id: int = Field(..., description="Skill token ID to renew")
+    new_expiry_date: int = Field(..., description="New expiry date as Unix timestamp")
+
+
+class RevokeSkillTokenRequest(BaseModel):
+    """Request model for skill token revocation - matches SkillToken.sol revokeSkillToken function exactly."""
+    token_id: int = Field(..., description="Skill token ID to revoke")
+    reason: str = Field(..., description="Reason for revocation")
+
+
+class UpdateSkillLevelRequest(BaseModel):
+    """Request model for skill level update - matches SkillToken.sol updateSkillLevel function exactly."""
+    token_id: int = Field(..., description="Skill token ID to update")
+    new_level: int = Field(..., ge=1, le=10, description="New skill level (1-10)")
+    evidence: str = Field("", description="Evidence supporting the level update")
 
 
 class SkillTokenUpdateRequest(BaseModel):
@@ -35,15 +71,66 @@ class SkillTokenUpdateRequest(BaseModel):
 
 
 class BatchSkillTokenRequest(BaseModel):
-    """Request model for batch skill token creation."""
-    recipient_address: str = Field(..., description="Recipient's Hedera account address")
-    skills: List[Dict[str, Any]] = Field(..., min_items=1, max_items=50, description="List of skills to create")
+    """Request model for batch skill token creation - matches SkillToken.sol batchMintSkillTokens function exactly."""
+    recipient_address: str = Field(..., description="Recipient's Hedera account address (address)")
+    categories: List[str] = Field(..., min_items=1, description="Skill categories (string[] array)")
+    subcategories: List[str] = Field(..., min_items=1, description="Skill subcategories (string[] array)")
+    levels: List[int] = Field(..., min_items=1, description="Skill levels (uint8[] array)")
+    expiry_dates: List[int] = Field(..., min_items=1, description="Expiry dates (uint64[] array)")
+    metadata_array: List[str] = Field(..., min_items=1, description="Metadata for each skill (string[] array)")
+    token_uris: List[str] = Field(..., min_items=1, description="Token URIs (string[] array)")
     
     @validator('recipient_address')
     def validate_address(cls, v):
         if not validate_hedera_address(v):
             raise ValueError('Invalid Hedera address format')
         return v
+    
+    @validator('categories', 'subcategories', 'levels', 'expiry_dates', 'metadata_array', 'token_uris')
+    def validate_arrays_same_length(cls, v, values, field):
+        # Get the length of the first array to compare against
+        first_array = None
+        for field_name in ['categories', 'subcategories', 'levels', 'expiry_dates', 'metadata_array', 'token_uris']:
+            if field_name in values:
+                first_array = values[field_name]
+                break
+        
+        if first_array is not None and len(v) != len(first_array):
+            raise ValueError('All arrays must have the same length')
+        return v
+
+
+class UpdateSkillLevelRequest(BaseModel):
+    """Request model for skill level updates - matches SkillToken.sol updateSkillLevel function exactly."""
+    token_id: int = Field(..., ge=0, description="Skill token ID to update (uint256)")
+    new_level: int = Field(..., ge=1, le=10, description="New skill level 1-10 (uint8)")
+    evidence: str = Field(..., min_length=1, description="Evidence supporting the update (string)")
+
+
+class RevokeSkillTokenRequest(BaseModel):
+    """Request model for skill token revocation - matches SkillToken.sol revokeSkillToken function exactly."""
+    token_id: int = Field(..., ge=0, description="Skill token ID to revoke (uint256)")
+    reason: str = Field(..., min_length=1, description="Reason for revocation (string)")
+
+
+class EndorseSkillTokenRequest(BaseModel):
+    """Request model for skill endorsements - matches SkillToken.sol endorseSkillToken function exactly."""
+    token_id: int = Field(..., ge=0, description="Skill token ID to endorse (uint256)")
+    endorsement_data: str = Field(..., min_length=1, description="Endorsement data (string)")
+
+
+class EndorseSkillTokenWithSignatureRequest(BaseModel):
+    """Request model for gasless skill endorsements - matches SkillToken.sol endorseSkillTokenWithSignature function exactly."""
+    token_id: int = Field(..., ge=0, description="Skill token ID to endorse (uint256)")
+    endorsement_data: str = Field(..., min_length=1, description="Endorsement data (string)")
+    deadline: int = Field(..., gt=0, description="Signature deadline timestamp (uint256)")
+    signature: str = Field(..., description="EIP-712 signature for gasless endorsement (bytes)")
+
+
+class RenewSkillTokenRequest(BaseModel):
+    """Request model for skill token renewal - matches SkillToken.sol renewSkillToken function exactly."""
+    token_id: int = Field(..., ge=0, description="Skill token ID to renew (uint256)")
+    new_expiry_date: int = Field(..., gt=0, description="New expiry date timestamp (uint64)")
 
 
 class SkillSearchRequest(BaseModel):

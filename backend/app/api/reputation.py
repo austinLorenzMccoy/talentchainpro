@@ -3,13 +3,15 @@ Enhanced Reputation API Endpoints
 
 This module provides comprehensive REST API endpoints for reputation management,
 oracle registration, work evaluation, consensus mechanisms, and challenge systems.
+
+Perfect 1:1 mapping with ReputationOracle.sol smart contract functions.
 """
 
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, HTTPException, Depends, Query, Body, status
 from fastapi.responses import JSONResponse
 
 from app.models.reputation_schemas import (
@@ -32,7 +34,419 @@ logger = logging.getLogger(__name__)
 # Create router
 router = APIRouter(tags=["reputation"])
 
-# ============ ORACLE MANAGEMENT ENDPOINTS ============
+# ============ CONTRACT-ALIGNED REPUTATION ENDPOINTS ============
+
+@router.post(
+    "/register-oracle",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def register_oracle(
+    oracle_address: str,
+    name: str,
+    specializations: List[str],
+    stake_amount: int
+) -> Dict[str, Any]:
+    """
+    Register a new reputation oracle - matches ReputationOracle.registerOracle() exactly.
+    
+    Contract function: registerOracle(address oracleAddress, string name, 
+                                    string[] specializations, uint256 stakeAmount)
+    """
+    try:
+        reputation_service = get_reputation_service()
+        
+        result = await reputation_service.register_oracle(
+            oracle_address=oracle_address,
+            name=name,
+            specializations=specializations,
+            stake_amount=stake_amount
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to register oracle")
+            )
+        
+        logger.info(f"Registered oracle {oracle_address}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error registering oracle: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/submit-evaluation",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def submit_evaluation(
+    oracle_address: str,
+    user_address: str,
+    work_id: int,
+    score: int,
+    ipfs_hash: str,
+    evaluation_type: int = 0
+) -> Dict[str, Any]:
+    """
+    Submit work evaluation - matches ReputationOracle.submitEvaluation() exactly.
+    
+    Contract function: submitEvaluation(address oracle, address user, 
+                                      uint256 workId, uint8 score, 
+                                      string ipfsHash, uint8 evaluationType)
+    """
+    try:
+        reputation_service = get_reputation_service()
+        
+        result = await reputation_service.submit_evaluation(
+            oracle_address=oracle_address,
+            user_address=user_address,
+            work_id=work_id,
+            score=score,
+            ipfs_hash=ipfs_hash,
+            evaluation_type=evaluation_type
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to submit evaluation")
+            )
+        
+        logger.info(f"Evaluation submitted by {oracle_address} for user {user_address}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error submitting evaluation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/update-reputation-score",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def update_reputation_score(
+    user_address: str,
+    new_score: int,
+    skill_categories: List[int],
+    evaluation_id: int
+) -> Dict[str, Any]:
+    """
+    Update reputation score - matches ReputationOracle.updateReputationScore() exactly.
+    
+    Contract function: updateReputationScore(address user, uint256 newScore, 
+                                           uint8[] skillCategories, uint256 evaluationId)
+    """
+    try:
+        reputation_service = get_reputation_service()
+        
+        result = await reputation_service.update_reputation_score(
+            user_address=user_address,
+            new_score=new_score,
+            skill_categories=skill_categories,
+            evaluation_id=evaluation_id
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to update reputation score")
+            )
+        
+        logger.info(f"Updated reputation score for {user_address}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error updating reputation score: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/challenge-evaluation",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def challenge_evaluation(
+    evaluation_id: int,
+    challenger: str,
+    challenge_reason: str,
+    stake_amount: int
+) -> Dict[str, Any]:
+    """
+    Challenge an evaluation - matches ReputationOracle.challengeEvaluation() exactly.
+    
+    Contract function: challengeEvaluation(uint256 evaluationId, address challenger, 
+                                         string challengeReason, uint256 stakeAmount)
+    """
+    try:
+        reputation_service = get_reputation_service()
+        
+        result = await reputation_service.challenge_evaluation(
+            evaluation_id=evaluation_id,
+            challenger=challenger,
+            challenge_reason=challenge_reason,
+            stake_amount=stake_amount
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to challenge evaluation")
+            )
+        
+        logger.info(f"Evaluation {evaluation_id} challenged by {challenger}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error challenging evaluation: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/resolve-challenge",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def resolve_challenge(
+    challenge_id: int,
+    resolution: bool,
+    resolution_reason: str
+) -> Dict[str, Any]:
+    """
+    Resolve a challenge - matches ReputationOracle.resolveChallenge() exactly.
+    
+    Contract function: resolveChallenge(uint256 challengeId, bool resolution, 
+                                      string resolutionReason)
+    """
+    try:
+        reputation_service = get_reputation_service()
+        
+        result = await reputation_service.resolve_challenge(
+            challenge_id=challenge_id,
+            resolution=resolution,
+            resolution_reason=resolution_reason
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to resolve challenge")
+            )
+        
+        logger.info(f"Challenge {challenge_id} resolved")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error resolving challenge: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.get(
+    "/is-active-oracle/{oracle_address}",
+    response_model=Dict[str, Any],
+    responses={
+        200: {"description": "Oracle status"},
+        404: {"model": ErrorResponse, "description": "Oracle not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def is_active_oracle(
+    oracle_address: str
+) -> Dict[str, Any]:
+    """
+    Check if oracle is active - matches ReputationOracle.isActiveOracle() exactly.
+    
+    Contract function: isActiveOracle(address oracle) returns (bool)
+    """
+    try:
+        reputation_service = get_reputation_service()
+        
+        result = await reputation_service.is_active_oracle(
+            oracle_address=oracle_address
+        )
+        
+        logger.info(f"Checked oracle status for {oracle_address}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error checking oracle status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/update-oracle-status",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def update_oracle_status(
+    oracle_address: str,
+    is_active: bool,
+    reason: str = ""
+) -> Dict[str, Any]:
+    """
+    Update oracle status - matches ReputationOracle.updateOracleStatus() exactly.
+    
+    Contract function: updateOracleStatus(address oracle, bool isActive, string reason)
+    """
+    try:
+        reputation_service = get_reputation_service()
+        
+        result = await reputation_service.update_oracle_status(
+            oracle_address=oracle_address,
+            is_active=is_active,
+            reason=reason
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to update oracle status")
+            )
+        
+        logger.info(f"Updated oracle status for {oracle_address}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error updating oracle status: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/slash-oracle",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def slash_oracle(
+    oracle_address: str,
+    slash_amount: int,
+    slash_reason: str
+) -> Dict[str, Any]:
+    """
+    Slash oracle stake - matches ReputationOracle.slashOracle() exactly.
+    
+    Contract function: slashOracle(address oracle, uint256 slashAmount, string slashReason)
+    """
+    try:
+        reputation_service = get_reputation_service()
+        
+        result = await reputation_service.slash_oracle(
+            oracle_address=oracle_address,
+            slash_amount=slash_amount,
+            slash_reason=slash_reason
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to slash oracle")
+            )
+        
+        logger.info(f"Slashed oracle {oracle_address}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error slashing oracle: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+@router.post(
+    "/withdraw-oracle-stake",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def withdraw_oracle_stake(
+    oracle_address: str,
+    withdrawal_amount: int
+) -> Dict[str, Any]:
+    """
+    Withdraw oracle stake - matches ReputationOracle.withdrawOracleStake() exactly.
+    
+    Contract function: withdrawOracleStake(address oracle, uint256 withdrawalAmount)
+    """
+    try:
+        reputation_service = get_reputation_service()
+        
+        result = await reputation_service.withdraw_oracle_stake(
+            oracle_address=oracle_address,
+            withdrawal_amount=withdrawal_amount
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to withdraw oracle stake")
+            )
+        
+        logger.info(f"Withdrew stake for oracle {oracle_address}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error withdrawing oracle stake: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
+
+# ============ LEGACY ORACLE MANAGEMENT ENDPOINTS ============
 
 @router.post("/oracles/register", response_model=Dict[str, Any])
 async def register_oracle(

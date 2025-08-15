@@ -32,7 +32,141 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# Enhanced API Endpoints
+# Contract-Aligned API Endpoints - Perfect 1:1 mapping with SkillToken.sol
+
+@router.post(
+    "/mint",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def mint_skill_token(
+    request: SkillTokenCreateRequest,
+    background_tasks: BackgroundTasks
+) -> Dict[str, Any]:
+    """
+    Create a new skill token - matches SkillToken.mintSkillToken() exactly.
+    
+    Contract function: mintSkillToken(address recipient, string category, string subcategory, 
+                                   uint8 level, uint64 expiryDate, string metadata, string tokenURIData)
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Call service with exact contract parameters
+        result = await skill_service.mint_skill_token(
+            recipient=request.recipient_address,
+            category=request.category,
+            subcategory=request.subcategory,
+            level=request.level,
+            expiry_date=request.expiry_date,
+            metadata=request.metadata,
+            token_uri_data=request.uri
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to mint skill token")
+            )
+        
+        # Add background task for reputation update
+        background_tasks.add_task(
+            update_reputation_for_skill_creation,
+            request.recipient_address,
+            request.category,
+            request.level
+        )
+        
+        logger.info(f"Minted skill token {result['token_id']} for {request.recipient_address}")
+        
+        return {
+            "transaction_id": result.get("transaction_id"),
+            "token_id": result["token_id"],
+            "contract_address": result.get("contract_address"),
+            "success": True
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error minting skill token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to mint skill token"
+        )
+
+
+@router.post(
+    "/batch-mint",
+    response_model=Dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        422: {"model": ErrorResponse, "description": "Validation error"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def batch_mint_skill_tokens(
+    request: BatchSkillTokenRequest,
+    background_tasks: BackgroundTasks
+) -> Dict[str, Any]:
+    """
+    Batch create skill tokens - matches SkillToken.batchMintSkillTokens() exactly.
+    
+    Contract function: batchMintSkillTokens(address recipient, string[] categories, string[] subcategories,
+                                         uint8[] levels, uint64[] expiryDates, string[] metadataArray, string[] tokenURIs)
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Call service with exact contract parameters
+        result = await skill_service.batch_mint_skill_tokens(
+            recipient=request.recipient_address,
+            categories=request.categories,
+            subcategories=request.subcategories,
+            levels=request.levels,
+            expiry_dates=request.expiry_dates,
+            metadata_array=request.metadata_array,
+            token_uris=request.token_uris
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to batch mint skill tokens")
+            )
+        
+        # Add background task for reputation updates
+        background_tasks.add_task(
+            update_reputation_for_batch_creation,
+            request.recipient_address,
+            len(request.categories),
+            len(result.get("token_ids", []))
+        )
+        
+        logger.info(f"Batch minted {len(result.get('token_ids', []))} skill tokens for {request.recipient_address}")
+        
+        return {
+            "transaction_id": result.get("transaction_id"),
+            "token_ids": result.get("token_ids", []),
+            "contract_address": result.get("contract_address"),
+            "success": True
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error batch minting skill tokens: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to batch mint skill tokens"
+        )
+
 
 @router.post(
     "/",
@@ -108,6 +242,299 @@ async def create_skill_token(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create skill token"
+        )
+
+
+@router.put(
+    "/update-level",
+    response_model=Dict[str, Any],
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        404: {"model": ErrorResponse, "description": "Skill token not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def update_skill_level(
+    token_id: int,
+    new_level: int,
+    evidence: str = "",
+    background_tasks: BackgroundTasks = None
+) -> Dict[str, Any]:
+    """
+    Update skill level - matches SkillToken.updateSkillLevel() exactly.
+    
+    Contract function: updateSkillLevel(uint256 tokenId, uint8 newLevel, string evidence)
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Get current token data for comparison
+        current_result = await skill_service.get_skill_token(str(token_id))
+        if not current_result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Skill token not found"
+            )
+        
+        current_data = current_result["data"]
+        
+        # Call service with exact contract parameters
+        result = await skill_service.update_skill_level(
+            token_id=token_id,
+            new_level=new_level,
+            evidence=evidence
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to update skill level")
+            )
+        
+        # Add background task for reputation update
+        if background_tasks:
+            background_tasks.add_task(
+                update_reputation_for_level_change,
+                current_data["owner_address"],
+                str(token_id),
+                current_data["level"],
+                new_level
+            )
+        
+        logger.info(f"Updated skill token {token_id} level to {new_level}")
+        
+        return {
+            "transaction_id": result.get("transaction_id"),
+            "token_id": token_id,
+            "old_level": current_data["level"],
+            "new_level": new_level,
+            "success": True
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating skill level: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update skill level"
+        )
+
+
+@router.post(
+    "/endorse",
+    response_model=Dict[str, Any],
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        404: {"model": ErrorResponse, "description": "Skill token not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def endorse_skill_token(
+    token_id: int,
+    endorsement_data: str,
+    background_tasks: BackgroundTasks = None
+) -> Dict[str, Any]:
+    """
+    Endorse a skill token - matches SkillToken.endorseSkillToken() exactly.
+    
+    Contract function: endorseSkillToken(uint256 tokenId, string endorsementData)
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Call service with exact contract parameters
+        result = await skill_service.endorse_skill_token(
+            token_id=token_id,
+            endorsement_data=endorsement_data
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to endorse skill token")
+            )
+        
+        logger.info(f"Endorsed skill token {token_id}")
+        
+        return {
+            "transaction_id": result.get("transaction_id"),
+            "token_id": token_id,
+            "endorsement_data": endorsement_data,
+            "success": True
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error endorsing skill token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to endorse skill token"
+        )
+
+
+@router.post(
+    "/endorse-with-signature",
+    response_model=Dict[str, Any],
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        404: {"model": ErrorResponse, "description": "Skill token not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def endorse_skill_token_with_signature(
+    token_id: int,
+    endorsement_data: str,
+    deadline: int,
+    signature: str,
+    background_tasks: BackgroundTasks = None
+) -> Dict[str, Any]:
+    """
+    Endorse skill token with signature - matches SkillToken.endorseSkillTokenWithSignature() exactly.
+    
+    Contract function: endorseSkillTokenWithSignature(uint256 tokenId, string endorsementData, uint256 deadline, bytes signature)
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Call service with exact contract parameters
+        result = await skill_service.endorse_skill_token_with_signature(
+            token_id=token_id,
+            endorsement_data=endorsement_data,
+            deadline=deadline,
+            signature=signature
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to endorse skill token with signature")
+            )
+        
+        logger.info(f"Endorsed skill token {token_id} with signature")
+        
+        return {
+            "transaction_id": result.get("transaction_id"),
+            "token_id": token_id,
+            "endorsement_data": endorsement_data,
+            "deadline": deadline,
+            "success": True
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error endorsing skill token with signature: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to endorse skill token with signature"
+        )
+
+
+@router.put(
+    "/renew",
+    response_model=Dict[str, Any],
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        404: {"model": ErrorResponse, "description": "Skill token not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def renew_skill_token(
+    token_id: int,
+    new_expiry_date: int,
+    background_tasks: BackgroundTasks = None
+) -> Dict[str, Any]:
+    """
+    Renew skill token expiry - matches SkillToken.renewSkillToken() exactly.
+    
+    Contract function: renewSkillToken(uint256 tokenId, uint64 newExpiryDate)
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Call service with exact contract parameters
+        result = await skill_service.renew_skill_token(
+            token_id=token_id,
+            new_expiry_date=new_expiry_date
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to renew skill token")
+            )
+        
+        logger.info(f"Renewed skill token {token_id} expiry to {new_expiry_date}")
+        
+        return {
+            "transaction_id": result.get("transaction_id"),
+            "token_id": token_id,
+            "new_expiry_date": new_expiry_date,
+            "success": True
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error renewing skill token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to renew skill token"
+        )
+
+
+@router.put(
+    "/revoke",
+    response_model=Dict[str, Any],
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request"},
+        404: {"model": ErrorResponse, "description": "Skill token not found"},
+        500: {"model": ErrorResponse, "description": "Internal server error"}
+    }
+)
+async def revoke_skill_token(
+    token_id: int,
+    reason: str,
+    background_tasks: BackgroundTasks = None
+) -> Dict[str, Any]:
+    """
+    Revoke skill token - matches SkillToken.revokeSkillToken() exactly.
+    
+    Contract function: revokeSkillToken(uint256 tokenId, string reason)
+    """
+    try:
+        skill_service = get_skill_service()
+        
+        # Call service with exact contract parameters
+        result = await skill_service.revoke_skill_token(
+            token_id=token_id,
+            reason=reason
+        )
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result.get("error", "Failed to revoke skill token")
+            )
+        
+        logger.info(f"Revoked skill token {token_id} for reason: {reason}")
+        
+        return {
+            "transaction_id": result.get("transaction_id"),
+            "token_id": token_id,
+            "reason": reason,
+            "success": True
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error revoking skill token: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to revoke skill token"
         )
 
 

@@ -20,14 +20,11 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 
 interface ContractJobApplication {
-    poolId: number;
-    coverLetter: string;
-    proposedSalary: number; // in tinybar
-    skillTokenIds: number[]; // skill token IDs as proof
-    portfolioUri: string; // URI to portfolio/resume
-    availabilityDate: number; // unix timestamp
-    estimatedCompletionTime: number; // in days for contract work
-    stakeAmount: number; // in tinybar for msg.value
+    poolId: number;              // uint256 poolId
+    skillTokenIds: number[];     // uint256[] skillTokenIds
+    coverLetter: string;         // string coverLetter
+    portfolio: string;           // string portfolio
+    stakeAmount: number;         // in tinybar for msg.value (not a function parameter, but needed for transaction)
 }
 
 interface JobPool {
@@ -82,12 +79,9 @@ export function ContractApplyToJobDialog({
     const [userSkillTokens, setUserSkillTokens] = useState<UserSkillToken[]>([]);
     const [formData, setFormData] = useState<ContractJobApplication>({
         poolId: jobPool.id,
-        coverLetter: "",
-        proposedSalary: Math.floor((jobPool.salaryMin + jobPool.salaryMax) / 2),
         skillTokenIds: [],
-        portfolioUri: "",
-        availabilityDate: Math.floor((Date.now() + 14 * 24 * 60 * 60 * 1000) / 1000), // 2 weeks
-        estimatedCompletionTime: 30, // 30 days default
+        coverLetter: "",
+        portfolio: "",
         stakeAmount: 50000000 // 0.5 HBAR in tinybar
     });
     
@@ -170,21 +164,13 @@ export function ContractApplyToJobDialog({
             return;
         }
         
-        if (formData.proposedSalary < jobPool.salaryMin || formData.proposedSalary > jobPool.salaryMax) {
-            alert(`Proposed salary must be between ${tinybarToHbar(jobPool.salaryMin)} and ${tinybarToHbar(jobPool.salaryMax)} HBAR`);
-            return;
-        }
-        
         setIsSubmitting(true);
         try {
             const contractData: ContractJobApplication = {
                 poolId: jobPool.id,
-                coverLetter: formData.coverLetter.trim(),
-                proposedSalary: formData.proposedSalary,
                 skillTokenIds: formData.skillTokenIds,
-                portfolioUri: formData.portfolioUri.trim(),
-                availabilityDate: formData.availabilityDate,
-                estimatedCompletionTime: formData.estimatedCompletionTime,
+                coverLetter: formData.coverLetter.trim(),
+                portfolio: formData.portfolio.trim(),
                 stakeAmount: formData.stakeAmount
             };
             
@@ -212,12 +198,9 @@ export function ContractApplyToJobDialog({
             // Reset and close
             setFormData({
                 poolId: jobPool.id,
-                coverLetter: "",
-                proposedSalary: Math.floor((jobPool.salaryMin + jobPool.salaryMax) / 2),
                 skillTokenIds: [],
-                portfolioUri: "",
-                availabilityDate: Math.floor((Date.now() + 14 * 24 * 60 * 60 * 1000) / 1000),
-                estimatedCompletionTime: 30,
+                coverLetter: "",
+                portfolio: "",
                 stakeAmount: 50000000
             });
             setIsDialogOpen(false);
@@ -232,8 +215,7 @@ export function ContractApplyToJobDialog({
     
     const matchScore = calculateMatchScore();
     const relevantTokens = getRelevantSkillTokens();
-    const isFormValid = formData.coverLetter.trim() && formData.skillTokenIds.length > 0 &&
-                       formData.proposedSalary >= jobPool.salaryMin && formData.proposedSalary <= jobPool.salaryMax;
+    const isFormValid = formData.coverLetter.trim() && formData.skillTokenIds.length > 0;
     
     return (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -405,63 +387,18 @@ export function ContractApplyToJobDialog({
                                 />
                             </div>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <Label htmlFor="proposedSalary">Proposed Salary (tinybar) *</Label>
-                                    <Input
-                                        id="proposedSalary"
-                                        type="number"
-                                        min={jobPool.salaryMin}
-                                        max={jobPool.salaryMax}
-                                        value={formData.proposedSalary || ""}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, proposedSalary: parseInt(e.target.value) || 0 }))}
-                                        className="mt-1"
-                                    />
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        ≈ {tinybarToHbar(formData.proposedSalary).toFixed(2)} HBAR
-                                        <span className="ml-2 text-slate-400">
-                                            (Range: {tinybarToHbar(jobPool.salaryMin).toFixed(1)} - {tinybarToHbar(jobPool.salaryMax).toFixed(1)} HBAR)
-                                        </span>
-                                    </p>
-                                </div>
-                                <div>
-                                    <Label htmlFor="portfolioUri">Portfolio/Resume URI</Label>
-                                    <Input
-                                        id="portfolioUri"
-                                        placeholder="https://portfolio.com or ipfs://..."
-                                        value={formData.portfolioUri}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, portfolioUri: e.target.value }))}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="availabilityDate">Available From *</Label>
-                                    <Input
-                                        id="availabilityDate"
-                                        type="date"
-                                        value={new Date(formData.availabilityDate * 1000).toISOString().split('T')[0]}
-                                        onChange={(e) => setFormData(prev => ({ 
-                                            ...prev, 
-                                            availabilityDate: Math.floor(new Date(e.target.value).getTime() / 1000) 
-                                        }))}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="estimatedCompletionTime">Estimated Duration (days)</Label>
-                                    <Input
-                                        id="estimatedCompletionTime"
-                                        type="number"
-                                        min="1"
-                                        max="365"
-                                        value={formData.estimatedCompletionTime || ""}
-                                        onChange={(e) => setFormData(prev => ({ ...prev, estimatedCompletionTime: parseInt(e.target.value) || 30 }))}
-                                        className="mt-1"
-                                    />
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        For contract/project work
-                                    </p>
-                                </div>
+                            <div>
+                                <Label htmlFor="portfolio">Portfolio/Resume URI</Label>
+                                <Input
+                                    id="portfolio"
+                                    placeholder="https://portfolio.com or ipfs://..."
+                                    value={formData.portfolio}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, portfolio: e.target.value }))}
+                                    className="mt-1"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Optional: Link to your portfolio or resume
+                                </p>
                             </div>
                             
                             <div>
@@ -493,16 +430,16 @@ export function ContractApplyToJobDialog({
                             <CardContent className="space-y-3">
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                                     <div>
-                                        <span className="text-slate-600 dark:text-slate-400">Skill Match:</span>
-                                        <p className="font-medium">{matchScore}%</p>
+                                        <span className="text-slate-600 dark:text-slate-400">Application:</span>
+                                        <p className="font-medium">Complete</p>
                                     </div>
                                     <div>
                                         <span className="text-slate-600 dark:text-slate-400">Tokens:</span>
                                         <p className="font-medium">{formData.skillTokenIds.length} selected</p>
                                     </div>
                                     <div>
-                                        <span className="text-slate-600 dark:text-slate-400">Salary:</span>
-                                        <p className="font-medium">{tinybarToHbar(formData.proposedSalary).toFixed(1)} HBAR</p>
+                                        <span className="text-slate-600 dark:text-slate-400">Portfolio:</span>
+                                        <p className="font-medium">{formData.portfolio ? "Provided" : "Not provided"}</p>
                                     </div>
                                     <div>
                                         <span className="text-slate-600 dark:text-slate-400">Stake:</span>

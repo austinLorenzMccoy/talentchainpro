@@ -2,6 +2,7 @@
 Reputation API Request/Response Models
 
 This module defines Pydantic models for reputation-related API endpoints.
+Perfect 1:1 mapping with ReputationOracle.sol smart contract functions.
 """
 
 from typing import List, Dict, Any, Optional
@@ -11,14 +12,69 @@ from pydantic import BaseModel, Field, validator
 from app.utils.hedera import validate_hedera_address
 
 
-# ============ REQUEST MODELS ============
+# ============ CONTRACT-ALIGNED REQUEST MODELS ============
+
+class ContractRegisterOracleRequest(BaseModel):
+    """Request model for registering oracle - matches ReputationOracle.registerOracle() exactly."""
+    oracle_address: str = Field(..., description="Oracle address")
+    name: str = Field(..., description="Oracle name")
+    specializations: List[str] = Field(..., description="Oracle specializations")
+    stake_amount: int = Field(..., description="Stake amount")
+
+class ContractSubmitEvaluationRequest(BaseModel):
+    """Request model for submitting evaluation - matches ReputationOracle.submitEvaluation() exactly."""
+    oracle_address: str = Field(..., description="Oracle address")
+    user_address: str = Field(..., description="User address")
+    work_id: int = Field(..., description="Work ID")
+    score: int = Field(..., description="Evaluation score")
+    ipfs_hash: str = Field(..., description="IPFS hash")
+    evaluation_type: int = Field(0, description="Evaluation type")
+
+class ContractUpdateReputationScoreRequest(BaseModel):
+    """Request model for updating reputation score - matches ReputationOracle.updateReputationScore() exactly."""
+    user_address: str = Field(..., description="User address")
+    new_score: int = Field(..., description="New reputation score")
+    skill_categories: List[int] = Field(..., description="Skill categories")
+    evaluation_id: int = Field(..., description="Evaluation ID")
+
+class ContractChallengeEvaluationRequest(BaseModel):
+    """Request model for challenging evaluation - matches ReputationOracle.challengeEvaluation() exactly."""
+    evaluation_id: int = Field(..., description="Evaluation ID")
+    challenger: str = Field(..., description="Challenger address")
+    challenge_reason: str = Field(..., description="Challenge reason")
+    stake_amount: int = Field(..., description="Stake amount")
+
+class ContractResolveChallengeRequest(BaseModel):
+    """Request model for resolving challenge - matches ReputationOracle.resolveChallenge() exactly."""
+    challenge_id: int = Field(..., description="Challenge ID")
+    resolution: bool = Field(..., description="Challenge resolution")
+    resolution_reason: str = Field(..., description="Resolution reason")
+
+class ContractUpdateOracleStatusRequest(BaseModel):
+    """Request model for updating oracle status - matches ReputationOracle.updateOracleStatus() exactly."""
+    oracle_address: str = Field(..., description="Oracle address")
+    is_active: bool = Field(..., description="Is oracle active")
+    reason: str = Field("", description="Status change reason")
+
+class ContractSlashOracleRequest(BaseModel):
+    """Request model for slashing oracle - matches ReputationOracle.slashOracle() exactly."""
+    oracle_address: str = Field(..., description="Oracle address")
+    slash_amount: int = Field(..., description="Slash amount")
+    slash_reason: str = Field(..., description="Slash reason")
+
+class ContractWithdrawOracleStakeRequest(BaseModel):
+    """Request model for withdrawing oracle stake - matches ReputationOracle.withdrawOracleStake() exactly."""
+    oracle_address: str = Field(..., description="Oracle address")
+    withdrawal_amount: int = Field(..., description="Withdrawal amount")
+
+# ============ LEGACY REQUEST MODELS ============
 
 class RegisterOracleRequest(BaseModel):
-    """Request model for oracle registration."""
+    """Request model for oracle registration - matches ReputationOracle.sol registerOracle function exactly."""
+    name: str = Field(..., min_length=1, description="Oracle name (string)")
+    specializations: List[str] = Field(..., min_items=1, description="Oracle specializations (string[] array)")
+    stake_amount: int = Field(..., gt=0, description="Stake amount in tinybar (for msg.value)")
     oracle_address: str = Field(..., description="Oracle's Hedera account address")
-    name: str = Field(..., min_length=3, max_length=100, description="Oracle display name")
-    specializations: List[str] = Field(..., min_items=1, description="List of specialization categories")
-    stake_amount: float = Field(100.0, ge=1.0, description="Stake amount for oracle registration")
     
     @validator('oracle_address')
     def validate_oracle_address(cls, v):
@@ -27,19 +83,43 @@ class RegisterOracleRequest(BaseModel):
         return v
 
 
-class WorkEvaluationRequest(BaseModel):
-    """Request model for work evaluation submission."""
+class SubmitWorkEvaluationRequest(BaseModel):
+    """Request model for work evaluation - matches ReputationOracle.sol submitWorkEvaluation function exactly."""
+    user_address: str = Field(..., description="User being evaluated (address)")
+    skill_token_ids: List[int] = Field(..., min_items=1, description="Skill token IDs (uint256[] array)")
+    work_description: str = Field(..., min_length=1, description="Work description (string)")
+    work_content: str = Field(..., min_length=1, description="Work content (string)")
+    overall_score: int = Field(..., ge=0, le=10000, description="Overall score 0-10000 (uint256)")
+    skill_scores: List[int] = Field(..., min_items=1, description="Individual skill scores (uint256[] array)")
+    feedback: str = Field(..., description="Evaluation feedback (string)")
+    ipfs_hash: str = Field(..., min_length=1, description="IPFS hash for evaluation data (string)")
     oracle_address: str = Field(..., description="Oracle submitting the evaluation")
-    user_address: str = Field(..., description="User being evaluated")
-    skill_token_ids: List[str] = Field(..., min_items=1, description="Skill tokens being evaluated")
-    work_description: str = Field(..., min_length=10, description="Description of the work")
-    artifacts: List[str] = Field(default_factory=list, description="Work artifacts (URLs, IPFS hashes)")
-    overall_score: int = Field(..., ge=0, le=100, description="Overall evaluation score")
-    skill_scores: Dict[str, int] = Field(..., description="Individual skill scores")
-    feedback: str = Field("", description="Detailed feedback")
-    ipfs_hash: Optional[str] = Field(None, description="IPFS hash for additional data")
     
-    @validator('oracle_address', 'user_address')
+    @validator('user_address', 'oracle_address')
+    def validate_addresses(cls, v):
+        if not validate_hedera_address(v):
+            raise ValueError('Invalid Hedera address format')
+        return v
+    
+    @validator('skill_scores')
+    def validate_skill_scores_length(cls, v, values):
+        if 'skill_token_ids' in values and len(v) != len(values['skill_token_ids']):
+            raise ValueError('skill_scores array must have same length as skill_token_ids array')
+        for score in v:
+            if not 0 <= score <= 10000:
+                raise ValueError('Each skill score must be between 0 and 10000')
+        return v
+
+
+class UpdateReputationScoreRequest(BaseModel):
+    """Request model for reputation updates - matches ReputationOracle.sol updateReputationScore function exactly."""
+    user_address: str = Field(..., description="User address to update (address)")
+    category: str = Field(..., min_length=1, description="Skill category (string)")
+    new_score: int = Field(..., ge=0, le=10000, description="New reputation score 0-10000 (uint256)")
+    evidence: str = Field(..., min_length=1, description="Evidence supporting the update (string)")
+    oracle_address: str = Field(..., description="Oracle updating the reputation")
+    
+    @validator('user_address', 'oracle_address')
     def validate_addresses(cls, v):
         if not validate_hedera_address(v):
             raise ValueError('Invalid Hedera address format')
@@ -47,12 +127,11 @@ class WorkEvaluationRequest(BaseModel):
 
 
 class ChallengeEvaluationRequest(BaseModel):
-    """Request model for challenging an evaluation."""
+    """Request model for challenging evaluations - matches ReputationOracle.sol challengeEvaluation function exactly."""
+    evaluation_id: int = Field(..., ge=0, description="Evaluation ID to challenge (uint256)")
+    reason: str = Field(..., min_length=1, description="Challenge reason (string)")
+    stake_amount: int = Field(..., gt=0, description="Challenge stake in tinybar (for msg.value)")
     challenger_address: str = Field(..., description="Address challenging the evaluation")
-    evaluation_id: str = Field(..., description="ID of evaluation being challenged")
-    reason: str = Field(..., min_length=20, description="Reason for the challenge")
-    evidence: List[str] = Field(..., min_items=1, description="Supporting evidence")
-    stake_amount: float = Field(10.0, ge=1.0, description="Stake required for challenge")
     
     @validator('challenger_address')
     def validate_challenger_address(cls, v):
@@ -61,81 +140,84 @@ class ChallengeEvaluationRequest(BaseModel):
         return v
 
 
-class UpdateReputationRequest(BaseModel):
-    """Request model for reputation updates."""
-    user_address: str = Field(..., description="User's address")
-    event_type: str = Field(..., description="Type of reputation event")
-    impact_score: float = Field(..., ge=-100, le=100, description="Impact score")
-    context: Dict[str, Any] = Field(..., description="Event context")
-    validator_address: Optional[str] = Field(None, description="Validator address")
-    blockchain_evidence: Optional[str] = Field(None, description="Blockchain evidence")
+class ResolveChallengeRequest(BaseModel):
+    """Request model for resolving challenges - matches ReputationOracle.sol resolveChallenge function exactly."""
+    challenge_id: int = Field(..., ge=0, description="Challenge ID to resolve (uint256)")
+    uphold_original: bool = Field(..., description="Whether to uphold original evaluation (bool)")
+    resolution: str = Field(..., min_length=1, description="Resolution explanation (string)")
+    resolver_address: str = Field(..., description="Challenge resolver address")
     
-    @validator('user_address')
-    def validate_user_address(cls, v):
+    @validator('resolver_address')
+    def validate_resolver_address(cls, v):
         if not validate_hedera_address(v):
             raise ValueError('Invalid Hedera address format')
-        return v
-    
-    @validator('validator_address')
-    def validate_validator_address(cls, v):
-        if v and not validate_hedera_address(v):
-            raise ValueError('Invalid validator address format')
         return v
 
 
 # ============ RESPONSE MODELS ============
 
-class OracleResponse(BaseModel):
-    """Response model for oracle information."""
+class OracleInfoResponse(BaseModel):
+    """Response model for oracle information - matches ReputationOracle.sol OracleInfo struct."""
     oracle_address: str
     name: str
     specializations: List[str]
-    stake_amount: float
-    reputation_score: float
-    evaluations_count: int
-    accuracy_rate: float
+    evaluations_completed: int
+    average_score: int
+    registered_at: int  # uint64 timestamp
     is_active: bool
-    registered_at: datetime
+    stake: int  # stake amount in tinybar
 
 
-class EvaluationResponse(BaseModel):
-    """Response model for work evaluation."""
-    evaluation_id: str
-    oracle_address: str
+class WorkEvaluationResponse(BaseModel):
+    """Response model for work evaluations - matches ReputationOracle.sol WorkEvaluation data."""
+    evaluation_id: int
     user_address: str
-    skill_token_ids: List[str]
+    skill_token_ids: List[int]
     work_description: str
-    artifacts: List[str]
+    work_content: str
     overall_score: int
-    skill_scores: Dict[str, int]
     feedback: str
-    ipfs_hash: Optional[str]
-    status: str
-    submitted_at: datetime
-    consensus_reached: bool
+    evaluated_by: str  # oracle address
+    timestamp: int  # uint64 timestamp
+    ipfs_hash: str
+
+
+class ReputationScoreResponse(BaseModel):
+    """Response model for reputation scores - matches ReputationOracle.sol getReputationScore return values."""
+    user_address: str
+    overall_score: int  # 0-10000 scale
+    total_evaluations: int
+    last_updated: int  # uint64 timestamp
+    is_active: bool
+
+
+class CategoryScoreResponse(BaseModel):
+    """Response model for category-specific reputation scores."""
+    user_address: str
+    category: str
+    score: int  # 0-10000 scale
 
 
 class ChallengeResponse(BaseModel):
-    """Response model for evaluation challenges."""
-    challenge_id: str
+    """Response model for evaluation challenges - matches ReputationOracle.sol Challenge struct."""
+    challenge_id: int
+    evaluation_id: int
     challenger_address: str
-    evaluation_id: str
     reason: str
-    evidence: List[str]
-    stake_amount: float
-    status: str
-    submitted_at: datetime
-    resolved_at: Optional[datetime]
-    resolution: Optional[str]
+    stake: int  # stake amount in tinybar
+    created_at: int  # uint64 timestamp
+    resolution_deadline: int  # uint64 timestamp
+    is_resolved: bool
+    uphold_original: bool
+    resolution: str
+    resolver_address: str
 
 
-class ReputationResponse(BaseModel):
-    """Response model for user reputation."""
-    user_address: str
-    overall_score: float
-    category_scores: Dict[str, float]
-    skill_scores: Dict[str, float]
-    total_evaluations: int
-    successful_evaluations: int
-    last_evaluation_date: Optional[datetime]
-    reputation_history: List[Dict[str, Any]]
+class OraclePerformanceResponse(BaseModel):
+    """Response model for oracle performance metrics."""
+    oracle_address: str
+    evaluations_completed: int
+    successful_challenges: int
+    failed_challenges: int
+    last_activity: int  # timestamp
+    accuracy_rate: float  # calculated field

@@ -5,6 +5,7 @@ import { Award, Sparkles, User, Hash, Loader2, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Dialog,
@@ -25,10 +26,13 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 
 interface ContractSkillForm {
-    recipient_address: string;
-    category: string;
-    level: number;
-    uri: string;
+    recipient_address: string;  // address recipient
+    category: string;           // string category  
+    subcategory: string;        // string subcategory
+    level: number;              // uint8 level
+    expiry_date: number;        // uint64 expiryDate (0 for default)
+    metadata: string;           // string metadata
+    uri: string;                // string tokenURIData
 }
 
 interface ContractCreateSkillDialogProps {
@@ -74,7 +78,10 @@ export function ContractCreateSkillDialog({
     const [formData, setFormData] = useState<ContractSkillForm>({
         recipient_address: "",
         category: "",
+        subcategory: "",
         level: 1,
+        expiry_date: 0, // 0 means use default expiry date
+        metadata: "",
         uri: ""
     });
 
@@ -91,8 +98,8 @@ export function ContractCreateSkillDialog({
             return;
         }
 
-        if (!formData.category || formData.level < 1 || formData.level > 10) {
-            alert("Please fill in all required fields correctly");
+        if (!formData.category || !formData.subcategory || formData.level < 1 || formData.level > 10) {
+            alert("Please fill in all required fields correctly (category, subcategory, and valid level)");
             return;
         }
 
@@ -106,7 +113,10 @@ export function ContractCreateSkillDialog({
             const contractData: ContractSkillForm = {
                 recipient_address: user.accountId,
                 category: formData.category,
+                subcategory: formData.subcategory,
                 level: formData.level,
+                expiry_date: formData.expiry_date,
+                metadata: formData.metadata,
                 uri: uri
             };
 
@@ -131,7 +141,10 @@ export function ContractCreateSkillDialog({
             setFormData({
                 recipient_address: user.accountId,
                 category: "",
+                subcategory: "",
                 level: 1,
+                expiry_date: 0,
+                metadata: "",
                 uri: ""
             });
             setIsDialogOpen(false);
@@ -224,6 +237,41 @@ export function ContractCreateSkillDialog({
                                 ))}
                             </SelectContent>
                         </Select>
+                    </div>
+
+                    {/* Subcategory */}
+                    <div className="space-y-2">
+                        <Label htmlFor="subcategory" className="text-sm font-medium text-slate-900 dark:text-white">
+                            Specific Skill *
+                        </Label>
+                        <Input
+                            id="subcategory"
+                            placeholder="e.g., React.js, Solidity Smart Contracts, Figma Design"
+                            value={formData.subcategory}
+                            onChange={(e) => setFormData(prev => ({ ...prev, subcategory: e.target.value }))}
+                            className="h-11 border-slate-200 dark:border-slate-700 focus:border-hedera-500"
+                        />
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Be specific about your exact skill (e.g., "React.js" instead of just "Frontend")
+                        </p>
+                    </div>
+
+                    {/* Metadata */}
+                    <div className="space-y-2">
+                        <Label htmlFor="metadata" className="text-sm font-medium text-slate-900 dark:text-white">
+                            Additional Information
+                        </Label>
+                        <Textarea
+                            id="metadata"
+                            placeholder="Describe your experience, certifications, or any relevant details..."
+                            value={formData.metadata}
+                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, metadata: e.target.value }))}
+                            rows={3}
+                            className="border-slate-200 dark:border-slate-700 focus:border-hedera-500 resize-none"
+                        />
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Optional: Add context about your skill background
+                        </p>
                     </div>
 
                     {/* Skill Level */}

@@ -2,6 +2,7 @@
 Pools API Request/Response Models
 
 This module defines Pydantic models for pools-related API endpoints.
+Perfect 1:1 mapping with TalentPool.sol smart contract functions.
 """
 
 from typing import List, Dict, Any, Optional
@@ -11,10 +12,58 @@ from pydantic import BaseModel, Field, validator
 from app.utils.hedera import validate_hedera_address
 
 
-# ============ REQUEST MODELS ============
+# ============ CONTRACT-ALIGNED REQUEST MODELS ============
+
+class CreatePoolRequest(BaseModel):
+    """Request model for creating talent pool - matches TalentPool.createPool() exactly."""
+    title: str = Field(..., description="Pool title")
+    description: str = Field(..., description="Pool description") 
+    job_type: str = Field(..., description="Job type string")
+    required_skills: List[str] = Field(..., description="Required skills array")
+    minimum_levels: List[int] = Field(..., description="Minimum skill levels array")
+    salary_min: int = Field(..., description="Minimum salary")
+    salary_max: int = Field(..., description="Maximum salary")
+    deadline: int = Field(..., description="Application deadline timestamp")
+    location: str = Field(..., description="Job location")
+    is_remote: bool = Field(..., description="Remote work allowed")
+    stake_amount: int = Field(0, description="Stake amount")
+
+class SubmitApplicationRequest(BaseModel):
+    """Request model for submitting application - matches TalentPool.submitApplication() exactly."""
+    pool_id: int = Field(..., description="Pool ID")
+    applicant: str = Field(..., description="Applicant address")
+    expected_salary: int = Field(..., description="Expected salary")
+    availability_date: int = Field(..., description="Availability date timestamp")
+    cover_letter: str = Field(..., description="Cover letter")
+    stake_amount: int = Field(0, description="Stake amount")
+
+class SelectCandidateRequest(BaseModel):
+    """Request model for selecting candidate - matches TalentPool.selectCandidate() exactly."""
+    pool_id: int = Field(..., description="Pool ID")
+    selected_candidate: str = Field(..., description="Selected candidate address")
+    selection_reason: str = Field(..., description="Selection reason")
+
+class CompletePoolRequest(BaseModel):
+    """Request model for completing pool - matches TalentPool.completePool() exactly."""
+    pool_id: int = Field(..., description="Pool ID")
+    completion_notes: str = Field("", description="Completion notes")
+    final_rating: int = Field(0, description="Final rating")
+
+class ClosePoolRequest(BaseModel):
+    """Request model for closing pool - matches TalentPool.closePool() exactly."""
+    pool_id: int = Field(..., description="Pool ID")
+    closure_reason: str = Field(..., description="Closure reason")
+
+class WithdrawApplicationRequest(BaseModel):
+    """Request model for withdrawing application - matches TalentPool.withdrawApplication() exactly."""
+    pool_id: int = Field(..., description="Pool ID")
+    applicant: str = Field(..., description="Applicant address")
+    withdrawal_reason: str = Field("", description="Withdrawal reason")
+
+# ============ LEGACY REQUEST MODELS ============
 
 class JobPoolCreateRequest(BaseModel):
-    """Request model for job pool creation - matches TalentPool.sol createPool function."""
+    """Legacy request model for job pool creation."""
     title: str = Field(..., min_length=1, max_length=200, description="Job title")
     description: str = Field(..., min_length=1, max_length=2000, description="Job description")
     job_type: int = Field(..., ge=0, le=3, description="Job type enum: 0=FullTime, 1=PartTime, 2=Contract, 3=Freelance")
@@ -44,19 +93,43 @@ class JobPoolCreateRequest(BaseModel):
 
 
 class PoolApplicationRequest(BaseModel):
-    """Request model for pool applications - matches TalentPool.sol submitApplication function."""
-    pool_id: int = Field(..., ge=0, description="Pool ID to apply to")
-    skill_token_ids: List[int] = Field(..., min_items=1, description="Skill token IDs to submit (uint256 array)")
-    cover_letter: str = Field(..., min_length=1, max_length=1000, description="Cover letter")
-    portfolio: str = Field("", description="Portfolio URL or description")
+    """Legacy request model for pool applications."""
+    pool_id: int = Field(..., ge=0, description="Pool ID to apply to (uint256)")
+    skill_token_ids: List[int] = Field(..., min_items=1, description="Skill token IDs to submit (uint256[] array)")
+    cover_letter: str = Field(..., min_length=1, max_length=1000, description="Cover letter (string)")
+    portfolio: str = Field("", description="Portfolio URL or description (string)")
     stake_amount: int = Field(..., gt=0, description="Application stake amount in tinybar (for msg.value)")
-    applicant_address: str = Field(..., description="Applicant's Hedera address")
+    # Note: applicant address is derived from msg.sender in the contract, not a parameter
+
+
+class SelectCandidateRequest(BaseModel):
+    """Request model for selecting candidates - matches TalentPool.sol selectCandidate function exactly."""
+    pool_id: int = Field(..., ge=0, description="Pool ID to select candidate for (uint256)")
+    candidate_address: str = Field(..., description="Selected candidate address (address)")
     
-    @validator('applicant_address')
-    def validate_address(cls, v):
+    @validator('candidate_address')
+    def validate_candidate_address(cls, v):
         if not validate_hedera_address(v):
             raise ValueError('Invalid Hedera address format')
         return v
+
+
+class CompletePoolRequest(BaseModel):
+    """Request model for completing pools - matches TalentPool.sol completePool function exactly."""
+    pool_id: int = Field(..., ge=0, description="Pool ID to complete (uint256)")
+    # Note: company address is derived from msg.sender in the contract, not a parameter
+
+
+class ClosePoolRequest(BaseModel):
+    """Request model for closing pools - matches TalentPool.sol closePool function exactly."""
+    pool_id: int = Field(..., ge=0, description="Pool ID to close (uint256)")
+    # Note: company address is derived from msg.sender in the contract, not a parameter
+
+
+class WithdrawApplicationRequest(BaseModel):
+    """Request model for withdrawing applications - matches TalentPool.sol withdrawApplication function exactly."""
+    pool_id: int = Field(..., ge=0, description="Pool ID to withdraw from (uint256)")
+    # Note: applicant address is derived from msg.sender in the contract, not a parameter
 
 
 class PoolMatchRequest(BaseModel):

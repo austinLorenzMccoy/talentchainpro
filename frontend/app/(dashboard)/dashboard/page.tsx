@@ -8,6 +8,8 @@ import {
   ReputationWidget,
   TransactionHistoryWidget
 } from "@/components/dashboard";
+import { GovernanceWidget } from "@/components/dashboard/governance-widget-simple";
+import { OracleReputationWidget } from "@/components/dashboard/oracle-reputation-widget";
 import { useAuth } from "@/hooks/useAuth";
 import { WifiOff } from "lucide-react";
 
@@ -69,6 +71,26 @@ export default function DashboardPage({ }: DashboardPageProps) {
               {/* Blockchain Transaction History */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <TransactionHistoryWidget />
+              </div>
+
+            </motion.div>
+
+            {/* Tertiary Dashboard Grid - Governance and Oracle */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.6 }}
+              className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8"
+            >
+
+              {/* Governance Participation */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <GovernanceWidget walletAddress={isConnected ? "mock-address" : undefined} />
+              </div>
+
+              {/* Oracle and Advanced Reputation */}
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <OracleReputationWidget walletAddress={isConnected ? "mock-address" : undefined} />
               </div>
 
             </motion.div>
