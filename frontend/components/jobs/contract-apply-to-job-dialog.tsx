@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Send, FileText, Trophy, Clock, Loader2, CheckCircle, AlertTriangle, User, Briefcase, Star } from "lucide-react";
+import { Send, FileText, Trophy, Loader2, CheckCircle, AlertTriangle, User, Briefcase, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

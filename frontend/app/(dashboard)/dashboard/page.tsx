@@ -8,15 +8,13 @@ import {
   ReputationWidget,
   TransactionHistoryWidget
 } from "@/components/dashboard";
-import { GovernanceWidget } from "@/components/dashboard/governance-widget-simple";
-import { OracleReputationWidget } from "@/components/dashboard/oracle-reputation-widget";
+import { GovernanceWidget } from "@/components/dashboard/governance-widget";
+
 import { useAuth } from "@/hooks/useAuth";
 import { WifiOff } from "lucide-react";
 
-interface DashboardPageProps { }
-
 // Dashboard page component with proper sidebar layout
-export default function DashboardPage({ }: DashboardPageProps) {
+export default function DashboardPage() {
   const { isConnected } = useAuth();
 
   return (
@@ -75,25 +73,22 @@ export default function DashboardPage({ }: DashboardPageProps) {
 
             </motion.div>
 
-            {/* Tertiary Dashboard Grid - Governance and Oracle */}
+            {/* Tertiary Dashboard Grid - Governance */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.6 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8"
+              className="grid grid-cols-1 gap-6 lg:gap-8"
             >
 
-              {/* Governance Participation */}
+              {/* Governance Participation - Full Width */}
               <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <GovernanceWidget walletAddress={isConnected ? "mock-address" : undefined} />
               </div>
 
-              {/* Oracle and Advanced Reputation */}
-              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <OracleReputationWidget walletAddress={isConnected ? "mock-address" : undefined} />
-              </div>
-
             </motion.div>
+
+
 
           </div>
         ) : (

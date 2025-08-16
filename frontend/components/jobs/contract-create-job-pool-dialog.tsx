@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Briefcase, Plus, Minus, Calendar, DollarSign, MapPin, Users, Clock, Loader2, Target, CheckCircle, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { Briefcase, Plus, Minus, DollarSign, MapPin, Users, Clock, Loader2, Target, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -357,7 +357,7 @@ export function ContractCreateJobPoolDialog({
                                 <div className="text-center py-8 text-slate-500">
                                     <Users className="w-12 h-12 mx-auto mb-3 text-slate-300" />
                                     <p>No skill requirements added yet</p>
-                                    <p className="text-sm">Click "Add Skill" to define required expertise</p>
+                                    <p className="text-sm">Click &quot;Add Skill&quot; to define required expertise</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">

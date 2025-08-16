@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Trophy, Briefcase, Users, Settings, X, LogOut, User, ChevronLeft, ChevronRight, Bell } from "lucide-react";
+import { LayoutDashboard, Trophy, Briefcase, Users, Settings, X, LogOut, User, ChevronLeft, ChevronRight, Bell, Vote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/ui/logo";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,6 +42,12 @@ const navigation = [
         href: '/dashboard/companies',
         icon: Users,
         description: 'Company profiles'
+    },
+    {
+        name: 'Governance',
+        href: '/dashboard/governance',
+        icon: Vote,
+        description: 'Participate in decisions'
     },
     {
         name: 'Notifications',

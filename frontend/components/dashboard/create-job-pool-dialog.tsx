@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Building2, DollarSign, MapPin, Clock, Users, Star, Plus, X, Save, Briefcase, Target, Calendar, FileText, Globe, Loader2 } from "lucide-react";
+import { useState } from "react";
+import {  Plus, X, Save, Briefcase, Target, FileText, Globe, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +54,7 @@ interface CreateJobPoolForm {
 
 interface CreateJobPoolDialogProps {
     triggerButton?: React.ReactNode;
-    onPoolCreated?: (pool: any) => void;
+    onPoolCreated?: (pool: object) => void;
 }
 
 const salaryTypes = [
@@ -150,7 +150,7 @@ export function CreateJobPoolDialog({
 
     const totalSteps = 4;
 
-    const updateFormData = (field: keyof CreateJobPoolForm, value: any) => {
+    const updateFormData = (field: keyof CreateJobPoolForm, value: string | number | boolean | object) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 

@@ -143,8 +143,50 @@ class ReputationService:
     def _get_db_session(self):
         """Get database session if available."""
         if DATABASE_MODELS_AVAILABLE:
-            return get_db_session()
+            try:
+                return get_db_session()
+            except Exception as e:
+                logger.warning(f"Database session not available: {str(e)}")
+                DATABASE_MODELS_AVAILABLE = False
         return None
+    
+    async def _get_current_user_address(self) -> Optional[str]:
+        """
+        Get the current authenticated user's address.
+        This is the equivalent of msg.sender in smart contracts.
+        
+        Returns:
+            User's Hedera address or None if not authenticated
+        """
+        # TODO: Implement proper authentication context
+        # For now, return a mock address - this should be replaced with
+        # actual authentication logic from the request context
+        try:
+            # This should come from the authenticated request context
+            # For example: request.state.user.address
+            return "0.0.123456"  # Mock address for development
+        except Exception as e:
+            logger.warning(f"Could not get current user address: {str(e)}")
+            return None
+    
+    async def _get_transaction_value(self) -> float:
+        """
+        Get the transaction value (msg.value equivalent).
+        This should come from the transaction context.
+        
+        Returns:
+            Transaction value in HBAR
+        """
+        # TODO: Implement proper transaction value extraction
+        # For now, return a default value - this should be replaced with
+        # actual transaction value from the request context
+        try:
+            # This should come from the transaction context
+            # For example: request.state.transaction.value
+            return 100.0  # Default stake amount for development
+        except Exception as e:
+            logger.warning(f"Could not get transaction value: {str(e)}")
+            return 100.0  # Default fallback value
     
     def _invalidate_cache(self, patterns: List[str]):
         """Invalidate cache patterns if cache manager is available."""
@@ -306,27 +348,33 @@ class ReputationService:
     
     async def register_oracle(
         self,
-        oracle_address: str,
-        name: str,
-        specializations: List[str],
-        stake_amount: float = 100.0
+        name: str,                      # ✅ Keep only contract parameters
+        specializations: List[str]      # ✅ Keep only contract parameters
+        # ❌ Removed oracle_address (should be msg.sender in contract)
+        # ❌ Removed stake_amount (should be msg.value in contract)
     ) -> Dict[str, Any]:
         """
         Register a new reputation oracle.
         
         Args:
-            oracle_address: Oracle's Hedera account address
             name: Oracle display name
             specializations: List of skill categories the oracle specializes in
-            stake_amount: Stake amount required for oracle registration
             
         Returns:
             Dict containing oracle registration result
         """
         try:
+            # Get oracle address from current context (msg.sender equivalent)
+            oracle_address = await self._get_current_user_address()
+            if not oracle_address:
+                raise ValueError("No authenticated user found")
+            
             if not validate_hedera_address(oracle_address):
                 raise ValueError("Invalid oracle address format")
             
+            # Get stake amount from transaction context (msg.value equivalent)
+            # This should come from the transaction that calls this function
+            stake_amount = await self._get_transaction_value()
             if stake_amount < self.min_validation_stake:
                 raise ValueError(f"Minimum stake amount is {self.min_validation_stake} HBAR")
             

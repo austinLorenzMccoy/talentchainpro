@@ -6,6 +6,14 @@ import { EventEmitter } from 'events';
 import { MetaMaskInpageProvider } from '@metamask/providers';
 
 // Types
+interface WalletProvider {
+    connect?(): Promise<void>;
+    disconnect?(): Promise<void>;
+    request?(args: { method: string; params?: unknown[] }): Promise<unknown>;
+    on?(event: string, listener: (...args: unknown[]) => void): void;
+    removeListener?(event: string, listener: (...args: unknown[]) => void): void;
+}
+
 export enum WalletType {
     HASHPACK = 'hashpack',
     METAMASK = 'metamask',
@@ -63,9 +71,9 @@ export const HEDERA_NETWORKS: Record<string, NetworkConfig> = {
 
 export class WalletConnector {
     private connection: WalletConnection | null = null;
-    private listeners: { [event: string]: Function[] } = {};
+    private listeners: { [event: string]: Array<(data?: unknown) => void> } = {};
     private hederaClient: Client | null = null;
-    private walletConnectProvider: any = null;
+    private walletConnectProvider: WalletProvider | null = null;
     private hashPackConnector: DAppConnector | null = null;
     private hederaWalletConnectProvider: DAppConnector | null = null;
 
@@ -77,20 +85,20 @@ export class WalletConnector {
     }
 
     // Event handling
-    on(event: string, callback: Function) {
+    on(event: string, callback: (data?: unknown) => void) {
         if (!this.listeners[event]) {
             this.listeners[event] = [];
         }
         this.listeners[event].push(callback);
     }
 
-    off(event: string, callback: Function) {
+    off(event: string, callback: (data?: unknown) => void) {
         if (this.listeners[event]) {
             this.listeners[event] = this.listeners[event].filter(cb => cb !== callback);
         }
     }
 
-    private emit(event: string, data?: any) {
+    private emit(event: string, data?: unknown) {
         if (this.listeners[event]) {
             this.listeners[event].forEach(callback => callback(data));
         }
@@ -99,6 +107,7 @@ export class WalletConnector {
     private initializeHederaClient() {
         const network = process.env.NEXT_PUBLIC_HEDERA_NETWORK || 'testnet';
         this.hederaClient = new Client({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             network: network as any
         });
     }
@@ -109,6 +118,22 @@ export class WalletConnector {
             return window.ethereum as unknown as MetaMaskInpageProvider;
         }
         return undefined;
+    }
+
+    // Debug method to check environment variables
+    private debugEnvironmentVariables(): void {
+        console.log('🔍 Environment Variables Debug:');
+        console.log('NEXT_PUBLIC_HEDERA_NETWORK:', process.env.NEXT_PUBLIC_HEDERA_NETWORK);
+        console.log('NEXT_PUBLIC_METAMASK_CHAIN_ID:', process.env.NEXT_PUBLIC_METAMASK_CHAIN_ID);
+        console.log('NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:', process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID);
+        console.log('NEXT_PUBLIC_APP_URL:', process.env.NEXT_PUBLIC_APP_URL);
+        console.log('NODE_ENV:', process.env.NODE_ENV);
+
+        // Check if we're in browser
+        if (typeof window !== 'undefined') {
+            console.log('Window location:', window.location.href);
+            console.log('MetaMask available:', !!window.ethereum?.isMetaMask);
+        }
     }
 
     // HashPack Integration
@@ -201,23 +226,37 @@ export class WalletConnector {
             }
 
             console.log('🔗 Connecting to MetaMask...');
+            this.debugEnvironmentVariables();
 
-            // Check if MetaMask is unlocked first
+            // Check if MetaMask is responsive and available
             try {
-                const accounts = await ethereum.request({ method: 'eth_accounts' }) as string[] | null | undefined;
-                if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
-                    throw new Error('MetaMask is locked. Please unlock MetaMask and try again.');
+                // Test if MetaMask is responsive by checking if it's available
+                // This doesn't require user permission and won't throw if locked
+                if (!ethereum.isMetaMask || typeof ethereum.request !== 'function') {
+                    throw new Error('MetaMask is not responsive. Please check if MetaMask is unlocked.');
                 }
-            } catch (unlockError: any) {
-                if (unlockError.code === 4001) {
+
+                // Additional check: try to get chainId without requesting accounts
+                // This helps verify MetaMask is truly responsive
+                try {
+                    const currentChainId = await ethereum.request({ method: 'eth_chainId' });
+                    console.log('Current MetaMask chainId:', currentChainId);
+                } catch (chainError) {
+                    console.warn('Could not get current chainId (MetaMask might be locked):', chainError);
+                    // Don't throw here, continue with connection attempt
+                }
+            } catch (unlockError: unknown) {
+                const error = unlockError as { code?: number; message?: string };
+                if (error.code === 4001) {
                     throw new Error('MetaMask connection was rejected. Please approve the connection request.');
-                } else if (unlockError.message?.includes('locked')) {
+                } else if (error.message?.includes('locked')) {
                     throw new Error('MetaMask is locked. Please unlock MetaMask and try again.');
                 }
                 // Continue with the connection process
             }
 
             // Request account access with timeout
+            console.log('Requesting account access...');
             const connectionPromise = ethereum.request({ method: 'eth_requestAccounts' });
             const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('MetaMask connection timeout. Please try again.')), 30000)
@@ -230,45 +269,67 @@ export class WalletConnector {
             }
 
             const account = accounts[0];
+            console.log('Connected account:', account);
 
             // Check if we're on the correct network
             const chainId = await ethereum.request({ method: 'eth_chainId' }) as string | null | undefined;
             const expectedChainId = process.env.NEXT_PUBLIC_METAMASK_CHAIN_ID || '296';
+            const expectedChainIdHex = `0x${parseInt(expectedChainId).toString(16)}`;
 
-            if (!chainId || chainId !== `0x${parseInt(expectedChainId).toString(16)}`) {
+            // Fallback chain ID if environment variable is not set
+            if (!process.env.NEXT_PUBLIC_METAMASK_CHAIN_ID) {
+                console.warn('⚠️ NEXT_PUBLIC_METAMASK_CHAIN_ID not set, using default: 296 (Hedera Testnet)');
+            }
+
+            console.log('Network check:', {
+                current: chainId,
+                expected: expectedChainIdHex,
+                expectedDecimal: expectedChainId
+            });
+
+            if (!chainId || chainId !== expectedChainIdHex) {
+                console.log('Switching to correct network...');
                 // Request network switch
                 try {
                     await ethereum.request({
                         method: 'wallet_switchEthereumChain',
-                        params: [{ chainId: `0x${parseInt(expectedChainId).toString(16)}` }]
+                        params: [{ chainId: expectedChainIdHex }]
                     });
-                } catch (switchError: any) {
+                    console.log('Successfully switched to correct network');
+                } catch (switchError: unknown) {
+                    const error = switchError as { code?: number };
                     // If the network doesn't exist, add it
-                    if (switchError.code === 4902) {
+                    if (error.code === 4902) {
+                        console.log('Adding new network...');
                         const networkConfig = HEDERA_NETWORKS[process.env.NEXT_PUBLIC_HEDERA_NETWORK || 'testnet'];
                         await ethereum.request({
                             method: 'wallet_addEthereumChain',
                             params: [{
-                                chainId: `0x${networkConfig.chainId.toString(16)}`,
+                                chainId: expectedChainIdHex,
                                 chainName: networkConfig.name,
                                 nativeCurrency: networkConfig.currency,
                                 rpcUrls: [networkConfig.rpcUrl],
                                 blockExplorerUrls: [networkConfig.blockExplorerUrl]
                             }]
                         });
+                        console.log('Successfully added new network');
                     } else {
+                        console.error('Network switch error:', switchError);
                         throw switchError;
                     }
                 }
             }
 
             // Create provider and signer
+            console.log('Creating provider and signer...');
             const provider = new ethers.BrowserProvider(ethereum);
             const signer = await provider.getSigner();
 
             // Get balance
+            console.log('Fetching balance...');
             const balance = await provider.getBalance(account);
             const balanceInEther = ethers.formatEther(balance);
+            console.log('Balance:', balanceInEther);
 
             const connection: WalletConnection = {
                 type: WalletType.METAMASK,
@@ -288,20 +349,23 @@ export class WalletConnector {
             // Set up event listeners
             this.setupMetaMaskListeners();
 
+            console.log('MetaMask connection successful!');
             return connection;
         } catch (error) {
             console.error('MetaMask connection error:', error);
 
             // Provide better error messages for common issues
             if (error instanceof Error) {
-                if (error.message.includes('locked')) {
-                    throw new Error('MetaMask is locked. Please unlock MetaMask and try again.');
-                } else if (error.message.includes('rejected')) {
+                if (error.message.includes('rejected')) {
                     throw new Error('MetaMask connection was rejected. Please approve the connection request.');
                 } else if (error.message.includes('timeout')) {
                     throw new Error('MetaMask connection timeout. Please try again.');
                 } else if (error.message.includes('No accounts found')) {
                     throw new Error('No accounts found in MetaMask. Please add an account and try again.');
+                } else if (error.message.includes('not responsive')) {
+                    throw new Error('MetaMask is not responding. Please check if MetaMask is unlocked and try again.');
+                } else if (error.message.includes('environment')) {
+                    throw new Error('Configuration issue detected. Please check your environment variables.');
                 }
             }
 
@@ -309,6 +373,12 @@ export class WalletConnector {
             if (error instanceof Error && error.message.includes('timeout')) {
                 console.log('Connection timeout detected, resetting state...');
                 this.resetConnectionState();
+            }
+
+            // Check if environment variables are missing
+            if (!process.env.NEXT_PUBLIC_METAMASK_CHAIN_ID || !process.env.NEXT_PUBLIC_HEDERA_NETWORK) {
+                console.error('❌ Missing required environment variables for MetaMask connection');
+                throw new Error('Configuration error: Missing required environment variables. Please check your .env.local file.');
             }
 
             throw error;
@@ -349,10 +419,16 @@ export class WalletConnector {
 
             console.log('Attempting to connect...');
             // Connect
+            if (!this.walletConnectProvider?.connect) {
+                throw new Error('WalletConnect provider not properly initialized');
+            }
             await this.walletConnectProvider.connect();
             console.log('WalletConnect connection successful');
 
             // Get accounts
+            if (!this.walletConnectProvider?.request) {
+                throw new Error('WalletConnect provider request method not available');
+            }
             const accounts = await this.walletConnectProvider.request({ method: 'eth_accounts' }) as string[];
             const account = accounts[0];
 
@@ -361,7 +437,8 @@ export class WalletConnector {
             }
 
             // Create provider and signer
-            const provider = new ethers.BrowserProvider(this.walletConnectProvider);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const provider = new ethers.BrowserProvider(this.walletConnectProvider as any);
             const signer = await provider.getSigner();
 
             // Get balance
@@ -420,8 +497,9 @@ export class WalletConnector {
     }
 
     private setupWalletConnectListeners() {
-        if (this.walletConnectProvider) {
-            this.walletConnectProvider.on('accountsChanged', (accounts: string[]) => {
+        if (this.walletConnectProvider?.on) {
+            this.walletConnectProvider.on('accountsChanged', (...args: unknown[]) => {
+                const accounts = args[0] as string[];
                 this.emit('accountsChanged', accounts);
                 if (accounts.length === 0) {
                     this.disconnect();
@@ -430,7 +508,8 @@ export class WalletConnector {
                 }
             });
 
-            this.walletConnectProvider.on('chainChanged', (chainId: string) => {
+            this.walletConnectProvider.on('chainChanged', (...args: unknown[]) => {
+                const chainId = args[0] as string;
                 this.emit('chainChanged', chainId);
             });
 
@@ -445,6 +524,7 @@ export class WalletConnector {
 
         try {
             if (this.connection.type === WalletType.METAMASK && this.connection.provider) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const signer = await (this.connection.provider as any).getSigner();
                 const balance = await this.connection.provider.getBalance(newAccount);
                 const balanceInEther = ethers.formatEther(balance);
@@ -500,7 +580,7 @@ export class WalletConnector {
             if (this.connection.type === WalletType.HASHPACK) {
                 // HashPack disconnection is handled by WalletConnect
                 console.log('Disconnecting HashPack via WalletConnect...');
-            } else if (this.connection.type === WalletType.WALLETCONNECT && this.walletConnectProvider) {
+            } else if (this.connection.type === WalletType.WALLETCONNECT && this.walletConnectProvider?.disconnect) {
                 await this.walletConnectProvider.disconnect();
             } else if (this.connection.type === WalletType.METAMASK) {
                 // MetaMask doesn't have a disconnect method, but we can clean up our state
@@ -553,14 +633,43 @@ export class WalletConnector {
                 // Test if MetaMask is still responsive
                 const balance = await this.connection.provider.getBalance(this.connection.address);
                 return true;
-            } else if (this.connection.type === WalletType.WALLETCONNECT && this.walletConnectProvider) {
+            } else if (this.connection.type === WalletType.WALLETCONNECT && this.walletConnectProvider?.request) {
                 // Test WalletConnect connection
                 const accounts = await this.walletConnectProvider.request({ method: 'eth_accounts' });
-                return accounts && accounts.length > 0;
+                return Array.isArray(accounts) && accounts.length > 0;
             }
             return true;
         } catch (error) {
             console.warn('Connection health check failed:', error);
+            return false;
+        }
+    }
+
+    // Check if connection can be restored without user interaction
+    async canRestoreConnection(): Promise<boolean> {
+        if (!this.connection) {
+            return false;
+        }
+
+        try {
+            if (this.connection.type === WalletType.METAMASK) {
+                const ethereum = this.ethereum;
+                if (!ethereum?.isMetaMask) {
+                    return false;
+                }
+
+                // Check if we can get accounts without requesting permission
+                const accounts = await ethereum.request({ method: 'eth_accounts' }) as string[] | null | undefined;
+                if (accounts && Array.isArray(accounts) && accounts.length > 0) {
+                    const currentAccount = accounts[0].toLowerCase();
+                    const savedAccount = this.connection.address.toLowerCase();
+                    return currentAccount === savedAccount;
+                }
+                return false;
+            }
+            return false;
+        } catch (error) {
+            console.warn('Connection restoration check failed:', error);
             return false;
         }
     }
@@ -624,6 +733,7 @@ export class WalletConnector {
         }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async sendTransaction(transaction: any): Promise<string> {
         if (!this.connection) {
             throw new Error('No wallet connected');
@@ -704,6 +814,7 @@ export class WalletConnector {
                 return false;
             }
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ethereum = window.ethereum as any;
 
             // Check if MetaMask is unlocked and responsive
@@ -775,13 +886,18 @@ export class WalletConnector {
             const saved = localStorage.getItem('talentchain_wallet_connection');
             if (saved) {
                 try {
+                    console.log('📥 Loading saved connection from localStorage...');
                     this.connection = JSON.parse(saved);
-                    
+                    console.log('Saved connection found:', this.connection);
+
                     // If we have a saved connection, try to restore it
                     if (this.connection) {
                         // For MetaMask, check if the account is still accessible
                         if (this.connection.type === WalletType.METAMASK) {
-                            this.restoreMetaMaskConnection();
+                            // Use setTimeout to ensure MetaMask is fully loaded
+                            setTimeout(() => {
+                                this.restoreMetaMaskConnection();
+                            }, 1000);
                         } else if (this.connection.type === WalletType.HASHPACK) {
                             this.restoreHashPackConnection();
                         }
@@ -791,28 +907,82 @@ export class WalletConnector {
                     console.error('Error loading saved connection:', error);
                     this.clearSavedConnection();
                 }
+            } else {
+                console.log('📭 No saved connection found in localStorage');
             }
         }
     }
 
     private async restoreMetaMaskConnection() {
         try {
+            console.log('🔄 Attempting to restore MetaMask connection...');
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ethereum = window.ethereum as any;
-            if (ethereum && ethereum.isMetaMask) {
-                // Check if the saved account is still accessible
-                const accounts = await ethereum.request({ method: 'eth_accounts' });
-                if (accounts && accounts.length > 0 && accounts[0].toLowerCase() === this.connection?.address.toLowerCase()) {
-                    // Account is still accessible, restore the connection
-                    console.log('Restoring MetaMask connection...');
-                    this.emit('connected', this.connection);
+            if (!ethereum || !ethereum.isMetaMask) {
+                console.log('MetaMask not available during restoration');
+                this.clearSavedConnection();
+                return;
+            }
+
+            // Check if the saved account is still accessible using eth_accounts
+            // This method returns the currently connected accounts without requesting permission
+            const accounts = await ethereum.request({ method: 'eth_accounts' });
+
+            if (accounts && accounts.length > 0) {
+                const currentAccount = accounts[0].toLowerCase();
+                const savedAccount = this.connection?.address.toLowerCase();
+
+                console.log('Account check:', { current: currentAccount, saved: savedAccount });
+
+                if (currentAccount === savedAccount) {
+                    // Account is still accessible, restore the connection with full provider/signer
+                    console.log('✅ Restoring MetaMask connection...');
+
+                    try {
+                        // Recreate provider and signer
+                        const provider = new ethers.BrowserProvider(ethereum);
+                        const signer = await provider.getSigner();
+
+                        // Get current balance
+                        const balance = await provider.getBalance(currentAccount);
+                        const balanceInEther = ethers.formatEther(balance);
+
+                        // Update connection with fresh provider/signer
+                        const restoredConnection: WalletConnection = {
+                            ...this.connection!,
+                            signer,
+                            provider,
+                            balance: balanceInEther
+                        };
+
+                        this.connection = restoredConnection;
+                        this.saveConnection();
+
+                        // Emit connected event
+                        this.emit('connected', restoredConnection);
+                        console.log('✅ MetaMask connection restored successfully');
+
+                        // Set up event listeners
+                        this.setupMetaMaskListeners();
+
+                    } catch (restoreError) {
+                        console.error('Error recreating provider/signer:', restoreError);
+                        this.clearSavedConnection();
+                    }
                 } else {
-                    console.log('Saved MetaMask account no longer accessible, clearing connection');
+                    console.log('Saved account no longer matches current account, clearing connection');
                     this.clearSavedConnection();
                 }
+            } else {
+                console.log('No accounts currently connected, clearing saved connection');
+                this.clearSavedConnection();
             }
         } catch (error) {
             console.error('Error restoring MetaMask connection:', error);
-            this.clearSavedConnection();
+            // Don't clear connection on error during restoration, just log it
+            // The user might need to unlock MetaMask
+            console.log('MetaMask restoration failed, but connection data preserved');
         }
     }
 

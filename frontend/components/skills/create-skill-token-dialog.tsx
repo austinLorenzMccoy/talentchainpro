@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 
 interface CreateSkillTokenDialogProps {
-    onSkillCreated?: (skillData: any) => void;
+    onSkillCreated?: (skillData: object) => void;
     isLoading?: boolean;
     setIsLoading?: (loading: boolean) => void;
     triggerButton?: React.ReactNode;

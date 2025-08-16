@@ -21,7 +21,10 @@ from app.models.governance_schemas import (
     ProposalResponse,
     VoteResponse,
     VotingPowerResponse,
-    GovernanceStatsResponse
+    GovernanceStatsResponse,
+    ContractCreateProposalRequest,
+    ContractCastVoteRequest,
+    ContractDelegateVotesRequest
 )
 from app.models.common_schemas import ErrorResponse, PaginatedResponse
 from app.services.governance import get_governance_service, GovernanceService, ProposalType, VoteType
@@ -46,30 +49,25 @@ router = APIRouter(tags=["governance"])
     }
 )
 async def create_proposal(
-    proposer: str,
-    description: str,
-    targets: List[str],
-    values: List[int],
-    calldatas: List[str],
-    proposal_type: int = 0
+    request: ContractCreateProposalRequest
 ) -> Dict[str, Any]:
     """
     Create a new governance proposal - matches Governance.createProposal() exactly.
     
-    Contract function: createProposal(address proposer, string description, 
+    Contract function: createProposal(string title, string description, 
                                     address[] targets, uint256[] values, 
-                                    bytes[] calldatas, uint8 proposalType)
+                                    bytes[] calldatas, string ipfsHash)
     """
     try:
         governance_service = get_governance_service()
         
         result = await governance_service.create_proposal(
-            proposer=proposer,
-            description=description,
-            targets=targets,
-            values=values,
-            calldatas=calldatas,
-            proposal_type=proposal_type
+            title=request.title,
+            description=request.description,
+            targets=request.targets,
+            values=request.values,
+            calldatas=request.calldatas,
+            ipfs_hash=request.ipfs_hash
         )
         
         if not result["success"]:
@@ -78,7 +76,7 @@ async def create_proposal(
                 detail=result.get("error", "Failed to create proposal")
             )
         
-        logger.info(f"Created proposal by {proposer}")
+        logger.info(f"Created proposal: {request.title}")
         return result
         
     except Exception as e:
@@ -99,25 +97,28 @@ async def create_proposal(
     }
 )
 async def cast_vote(
-    proposal_id: int,
-    voter: str,
-    support: int,
-    reason: str = ""
+    request: ContractCastVoteRequest
 ) -> Dict[str, Any]:
     """
     Cast a vote on a proposal - matches Governance.castVote() exactly.
     
-    Contract function: castVote(uint256 proposalId, address voter, 
-                              uint8 support, string reason)
+    Contract function: castVote(uint256 proposalId, uint8 vote, string reason)
     """
     try:
         governance_service = get_governance_service()
         
+        # Convert vote integer to VoteType enum
+        vote_type_map = {
+            0: VoteType.AGAINST,
+            1: VoteType.FOR,
+            2: VoteType.ABSTAIN
+        }
+        vote_type = vote_type_map.get(request.vote, VoteType.AGAINST)
+        
         result = await governance_service.cast_vote(
-            proposal_id=proposal_id,
-            voter=voter,
-            support=support,
-            reason=reason
+            proposal_id=str(request.proposal_id),
+            vote_type=vote_type,
+            reason=request.reason
         )
         
         if not result["success"]:
@@ -126,7 +127,7 @@ async def cast_vote(
                 detail=result.get("error", "Failed to cast vote")
             )
         
-        logger.info(f"Vote cast by {voter} on proposal {proposal_id}")
+        logger.info(f"Vote cast on proposal {request.proposal_id}")
         return result
         
     except Exception as e:
@@ -323,7 +324,7 @@ async def cancel_proposal(
 @router.post(
     "/delegate",
     response_model=Dict[str, Any],
-    status_code=status.HTTP_200_OK,
+    status_code=status.HTTP_201_CREATED,
     responses={
         400: {"model": ErrorResponse, "description": "Bad request"},
         422: {"model": ErrorResponse, "description": "Validation error"},
@@ -331,20 +332,18 @@ async def cancel_proposal(
     }
 )
 async def delegate_votes(
-    delegator: str,
-    delegatee: str
+    request: ContractDelegateVotesRequest
 ) -> Dict[str, Any]:
     """
     Delegate voting power - matches Governance.delegate() exactly.
     
-    Contract function: delegate(address delegator, address delegatee)
+    Contract function: delegate(address delegatee)
     """
     try:
         governance_service = get_governance_service()
         
-        result = await governance_service.delegate_votes(
-            delegator=delegator,
-            delegatee=delegatee
+        result = await governance_service.delegate_voting_power(
+            delegatee_address=request.delegatee
         )
         
         if not result["success"]:
@@ -353,7 +352,7 @@ async def delegate_votes(
                 detail=result.get("error", "Failed to delegate votes")
             )
         
-        logger.info(f"Delegated votes from {delegator} to {delegatee}")
+        logger.info(f"Delegated votes to {request.delegatee}")
         return result
         
     except Exception as e:
@@ -373,20 +372,16 @@ async def delegate_votes(
         500: {"model": ErrorResponse, "description": "Internal server error"}
     }
 )
-async def undelegate_votes(
-    delegator: str
-) -> Dict[str, Any]:
+async def undelegate_votes() -> Dict[str, Any]:
     """
     Undelegate voting power - matches Governance.undelegate() exactly.
     
-    Contract function: undelegate(address delegator)
+    Contract function: undelegate() - no parameters needed
     """
     try:
         governance_service = get_governance_service()
         
-        result = await governance_service.undelegate_votes(
-            delegator=delegator
-        )
+        result = await governance_service.undelegate_voting_power()
         
         if not result["success"]:
             raise HTTPException(
@@ -394,7 +389,7 @@ async def undelegate_votes(
                 detail=result.get("error", "Failed to undelegate votes")
             )
         
-        logger.info(f"Undelegated votes for {delegator}")
+        logger.info("Undelegated votes")
         return result
         
     except Exception as e:

@@ -14,8 +14,8 @@ export interface WalletConnection {
   type: WalletType;
   accountId: string;
   address: string;
-  signer?: any;
-  provider?: any;
+  signer?: object;
+  provider?: object;
   balance?: string;
   network?: string;
   chainId?: number;
@@ -82,12 +82,12 @@ export const HEDERA_NETWORKS: Record<string, HederaNetwork> = {
 export interface TransactionResult {
   success: boolean;
   transactionId?: string;
-  receipt?: any;
+  receipt?: unknown;
   error?: string;
 }
 
 // API Response Types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -104,7 +104,7 @@ export interface SkillToken {
     name: string;
     description: string;
     image?: string;
-    attributes?: Record<string, any>;
+    attributes?: Record<string, unknown>;
   };
   createdAt: string;
   updatedAt: string;
@@ -186,8 +186,8 @@ export interface UserProfile {
 export interface DashboardData {
   user: UserProfile;
   skillTokens: SkillToken[];
-  activeApplications: any[];
-  completedMatches: any[];
+  activeApplications: unknown[];
+  completedMatches: unknown[];
   reputationScore: number;
   totalEarnings: number;
 }
@@ -195,7 +195,7 @@ export interface DashboardData {
 // Contract Interaction Types
 export interface ContractCall {
   functionName: string;
-  parameters: any[];
+  parameters: unknown[];
   value?: string;
   gasLimit?: number;
 }
@@ -205,12 +205,12 @@ export interface ContractCallResult {
   transactionId?: string;
   gasUsed?: number;
   error?: string;
-  data?: any;
+  data?: unknown;
 }
 
 // Wallet Event Types
 export interface WalletEvent {
   type: 'connected' | 'disconnected' | 'accountChanged' | 'networkChanged';
-  data?: any;
+  data?: unknown;
   timestamp: number;
 }

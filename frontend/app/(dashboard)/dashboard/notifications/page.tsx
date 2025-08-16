@@ -1,11 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Bell, CheckCircle, AlertCircle, Info, Clock, Filter, Search, Check, Trash2, Archive } from "lucide-react";
+import { Bell, CheckCircle, AlertCircle, Info, Clock, Search, Check, Trash2, Archive } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -176,7 +176,7 @@ export default function NotificationsPage() {
 
                     {/* Stats */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 rounded-lg p-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 bg-hedera-100 dark:bg-hedera-900/30 rounded-lg flex items-center justify-center">
                                     <Bell className="w-4 h-4 text-hedera-600 dark:text-hedera-400" />
@@ -189,7 +189,7 @@ export default function NotificationsPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 rounded-lg p-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
                                     <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
@@ -202,7 +202,7 @@ export default function NotificationsPage() {
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-white dark:bg-slate-800 rounded-lg p-4 border border-slate-200 dark:border-slate-700">
+                        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 rounded-lg p-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
                                     <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -225,7 +225,7 @@ export default function NotificationsPage() {
                     transition={{ duration: 0.5, delay: 0.1 }}
                     className="mb-6"
                 >
-                    <Card className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                    <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                         <CardContent className="p-6">
                             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
                                 {/* Search and Filters */}
@@ -300,7 +300,7 @@ export default function NotificationsPage() {
                     className="space-y-4"
                 >
                     {filteredNotifications.length === 0 ? (
-                        <Card className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                        <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                             <CardContent className="p-12 text-center">
                                 <Bell className="w-16 h-16 mx-auto text-slate-400 mb-4" />
                                 <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
@@ -323,7 +323,7 @@ export default function NotificationsPage() {
                                 transition={{ duration: 0.5, delay: 0.1 * index }}
                             >
                                 <Card className={cn(
-                                    "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 transition-all duration-200 hover:shadow-md",
+                                    "bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 transition-all duration-200 hover:shadow-md hover:border-hedera-300/50 dark:hover:border-hedera-700/50",
                                     !notification.read && "ring-2 ring-hedera-200 dark:ring-hedera-800 bg-hedera-50/30 dark:bg-hedera-950/20"
                                 )}>
                                     <CardContent className="p-6">

@@ -4,7 +4,7 @@
  */
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,14 +15,10 @@ import {
   Shield, 
   Star, 
   AlertTriangle, 
-  CheckCircle, 
-  XCircle, 
   Plus,
   Users,
-  TrendingUp,
   Award,
   Eye,
-  Target
 } from 'lucide-react';
 import { contractService } from '@/lib/api/contract-service';
 import { 
@@ -30,8 +26,6 @@ import {
   OracleInfo, 
   Challenge,
   ReputationScore,
-  ApiResponse,
-  PaginatedApiResponse
 } from '@/lib/types/contracts';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -77,7 +71,7 @@ export function OracleReputationWidget({ walletAddress }: OracleReputationWidget
     loadOracleData();
   }, [walletAddress]);
 
-  const loadOracleData = async () => {
+  const loadOracleData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -96,19 +90,19 @@ export function OracleReputationWidget({ walletAddress }: OracleReputationWidget
       ]);
 
       if (evaluationsRes?.success && evaluationsRes.data) {
-        setWorkEvaluations(evaluationsRes.data.items || []);
+        setWorkEvaluations((evaluationsRes.data.items || []) as WorkEvaluation[]);
       }
 
       if (oraclesRes.success && oraclesRes.data) {
-        setActiveOracles(oraclesRes.data || []);
+        setActiveOracles((oraclesRes.data || []) as OracleInfo[]);
       }
 
       if (challengesRes.success && challengesRes.data) {
-        setChallenges(challengesRes.data.items || []);
+        setChallenges((challengesRes.data.items || []) as Challenge[]);
       }
 
       if (oracleInfoRes?.success && oracleInfoRes.data) {
-        setOracleInfo(oracleInfoRes.data);
+        setOracleInfo(oracleInfoRes.data as OracleInfo);
       }
 
       // Mock user reputation for now
@@ -126,7 +120,11 @@ export function OracleReputationWidget({ walletAddress }: OracleReputationWidget
     } finally {
       setLoading(false);
     }
-  };
+  }, [walletAddress]);
+
+  useEffect(() => {
+    loadOracleData();
+  }, [loadOracleData]);
 
   const handleSubmitWorkEvaluation = async () => {
     if (!walletAddress) return;
@@ -138,14 +136,12 @@ export function OracleReputationWidget({ walletAddress }: OracleReputationWidget
         .filter(id => !isNaN(id));
 
       const response = await contractService.submitWorkEvaluation({
-        userAddress: walletAddress,
-        skillTokenIds,
-        workDescription: workSubmission.workDescription,
-        workContent: workSubmission.workContent,
-        overallScore: 0, // Will be set by oracle
-        skillScores: [8, 7, 8, 7], // Convert to array format
-        feedback: '',
-        ipfsHash: '' // Would be generated from work content
+        oracleAddress: walletAddress, // Assuming wallet user is the oracle
+        userAddress: walletAddress, // User submitting work
+        workId: Date.now(), // Generate a work ID (in real app, this would come from the system)
+        score: 0, // Will be set by oracle
+        ipfsHash: '', // Would be generated from work content
+        evaluationType: 1 // Default evaluation type
       });
 
       if (response.success) {
@@ -182,6 +178,7 @@ export function OracleReputationWidget({ walletAddress }: OracleReputationWidget
         .filter(s => s.length > 0);
 
       const response = await contractService.registerOracle({
+        oracleAddress: walletAddress, // The wallet address becomes the oracle address
         name: oracleRegistration.name,
         specializations,
         stakeAmount: parseFloat(oracleRegistration.stakeAmount)

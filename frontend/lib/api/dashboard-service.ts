@@ -277,7 +277,7 @@ class DashboardApiService {
 
   async queryMCP(request: {
     query: string;
-    context?: Record<string, any>;
+    context?: Record<string, unknown>;
   }): Promise<ApiResponse<{
     response: string;
     confidence: number;

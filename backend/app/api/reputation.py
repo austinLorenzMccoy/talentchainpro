@@ -22,7 +22,9 @@ from app.models.reputation_schemas import (
     OracleResponse,
     EvaluationResponse,
     ChallengeResponse,
-    ReputationResponse
+    ReputationResponse,
+    ContractRegisterOracleRequest,
+    ContractSubmitEvaluationRequest
 )
 from app.models.common_schemas import ErrorResponse, BatchResponse
 from app.services.reputation import get_reputation_service, ReputationService, ReputationEventType, ReputationCategory
@@ -47,25 +49,19 @@ router = APIRouter(tags=["reputation"])
     }
 )
 async def register_oracle(
-    oracle_address: str,
-    name: str,
-    specializations: List[str],
-    stake_amount: int
+    request: ContractRegisterOracleRequest
 ) -> Dict[str, Any]:
     """
     Register a new reputation oracle - matches ReputationOracle.registerOracle() exactly.
     
-    Contract function: registerOracle(address oracleAddress, string name, 
-                                    string[] specializations, uint256 stakeAmount)
+    Contract function: registerOracle(string name, string[] specializations)
     """
     try:
         reputation_service = get_reputation_service()
         
         result = await reputation_service.register_oracle(
-            oracle_address=oracle_address,
-            name=name,
-            specializations=specializations,
-            stake_amount=stake_amount
+            name=request.name,
+            specializations=request.specializations
         )
         
         if not result["success"]:
@@ -74,7 +70,7 @@ async def register_oracle(
                 detail=result.get("error", "Failed to register oracle")
             )
         
-        logger.info(f"Registered oracle {oracle_address}")
+        logger.info(f"Registered oracle: {request.name}")
         return result
         
     except Exception as e:
@@ -95,30 +91,28 @@ async def register_oracle(
     }
 )
 async def submit_evaluation(
-    oracle_address: str,
-    user_address: str,
-    work_id: int,
-    score: int,
-    ipfs_hash: str,
-    evaluation_type: int = 0
+    request: ContractSubmitEvaluationRequest
 ) -> Dict[str, Any]:
     """
-    Submit work evaluation - matches ReputationOracle.submitEvaluation() exactly.
+    Submit work evaluation - matches ReputationOracle.submitWorkEvaluation() exactly.
     
-    Contract function: submitEvaluation(address oracle, address user, 
-                                      uint256 workId, uint8 score, 
-                                      string ipfsHash, uint8 evaluationType)
+    Contract function: submitWorkEvaluation(address user, uint256[] skillTokenIds,
+                                          string workDescription, string workContent,
+                                          uint256 overallScore, uint256[] skillScores,
+                                          string feedback, string ipfsHash)
     """
     try:
         reputation_service = get_reputation_service()
         
-        result = await reputation_service.submit_evaluation(
-            oracle_address=oracle_address,
-            user_address=user_address,
-            work_id=work_id,
-            score=score,
-            ipfs_hash=ipfs_hash,
-            evaluation_type=evaluation_type
+        result = await reputation_service.submit_work_evaluation(
+            user=request.user,
+            skill_token_ids=request.skill_token_ids,
+            work_description=request.work_description,
+            work_content=request.work_content,
+            overall_score=request.overall_score,
+            skill_scores=request.skill_scores,
+            feedback=request.feedback,
+            ipfs_hash=request.ipfs_hash
         )
         
         if not result["success"]:
@@ -127,7 +121,7 @@ async def submit_evaluation(
                 detail=result.get("error", "Failed to submit evaluation")
             )
         
-        logger.info(f"Evaluation submitted by {oracle_address} for user {user_address}")
+        logger.info(f"Evaluation submitted for user {request.user}")
         return result
         
     except Exception as e:

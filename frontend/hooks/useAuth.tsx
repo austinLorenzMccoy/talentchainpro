@@ -38,6 +38,7 @@ interface AuthContextType {
     updateBalance: () => Promise<void>;
     getAvailableWallets: () => Promise<WalletType[]>;
     connection: WalletConnection | null;
+    restoreConnection: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,7 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const initializeWalletListeners = () => {
         // Listen for wallet events
-        walletConnector.on('connected', (connection: WalletConnection) => {
+        walletConnector.on('connected', (data: unknown) => {
+            const connection = data as WalletConnection;
             setConnection(connection);
             setIsConnected(true);
 
@@ -87,7 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(null);
         });
 
-        walletConnector.on('accountsChanged', (accounts: string[]) => {
+        walletConnector.on('accountsChanged', (data: unknown) => {
+            const accounts = data as string[];
             if (accounts.length === 0) {
                 // User disconnected
                 setConnection(null);
@@ -114,38 +117,61 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         });
 
-        walletConnector.on('chainChanged', (chainId: string) => {
+        walletConnector.on('chainChanged', (data: unknown) => {
+            const chainId = data as string;
             console.log('Chain changed:', chainId);
             // Handle network changes if needed
         });
 
-        walletConnector.on('networkMismatch', (data: { current: string; expected: string }) => {
-            console.warn('Network mismatch detected:', data);
+        walletConnector.on('networkMismatch', (data: unknown) => {
+            const networkData = data as { current: string; expected: string };
+            console.warn('Network mismatch detected:', networkData);
             // Could show a notification to user about network mismatch
         });
     };
 
     const checkExistingSession = async () => {
         try {
+            console.log('🔍 Checking for existing wallet session...');
             const currentConnection = walletConnector.getConnection();
-            if (currentConnection && walletConnector.isConnected()) {
-                // Check if the connection is still healthy
-                const isHealthy = await walletConnector.checkConnectionHealth();
 
-                if (isHealthy) {
-                    setConnection(currentConnection);
-                    setIsConnected(true);
+            if (currentConnection) {
+                console.log('Found saved connection:', currentConnection);
 
-                    // Check for existing user profile
-                    const existingUser = localStorage.getItem(`user_${currentConnection.accountId}`);
-                    if (existingUser) {
-                        const userProfile = JSON.parse(existingUser);
-                        setUser(userProfile);
+                // Check if the connection can be restored without user interaction
+                const canRestore = await walletConnector.canRestoreConnection();
+
+                if (canRestore) {
+                    console.log('✅ Connection can be restored automatically');
+
+                    // Check if the connection is still healthy
+                    const isHealthy = await walletConnector.checkConnectionHealth();
+
+                    if (isHealthy) {
+                        console.log('✅ Connection is healthy, restoring session...');
+                        setConnection(currentConnection);
+                        setIsConnected(true);
+
+                        // Check for existing user profile
+                        const existingUser = localStorage.getItem(`user_${currentConnection.accountId}`);
+                        if (existingUser) {
+                            const userProfile = JSON.parse(existingUser);
+                            setUser(userProfile);
+                            console.log('✅ User profile restored');
+                        } else {
+                            console.log('No existing user profile found');
+                        }
+                    } else {
+                        console.log('❌ Connection is unhealthy, clearing...');
+                        walletConnector.resetConnectionState();
                     }
                 } else {
-                    console.log('Stored connection is unhealthy, clearing...');
-                    walletConnector.resetConnectionState();
+                    console.log('⚠️ Connection cannot be restored automatically (MetaMask might be locked)');
+                    // Don't clear the connection, just don't mark as connected
+                    // The user will need to unlock MetaMask to restore
                 }
+            } else {
+                console.log('No saved connection found');
             }
         } catch (error) {
             console.error('Error checking existing session:', error);
@@ -234,6 +260,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return await WalletConnector.getAvailableWallets();
     };
 
+    const restoreConnection = async () => {
+        try {
+            console.log('🔄 Attempting to restore connection...');
+            const currentConnection = walletConnector.getConnection();
+
+            if (currentConnection) {
+                const canRestore = await walletConnector.canRestoreConnection();
+
+                if (canRestore) {
+                    const isHealthy = await walletConnector.checkConnectionHealth();
+
+                    if (isHealthy) {
+                        setConnection(currentConnection);
+                        setIsConnected(true);
+
+                        // Check for existing user profile
+                        const existingUser = localStorage.getItem(`user_${currentConnection.accountId}`);
+                        if (existingUser) {
+                            const userProfile = JSON.parse(existingUser);
+                            setUser(userProfile);
+                        }
+
+                        console.log('✅ Connection restored successfully');
+                        return true;
+                    }
+                }
+            }
+
+            console.log('❌ Connection cannot be restored');
+            return false;
+        } catch (error) {
+            console.error('Error restoring connection:', error);
+            return false;
+        }
+    };
+
     const value: AuthContextType = {
         user,
         isConnected,
@@ -244,7 +306,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updateProfile,
         updateBalance,
         getAvailableWallets,
-        connection
+        connection,
+        restoreConnection
     };
 
     return (

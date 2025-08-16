@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import {
-    Settings,
     User,
     Shield,
     Bell,
@@ -22,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Select,
@@ -184,8 +182,8 @@ export default function SettingsPage() {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === tab.id
-                                        ? 'bg-hedera-100 dark:bg-hedera-900/50 text-hedera-700 dark:text-hedera-300 border-b-2 border-hedera-500'
-                                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    ? 'bg-hedera-100 dark:bg-hedera-900/50 text-hedera-700 dark:text-hedera-300 border-b-2 border-hedera-500'
+                                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
                                     }`}
                             >
                                 <tab.icon className="w-4 h-4" />
@@ -205,7 +203,7 @@ export default function SettingsPage() {
                     {/* Profile Tab */}
                     {activeTab === "profile" && (
                         <div className="space-y-6">
-                            <Card>
+                            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
                                         <User className="w-5 h-5" />
@@ -257,7 +255,7 @@ export default function SettingsPage() {
                                 </CardContent>
                             </Card>
 
-                            <Card>
+                            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
                                         <Globe className="w-5 h-5" />
@@ -313,7 +311,7 @@ export default function SettingsPage() {
 
                     {/* Notifications Tab */}
                     {activeTab === "notifications" && (
-                        <Card>
+                        <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Bell className="w-5 h-5" />
@@ -345,7 +343,7 @@ export default function SettingsPage() {
 
                     {/* Privacy Tab */}
                     {activeTab === "privacy" && (
-                        <Card>
+                        <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Shield className="w-5 h-5" />
@@ -414,7 +412,7 @@ export default function SettingsPage() {
                     {/* Wallet Tab */}
                     {activeTab === "wallet" && (
                         <div className="space-y-6">
-                            <Card>
+                            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
                                         <Wallet className="w-5 h-5" />
@@ -446,7 +444,7 @@ export default function SettingsPage() {
                                 </CardContent>
                             </Card>
 
-                            <Card>
+                            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
                                         <AlertCircle className="w-5 h-5 text-orange-500" />
@@ -475,7 +473,7 @@ export default function SettingsPage() {
                     {/* Security Tab */}
                     {activeTab === "security" && (
                         <div className="space-y-6">
-                            <Card>
+                            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2">
                                         <Key className="w-5 h-5" />
@@ -528,7 +526,7 @@ export default function SettingsPage() {
                                 </CardContent>
                             </Card>
 
-                            <Card>
+                            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
                                         <Trash2 className="w-5 h-5" />

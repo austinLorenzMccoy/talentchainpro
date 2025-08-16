@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Wallet, ChevronDown, Loader2, User, LogOut, ExternalLink, Sparkles, AlertCircle, Wifi, WifiOff, LayoutDashboard } from 'lucide-react';
+import { Wallet, ChevronDown, Loader2, User, LogOut, Sparkles, AlertCircle, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,

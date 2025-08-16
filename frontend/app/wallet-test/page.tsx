@@ -1,287 +1,338 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { WalletConnector, WalletType } from '@/lib/wallet/wallet-connector';
-import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, XCircle, AlertCircle, Info } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { WalletType, walletConnector, WalletConnector } from '@/lib/wallet/wallet-connector';
+import { AlertCircle, CheckCircle, XCircle, Info } from 'lucide-react';
 
 export default function WalletTestPage() {
-    const [availableWallets, setAvailableWallets] = useState<WalletType[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState<string>('Not connected');
-    const [error, setError] = useState<string>('');
-    const [logs, setLogs] = useState<string[]>([]);
-    const [isTesting, setIsTesting] = useState(false);
-
-    const { user, isConnected, isLoading, connectWallet, disconnectWallet, getAvailableWallets } = useAuth();
-
-    const addLog = (message: string) => {
-        setLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
-    };
+    const [error, setError] = useState<string | null>(null);
+    const [debugInfo, setDebugInfo] = useState<any>({});
+    const [availableWallets, setAvailableWallets] = useState<WalletType[]>([]);
 
     useEffect(() => {
-        addLog('Page loaded');
+        checkEnvironmentVariables();
         checkAvailableWallets();
+        checkConnectionStatus();
     }, []);
 
-    const checkAvailableWallets = async () => {
-        addLog('Checking available wallets...');
-
-        // Check HashPack
-        const hashpackInstalled = WalletConnector.isHashPackInstalled();
-        addLog(`HashPack installed: ${hashpackInstalled}`);
-
-        // Check MetaMask
-        const metamaskInstalled = WalletConnector.isMetaMaskInstalled();
-        addLog(`MetaMask installed: ${metamaskInstalled}`);
-
-        // Get all available wallets
-        const available = await getAvailableWallets();
-        setAvailableWallets(available);
-        addLog(`Available wallets: ${available.join(', ')}`);
+    const checkConnectionStatus = () => {
+        const currentConnection = walletConnector.getConnection();
+        if (currentConnection) {
+            setConnectionStatus(`Saved connection: ${currentConnection.type} - ${currentConnection.address.slice(0, 6)}...${currentConnection.address.slice(-4)}`);
+        }
     };
 
-    const testConnection = async (walletType: WalletType) => {
-        setIsTesting(true);
-        setError('');
-        setConnectionStatus('Connecting...');
+    const checkEnvironmentVariables = () => {
+        const envVars = {
+            NEXT_PUBLIC_HEDERA_NETWORK: process.env.NEXT_PUBLIC_HEDERA_NETWORK,
+            NEXT_PUBLIC_METAMASK_CHAIN_ID: process.env.NEXT_PUBLIC_METAMASK_CHAIN_ID,
+            NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
+            NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+            NODE_ENV: process.env.NODE_ENV,
+        };
+        setDebugInfo(envVars);
+    };
+
+    const checkAvailableWallets = async () => {
+        try {
+            const wallets = await WalletConnector.getAvailableWallets();
+            setAvailableWallets(wallets);
+        } catch (error) {
+            console.error('Error checking available wallets:', error);
+        }
+    };
+
+    const testMetaMaskConnection = async () => {
+        setIsLoading(true);
+        setError(null);
+        setConnectionStatus('Testing connection...');
 
         try {
-            addLog(`Testing connection to ${walletType}...`);
-            await connectWallet(walletType);
-            setConnectionStatus(`Connected to ${walletType}`);
-            addLog(`Successfully connected to ${walletType}`);
+            console.log('🧪 Starting MetaMask connection test...');
+
+            // Test if MetaMask is installed
+            const isInstalled = WalletConnector.isMetaMaskInstalled();
+            console.log('MetaMask installed:', isInstalled);
+
+            if (!isInstalled) {
+                throw new Error('MetaMask extension not found');
+            }
+
+            // Test if MetaMask is available
+            const isAvailable = await WalletConnector.isMetaMaskAvailable();
+            console.log('MetaMask available:', isAvailable);
+
+            if (!isAvailable) {
+                throw new Error('MetaMask is not available (might be locked)');
+            }
+
+            // Test connection
+            const connection = await walletConnector.connect(WalletType.METAMASK);
+            console.log('Connection successful:', connection);
+
+            setConnectionStatus(`Connected to ${connection.address}`);
         } catch (error) {
+            console.error('MetaMask test failed:', error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             setError(errorMessage);
             setConnectionStatus('Connection failed');
-            addLog(`Failed to connect to ${walletType}: ${errorMessage}`);
         } finally {
-            setIsTesting(false);
+            setIsLoading(false);
         }
     };
 
-    const handleDisconnect = () => {
+    const testWalletConnect = async () => {
+        setIsLoading(true);
+        setError(null);
+        setConnectionStatus('Testing WalletConnect...');
+
         try {
-            disconnectWallet();
-            setConnectionStatus('Disconnected');
-            addLog('Wallet disconnected');
+            const connection = await walletConnector.connect(WalletType.WALLETCONNECT);
+            console.log('WalletConnect connection successful:', connection);
+            setConnectionStatus(`Connected via WalletConnect to ${connection.address}`);
         } catch (error) {
-            addLog(`Failed to disconnect: ${error}`);
+            console.error('WalletConnect test failed:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            setError(errorMessage);
+            setConnectionStatus('WalletConnect failed');
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const clearLogs = () => {
-        setLogs([]);
+    const disconnect = () => {
+        try {
+            walletConnector.disconnect();
+            setConnectionStatus('Disconnected');
+            setError(null);
+        } catch (error) {
+            console.error('Disconnect error:', error);
+        }
+    };
+
+    const resetState = () => {
+        try {
+            walletConnector.resetConnectionState();
+            setConnectionStatus('State reset');
+            setError(null);
+        } catch (error) {
+            console.error('Reset error:', error);
+        }
+    };
+
+    const restoreConnection = async () => {
+        setIsLoading(true);
+        setError(null);
+        setConnectionStatus('Attempting to restore connection...');
+
+        try {
+            console.log('🔄 Attempting to restore connection...');
+            const currentConnection = walletConnector.getConnection();
+
+            if (currentConnection) {
+                const canRestore = await walletConnector.canRestoreConnection();
+
+                if (canRestore) {
+                    const isHealthy = await walletConnector.checkConnectionHealth();
+
+                    if (isHealthy) {
+                        setConnectionStatus(`Connection restored to ${currentConnection.address}`);
+                        console.log('✅ Connection restored successfully');
+                    } else {
+                        throw new Error('Connection is unhealthy');
+                    }
+                } else {
+                    throw new Error('Connection cannot be restored (MetaMask might be locked)');
+                }
+            } else {
+                throw new Error('No saved connection found');
+            }
+        } catch (error) {
+            console.error('Error restoring connection:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            setError(errorMessage);
+            setConnectionStatus('Restore failed');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
-            <div className="max-w-6xl mx-auto space-y-8">
-                {/* Header */}
-                <div className="text-center">
-                    <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">
-                        🧪 Wallet Connection Test
-                    </h1>
-                    <p className="text-lg text-slate-600 dark:text-slate-400">
-                        Test your wallet connections and verify the implementation
-                    </p>
-                </div>
+        <div className="container mx-auto p-6 max-w-4xl">
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                    Wallet Connection Test
+                </h1>
+                <p className="text-gray-600 dark:text-gray-400">
+                    Test and debug wallet connections for TalentChain Pro
+                </p>
+            </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    {/* Wallet Detection */}
-                    <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-                        <CardHeader>
-                            <CardTitle className="flex items-center space-x-2">
-                                <Info className="w-5 h-5 text-blue-500" />
-                                <span>Wallet Detection</span>
-                            </CardTitle>
-                            <CardDescription>
-                                Check which wallets are available on your system
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                                    <div className="flex items-center space-x-2">
-                                        <span className="text-lg">🔗</span>
-                                        <span className="font-medium">HashPack</span>
-                                    </div>
-                                    <Badge variant={availableWallets.includes(WalletType.HASHPACK) ? "default" : "secondary"}>
-                                        {availableWallets.includes(WalletType.HASHPACK) ? "Available" : "Not Installed"}
-                                    </Badge>
-                                </div>
-
-                                <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                                    <div className="flex items-center space-x-2">
-                                        <span className="text-lg">🦊</span>
-                                        <span className="font-medium">MetaMask</span>
-                                    </div>
-                                    <Badge variant={availableWallets.includes(WalletType.METAMASK) ? "default" : "secondary"}>
-                                        {availableWallets.includes(WalletType.METAMASK) ? "Available" : "Not Installed"}
-                                    </Badge>
-                                </div>
-
-                                <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                                    <div className="flex items-center space-x-2">
-                                        <span className="text-lg">🔌</span>
-                                        <span className="font-medium">WalletConnect</span>
-                                    </div>
-                                    <Badge variant="default">Always Available</Badge>
-                                </div>
-                            </div>
-
-                            <Button
-                                onClick={checkAvailableWallets}
-                                variant="outline"
-                                className="w-full"
-                            >
-                                Refresh Detection
-                            </Button>
-                        </CardContent>
-                    </Card>
-
-                    {/* Connection Testing */}
-                    <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-                        <CardHeader>
-                            <CardTitle className="flex items-center space-x-2">
-                                <CheckCircle className="w-5 h-5 text-green-500" />
-                                <span>Connection Testing</span>
-                            </CardTitle>
-                            <CardDescription>
-                                Test connections to available wallets
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <h3 className="font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                    Status: {connectionStatus}
-                                </h3>
-                                {error && (
-                                    <div className="text-sm text-red-500 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
-                                        {error}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-2">
-                                {availableWallets.map(wallet => (
-                                    <Button
-                                        key={wallet}
-                                        onClick={() => testConnection(wallet)}
-                                        disabled={isTesting || isConnected}
-                                        className="w-full"
-                                        variant="outline"
-                                    >
-                                        {isTesting ? (
-                                            <>
-                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                                Connecting...
-                                            </>
-                                        ) : (
-                                            <>
-                                                Connect to {wallet}
-                                            </>
-                                        )}
-                                    </Button>
-                                ))}
-                            </div>
-
-                            {isConnected && (
-                                <Button
-                                    onClick={handleDisconnect}
-                                    variant="destructive"
-                                    className="w-full"
-                                >
-                                    Disconnect
-                                </Button>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Connection Status */}
-                {isConnected && user && (
-                    <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-                        <CardHeader>
-                            <CardTitle className="flex items-center space-x-2">
-                                <CheckCircle className="w-5 h-5 text-green-500" />
-                                <span>Connected Wallet</span>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                                    <div className="text-sm text-slate-500 dark:text-slate-400">Wallet Type</div>
-                                    <div className="font-medium">{user.walletType}</div>
-                                </div>
-                                <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                                    <div className="text-sm text-slate-500 dark:text-slate-400">Address</div>
-                                    <div className="font-medium font-mono text-sm">
-                                        {user.walletAddress.slice(0, 10)}...{user.walletAddress.slice(-8)}
-                                    </div>
-                                </div>
-                                <div className="p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
-                                    <div className="text-sm text-slate-500 dark:text-slate-400">Balance</div>
-                                    <div className="font-medium">{user.balance} HBAR</div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Logs */}
-                <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Environment Variables */}
+                <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                     <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center space-x-2">
-                                <AlertCircle className="w-5 h-5 text-blue-500" />
-                                <span>Connection Logs</span>
-                            </CardTitle>
-                            <Button onClick={clearLogs} variant="outline" size="sm">
-                                Clear Logs
-                            </Button>
-                        </div>
+                        <CardTitle className="flex items-center gap-2">
+                            <Info className="h-5 w-5" />
+                            Environment Variables
+                        </CardTitle>
                         <CardDescription>
-                            Real-time logs of wallet connection attempts and status
+                            Check if required environment variables are set
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {Object.entries(debugInfo).map(([key, value]) => (
+                            <div key={key} className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                    {key}:
+                                </span>
+                                <Badge variant={value ? "default" : "destructive"}>
+                                    {value ? value.toString() : "Not set"}
+                                </Badge>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+
+                {/* Available Wallets */}
+                <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <CheckCircle className="h-5 w-5" />
+                            Available Wallets
+                        </CardTitle>
+                        <CardDescription>
+                            Wallets detected in the browser
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="bg-slate-900 text-green-400 p-4 rounded-lg font-mono text-sm h-64 overflow-y-auto">
-                            {logs.length === 0 ? (
-                                <div className="text-slate-500">No logs yet. Try connecting a wallet to see activity.</div>
-                            ) : (
-                                logs.map((log, index) => (
-                                    <div key={index} className="mb-1">
-                                        {log}
-                                    </div>
-                                ))
+                        <div className="space-y-2">
+                            {availableWallets.map((wallet) => (
+                                <Badge key={wallet} variant="outline" className="mr-2">
+                                    {wallet}
+                                </Badge>
+                            ))}
+                            {availableWallets.length === 0 && (
+                                <p className="text-sm text-gray-500">No wallets detected</p>
                             )}
                         </div>
                     </CardContent>
                 </Card>
-
-                {/* Instructions */}
-                <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-                    <CardHeader>
-                        <CardTitle className="text-blue-900 dark:text-blue-100">
-                            💡 How to Test
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-blue-800 dark:text-blue-200">
-                        <ol className="list-decimal list-inside space-y-2">
-                            <li>Make sure you have the required environment variables set in <code className="bg-blue-100 dark:bg-blue-800 px-1 rounded">.env.local</code></li>
-                            <li>Install HashPack and/or MetaMask browser extensions</li>
-                            <li>Click "Refresh Detection" to check available wallets</li>
-                            <li>Click "Connect to [Wallet]" to test the connection</li>
-                            <li>Check the logs for detailed connection information</li>
-                            <li>Verify the connection status and wallet information</li>
-                        </ol>
-                    </CardContent>
-                </Card>
             </div>
+
+            {/* Connection Status */}
+            <Card className="mt-6 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
+                <CardHeader>
+                    <CardTitle>Connection Status</CardTitle>
+                    <CardDescription>
+                        Current wallet connection status
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center gap-2 mb-4">
+                        <span className="text-sm font-medium">Status:</span>
+                        <Badge variant={connectionStatus.includes('Connected') ? "default" : "secondary"}>
+                            {connectionStatus}
+                        </Badge>
+
+                        {/* Show saved connection info */}
+                        {walletConnector.getConnection() && (
+                            <div className="ml-4 flex items-center gap-2">
+                                <span className="text-sm text-gray-600">Saved:</span>
+                                <Badge variant="outline" className="text-xs">
+                                    {walletConnector.getConnection()?.type} - {walletConnector.getConnection()?.address?.slice(0, 6)}...{walletConnector.getConnection()?.address?.slice(-4)}
+                                </Badge>
+                            </div>
+                        )}
+                    </div>
+
+                    {error && (
+                        <Alert variant="destructive" className="mb-4">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                    )}
+
+                    <div className="flex flex-wrap gap-3">
+                        <Button
+                            onClick={testMetaMaskConnection}
+                            disabled={isLoading}
+                            className="bg-orange-600 hover:bg-orange-700"
+                        >
+                            {isLoading ? 'Testing...' : 'Test MetaMask'}
+                        </Button>
+
+                        <Button
+                            onClick={testWalletConnect}
+                            disabled={isLoading}
+                            className="bg-blue-600 hover:bg-blue-700"
+                        >
+                            {isLoading ? 'Testing...' : 'Test WalletConnect'}
+                        </Button>
+
+                        <Button
+                            onClick={disconnect}
+                            variant="outline"
+                            disabled={isLoading}
+                        >
+                            Disconnect
+                        </Button>
+
+                        <Button
+                            onClick={resetState}
+                            variant="outline"
+                            disabled={isLoading}
+                        >
+                            Reset State
+                        </Button>
+
+                        <Button
+                            onClick={restoreConnection}
+                            variant="outline"
+                            disabled={isLoading}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                            Restore Connection
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Debug Information */}
+            <Card className="mt-6">
+                <CardHeader>
+                    <CardTitle>Debug Information</CardTitle>
+                    <CardDescription>
+                        Additional debugging information
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        <div>
+                            <h4 className="font-medium mb-2">Browser Info:</h4>
+                            <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                <p>User Agent: {typeof window !== 'undefined' ? window.navigator.userAgent : 'N/A'}</p>
+                                <p>Location: {typeof window !== 'undefined' ? window.location.href : 'N/A'}</p>
+                                <p>MetaMask: {typeof window !== 'undefined' ? (window.ethereum?.isMetaMask ? 'Detected' : 'Not detected') : 'N/A'}</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 className="font-medium mb-2">Wallet Connector State:</h4>
+                            <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                <p>Is Connected: {walletConnector.isConnected().toString()}</p>
+                                <p>Connection: {walletConnector.getConnection() ? 'Active' : 'None'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }

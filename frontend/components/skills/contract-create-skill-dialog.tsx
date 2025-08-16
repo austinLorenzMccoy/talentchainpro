@@ -42,7 +42,7 @@ interface ContractCreateSkillDialogProps {
 
 const skillCategories = [
     "Frontend Development",
-    "Backend Development", 
+    "Backend Development",
     "Smart Contracts",
     "UI/UX Design",
     "DevOps",
@@ -58,7 +58,7 @@ const skillCategories = [
 const levelDescriptions = {
     1: "Novice - Just starting to learn",
     2: "Beginner - Basic understanding",
-    3: "Developing - Some practical experience", 
+    3: "Developing - Some practical experience",
     4: "Competent - Can work independently",
     5: "Intermediate - Solid practical skills",
     6: "Proficient - Advanced practical skills",
@@ -175,27 +175,27 @@ export function ContractCreateSkillDialog({
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader className="space-y-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-r from-hedera-500 to-web3-pink-500 rounded-xl flex items-center justify-center">
-                            <Sparkles className="w-6 h-6 text-white" />
+            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-10 h-10 bg-gradient-to-r from-hedera-500 to-web3-pink-500 rounded-lg flex items-center justify-center">
+                            <Sparkles className="w-5 h-5 text-white" />
                         </div>
                         <div>
-                            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-hedera-600 to-web3-pink-600 bg-clip-text text-transparent">
+                            <DialogTitle className="text-lg font-bold bg-gradient-to-r from-hedera-600 to-web3-pink-600 bg-clip-text text-transparent">
                                 Create Skill Token
                             </DialogTitle>
-                            <DialogDescription className="text-slate-600 dark:text-slate-400">
+                            <DialogDescription className="text-sm text-slate-600 dark:text-slate-400">
                                 Mint a soulbound skill token on Hedera
                             </DialogDescription>
                         </div>
                     </div>
                 </DialogHeader>
 
-                <div className="space-y-6">
+                <div className="space-y-4">{/* Reduced from space-y-6 */}
                     {/* Connection Status */}
-                    <Card className="border-slate-200 dark:border-slate-700">
-                        <CardContent className="p-4">
+                    <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
+                        <CardContent className="p-3">{/* Reduced from p-4 */}
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <User className="w-4 h-4 text-slate-600 dark:text-slate-400" />
@@ -218,15 +218,15 @@ export function ContractCreateSkillDialog({
                     </Card>
 
                     {/* Skill Category */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">{/* Reduced from space-y-2 */}
                         <Label htmlFor="category" className="text-sm font-medium text-slate-900 dark:text-white">
                             Skill Category *
                         </Label>
-                        <Select 
-                            value={formData.category} 
+                        <Select
+                            value={formData.category}
                             onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
                         >
-                            <SelectTrigger className="h-11 border-slate-200 dark:border-slate-700 focus:border-hedera-500">
+                            <SelectTrigger className="h-10 border-slate-200 dark:border-slate-700 focus:border-hedera-500">
                                 <SelectValue placeholder="Select your expertise area" />
                             </SelectTrigger>
                             <SelectContent>
@@ -240,7 +240,7 @@ export function ContractCreateSkillDialog({
                     </div>
 
                     {/* Subcategory */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">{/* Reduced from space-y-2 */}
                         <Label htmlFor="subcategory" className="text-sm font-medium text-slate-900 dark:text-white">
                             Specific Skill *
                         </Label>
@@ -249,15 +249,15 @@ export function ContractCreateSkillDialog({
                             placeholder="e.g., React.js, Solidity Smart Contracts, Figma Design"
                             value={formData.subcategory}
                             onChange={(e) => setFormData(prev => ({ ...prev, subcategory: e.target.value }))}
-                            className="h-11 border-slate-200 dark:border-slate-700 focus:border-hedera-500"
+                            className="h-10 border-slate-200 dark:border-slate-700 focus:border-hedera-500"
                         />
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Be specific about your exact skill (e.g., "React.js" instead of just "Frontend")
+                            Be specific about your exact skill (e.g., &quot;React.js&quot; instead of just &quot;Frontend&quot;)
                         </p>
                     </div>
 
                     {/* Metadata */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">{/* Reduced from space-y-2 */}
                         <Label htmlFor="metadata" className="text-sm font-medium text-slate-900 dark:text-white">
                             Additional Information
                         </Label>
@@ -266,7 +266,7 @@ export function ContractCreateSkillDialog({
                             placeholder="Describe your experience, certifications, or any relevant details..."
                             value={formData.metadata}
                             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, metadata: e.target.value }))}
-                            rows={3}
+                            rows={2}
                             className="border-slate-200 dark:border-slate-700 focus:border-hedera-500 resize-none"
                         />
                         <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -275,16 +275,16 @@ export function ContractCreateSkillDialog({
                     </div>
 
                     {/* Skill Level */}
-                    <div className="space-y-3">
+                    <div className="space-y-2">{/* Reduced from space-y-3 */}
                         <Label htmlFor="level" className="text-sm font-medium text-slate-900 dark:text-white">
                             Skill Level *
                         </Label>
-                        <div className="space-y-3">
-                            <Select 
-                                value={formData.level.toString()} 
+                        <div className="space-y-2">{/* Reduced from space-y-3 */}
+                            <Select
+                                value={formData.level.toString()}
                                 onValueChange={(value) => setFormData(prev => ({ ...prev, level: parseInt(value) }))}
                             >
-                                <SelectTrigger className="h-11 border-slate-200 dark:border-slate-700 focus:border-hedera-500">
+                                <SelectTrigger className="h-10 border-slate-200 dark:border-slate-700 focus:border-hedera-500">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -298,9 +298,9 @@ export function ContractCreateSkillDialog({
                                     ))}
                                 </SelectContent>
                             </Select>
-                            
+
                             {formData.level > 0 && (
-                                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                                <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50">
                                     <div className="flex items-center gap-2 mb-1">
                                         <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${getSkillLevelColor(formData.level)}`} />
                                         <span className="text-sm font-medium text-slate-900 dark:text-white">
@@ -317,11 +317,11 @@ export function ContractCreateSkillDialog({
 
                     {/* Metadata URI Preview */}
                     {formData.category && (
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">{/* Reduced from space-y-2 */}
                             <Label className="text-sm font-medium text-slate-900 dark:text-white">
                                 Metadata URI Preview
                             </Label>
-                            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                            <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                                 <div className="flex items-center gap-2">
                                     <Hash className="w-4 h-4 text-slate-500" />
                                     <span className="text-xs font-mono text-slate-600 dark:text-slate-400">
@@ -335,13 +335,13 @@ export function ContractCreateSkillDialog({
                     {/* Contract Parameters Summary */}
                     {formData.category && isConnected && (
                         <Card className="border-hedera-200 dark:border-hedera-800 bg-gradient-to-r from-hedera-50/50 to-web3-pink-50/50 dark:from-hedera-950/30 dark:to-web3-pink-950/30">
-                            <CardHeader className="pb-3">
+                            <CardHeader className="pb-2">
                                 <CardTitle className="text-sm font-medium text-hedera-900 dark:text-hedera-100">
                                     Smart Contract Parameters
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="pt-0 space-y-2">
-                                <div className="grid grid-cols-2 gap-3 text-xs">
+                            <CardContent className="pt-0 space-y-1.5">
+                                <div className="grid grid-cols-2 gap-2.5 text-xs">
                                     <div>
                                         <span className="text-slate-600 dark:text-slate-400">recipient:</span>
                                         <p className="font-mono text-slate-900 dark:text-white truncate">
@@ -372,7 +372,7 @@ export function ContractCreateSkillDialog({
                     )}
 
                     {/* Action Buttons */}
-                    <div className="flex items-center gap-3 pt-4">
+                    <div className="flex items-center gap-3 pt-3">
                         <Button
                             variant="outline"
                             onClick={() => setIsDialogOpen(false)}

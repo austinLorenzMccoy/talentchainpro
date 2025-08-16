@@ -78,7 +78,7 @@ export const executeContractWithWallet = async (
   parameters?: ContractFunctionParameters,
   gasLimit: number = CONTRACT_CONSTANTS.GAS_LIMIT,
   payableAmount?: string,
-  walletInterface?: any // HashPack or other wallet interface
+  walletInterface?: { executeTransaction: (transaction: unknown) => Promise<unknown> } // HashPack or other wallet interface
 ): Promise<TransactionResult> => {
   try {
     if (!walletInterface) {
@@ -104,7 +104,7 @@ export const executeContractWithWallet = async (
 
     // Execute transaction via wallet
     console.log('⏳ Submitting transaction via wallet...');
-    const result = await walletInterface.executeTransaction(transaction);
+    const result = await walletInterface.executeTransaction(transaction) as { transactionId?: { toString(): string }; receipt?: unknown };
     
     console.log('✅ Transaction submitted successfully');
     return {
@@ -135,12 +135,14 @@ export const getSkillTokenInfo = async (
 
   if (result.success && result.data) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = result.data as any;
       return {
         success: true,
         data: {
-          category: result.data.getString(0),
-          level: result.data.getUint256(1).toNumber(),
-          uri: result.data.getString(2),
+          category: data.getString(0),
+          level: data.getUint256(1).toNumber(),
+          uri: data.getString(2),
         },
       };
     } catch (error) {
@@ -165,19 +167,21 @@ export const getJobPoolInfo = async (
 
   if (result.success && result.data) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = result.data as any;
       return {
         success: true,
         data: {
-          company: result.data.getAddress(0),
-          description: result.data.getString(1),
-          requiredSkills: result.data.getUint256Array(2).map((n: any) => n.toNumber()),
-          stakeAmount: result.data.getUint256(3).toString(),
-          salary: result.data.getUint256(4).toString(),
-          status: result.data.getUint256(5).toNumber(),
-          applicants: result.data.getAddressArray(6),
-          selectedCandidate: result.data.getAddress(7),
-          createdAt: result.data.getUint256(8).toNumber(),
-          deadline: result.data.getUint256(9).toNumber(),
+          company: data.getAddress(0),
+          description: data.getString(1),
+          requiredSkills: data.getUint256Array(2).map((n: { toNumber(): number }) => n.toNumber()),
+          stakeAmount: data.getUint256(3).toString(),
+          salary: data.getUint256(4).toString(),
+          status: data.getUint256(5).toNumber(),
+          applicants: data.getAddressArray(6),
+          selectedCandidate: data.getAddress(7),
+          createdAt: data.getUint256(8).toNumber(),
+          deadline: data.getUint256(9).toNumber(),
         },
       };
     } catch (error) {
@@ -200,7 +204,8 @@ export const getPoolCount = async (
   
   if (result.success && result.data) {
     try {
-      return result.data.getUint256(0).toNumber();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (result.data as any).getUint256(0).toNumber();
     } catch (error) {
       console.error('Failed to parse pool count:', error);
       return null;
@@ -223,9 +228,11 @@ export const getUserApplications = async (
 
   if (result.success && result.data) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = result.data as any;
       return {
         success: true,
-        data: result.data.getUint256Array(0).map((n: any) => n.toNumber()),
+        data: data.getUint256Array(0).map((n: { toNumber(): number }) => n.toNumber()),
       };
     } catch (error) {
       console.error('Failed to parse user applications:', error);
@@ -239,8 +246,8 @@ export const getUserApplications = async (
 /**
  * Error handling utilities
  */
-export const parseHederaError = (error: any): string => {
-  if (error?.message) {
+export const parseHederaError = (error: Error | { message?: string } | unknown): string => {
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
     const message = error.message.toLowerCase();
     
     // Common Hedera error patterns

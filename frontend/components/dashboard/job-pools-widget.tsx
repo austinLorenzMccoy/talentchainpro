@@ -7,7 +7,6 @@ import {
   Plus,
   Search,
   Filter,
-  MapPin,
   Clock,
   DollarSign,
   Users,
@@ -33,7 +32,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -260,7 +258,7 @@ export function JobPoolsWidget({ className }: JobPoolsWidgetProps) {
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-green-500" />
             <span className="text-green-700 dark:text-green-300 font-medium">
-              Job pool "{newlyCreatedPool.title}" created successfully! It's now visible to potential candidates.
+              Job pool &quot;{newlyCreatedPool.title}&quot; created successfully! It&apos;s now visible to potential candidates.
             </span>
           </div>
         </motion.div>

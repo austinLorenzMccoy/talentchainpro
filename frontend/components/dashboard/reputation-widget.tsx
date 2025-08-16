@@ -2,18 +2,12 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Star, 
-  TrendingUp, 
-  Brain, 
-  Award, 
-  Clock, 
-  FileText, 
+import {
+  Star,
+  Brain,
+  Clock,
   ChevronRight,
   BarChart3,
-  Zap,
-  Target,
-  Calendar,
   AlertCircle,
   RefreshCw,
   Sparkles,
@@ -21,7 +15,6 @@ import {
   Upload,
   Plus
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -57,12 +50,12 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
   const { user } = useAuth();
   const { reputation, history, isLoading, error, refetch } = useReputation();
   const { skillTokens } = useSkillTokens();
-  
+
   const [isWorkSubmissionOpen, setIsWorkSubmissionOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  
+
   const [workSubmission, setWorkSubmission] = useState({
     skillTokenId: "",
     workDescription: "",
@@ -83,7 +76,7 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (days === 0) return "Today";
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days} days ago`;
@@ -164,7 +157,7 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
               <BarChart3 className="w-4 h-4" />
             )}
           </Button>
-          
+
           <Dialog open={isWorkSubmissionOpen} onOpenChange={setIsWorkSubmissionOpen}>
             <DialogTrigger asChild>
               <Button size="sm" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white">
@@ -187,9 +180,9 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
                 {/* Skill Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="skillToken">Select Skill Token</Label>
-                  <Select 
-                    value={workSubmission.skillTokenId} 
-                    onValueChange={(value) => setWorkSubmission({...workSubmission, skillTokenId: value})}
+                  <Select
+                    value={workSubmission.skillTokenId}
+                    onValueChange={(value) => setWorkSubmission({ ...workSubmission, skillTokenId: value })}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Choose the skill this work demonstrates" />
@@ -210,7 +203,7 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
                   <Textarea
                     id="workDescription"
                     value={workSubmission.workDescription}
-                    onChange={(e) => setWorkSubmission({...workSubmission, workDescription: e.target.value})}
+                    onChange={(e) => setWorkSubmission({ ...workSubmission, workDescription: e.target.value })}
                     placeholder="Describe the work you completed, technologies used, challenges solved, and outcomes achieved..."
                     rows={4}
                     className="resize-none"
@@ -221,9 +214,9 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Portfolio Links & Artifacts</Label>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       size="sm"
                       onClick={addArtifactUrl}
                     >
@@ -252,7 +245,7 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
                 {submitError && (
                   <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3">
                     <div className="flex items-center space-x-2">
-                      <AlertCircle className="w-4 h-4 text-red-500" />
+                      <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400" />
                       <p className="text-sm text-red-600 dark:text-red-400">{submitError}</p>
                     </div>
                   </div>
@@ -261,7 +254,7 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
                 {submitSuccess && (
                   <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-3">
                     <div className="flex items-center space-x-2">
-                      <Sparkles className="w-4 h-4 text-green-500" />
+                      <Sparkles className="w-4 h-4 text-green-500 dark:text-green-400" />
                       <p className="text-sm text-green-600 dark:text-green-400">
                         Work submitted successfully! AI evaluation in progress...
                       </p>
@@ -270,7 +263,7 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
                 )}
 
                 {/* Submit Button */}
-                <Button 
+                <Button
                   onClick={handleWorkSubmission}
                   disabled={!workSubmission.skillTokenId || !workSubmission.workDescription || isSubmitting || submitSuccess}
                   className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
@@ -370,29 +363,29 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
               </h4>
               <div className="space-y-3">
                 {Object.entries(reputation.skill_scores)
-                  .sort(([,a], [,b]) => b - a)
+                  .sort(([, a], [, b]) => b - a)
                   .slice(0, 5)
                   .map(([skill, score], index) => (
-                  <motion.div
-                    key={skill}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.5, delay: index * 0.1 }}
-                    className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-slate-900 dark:text-white">
-                          {skill}
-                        </span>
-                        <span className="text-sm font-bold text-slate-600 dark:text-slate-400">
-                          {Math.round(score)}%
-                        </span>
+                    <motion.div
+                      key={skill}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.5, delay: index * 0.1 }}
+                      className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium text-slate-900 dark:text-white">
+                            {skill}
+                          </span>
+                          <span className="text-sm font-bold text-slate-600 dark:text-slate-400">
+                            {Math.round(score)}%
+                          </span>
+                        </div>
+                        <Progress value={score} className="h-2" />
                       </div>
-                      <Progress value={score} className="h-2" />
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  ))}
               </div>
             </div>
           )}
@@ -419,12 +412,12 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
                           <Badge variant="outline" className="text-xs">
                             {evaluation.skill_category}
                           </Badge>
-                          <Badge 
+                          <Badge
                             className={cn(
                               "text-xs",
                               evaluation.score >= 80 ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" :
-                              evaluation.score >= 60 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" :
-                              "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                                evaluation.score >= 60 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300" :
+                                  "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
                             )}
                           >
                             {evaluation.score}% Score
@@ -442,7 +435,7 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
                   </motion.div>
                 ))}
               </AnimatePresence>
-              
+
               {history.length === 0 && (
                 <div className="text-center py-6">
                   <Brain className="w-12 h-12 mx-auto text-slate-400 mb-3" />
@@ -463,7 +456,7 @@ export function ReputationWidget({ className }: ReputationWidgetProps) {
           <p className="text-slate-600 dark:text-slate-400 mb-6">
             Submit your work for AI evaluation to build your professional reputation score
           </p>
-          <Button 
+          <Button
             onClick={() => setIsWorkSubmissionOpen(true)}
             className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
             disabled={skillTokens.length === 0}

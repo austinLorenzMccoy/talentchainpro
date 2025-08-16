@@ -5,14 +5,12 @@ import { motion } from "framer-motion";
 import {
     Briefcase,
     Search,
-    Filter,
     MapPin,
     Building,
     DollarSign,
     Clock,
     Users,
     Star,
-    ExternalLink,
     Bookmark,
     BookmarkPlus,
     CheckCircle
@@ -20,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
     Select,
     SelectContent,
@@ -29,7 +27,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
-import { ContractCreateSkillDialog } from "@/components/skills/contract-create-skill-dialog";
 import { ViewJobDetailsDialog } from "@/components/jobs/view-job-details-dialog";
 import { ContractApplyToJobDialog } from "@/components/jobs/contract-apply-to-job-dialog";
 import { WalletConnectionPrompt } from "@/components/dashboard/wallet-connection-prompt";
@@ -415,7 +412,7 @@ export default function JobsPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6, delay: 0.1 * index }}
                         >
-                            <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                            <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                                 <CardContent className="p-6">
                                     <div className="flex items-start justify-between">
                                         <div className="flex-1 min-w-0">

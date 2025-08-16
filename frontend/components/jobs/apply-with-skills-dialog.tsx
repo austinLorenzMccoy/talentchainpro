@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Award, Star, Target, Send, X, CheckCircle, AlertCircle, FileText, Users, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +42,7 @@ interface JobApplication {
 interface ApplyWithSkillsDialogProps {
     job: JobApplication;
     triggerButton?: React.ReactNode;
-    onApplicationSubmitted?: (application: any) => void;
+    onApplicationSubmitted?: (application: object) => void;
 }
 
 // Mock user skills - will be replaced with real data from wallet
@@ -319,7 +319,7 @@ export function ApplyWithSkillsDialog({
                                         No Matching Skills Found
                                     </h4>
                                     <p className="text-slate-600 dark:text-slate-400 mb-4">
-                                        You don't have any skills that match the job requirements. Consider creating new skill tokens or upgrading existing ones.
+                                        You don&apos;t have any skills that match the job requirements. Consider creating new skill tokens or upgrading existing ones.
                                     </p>
                                     <Button variant="outline" onClick={() => setIsApplyDialogOpen(false)}>
                                         Create Skills First

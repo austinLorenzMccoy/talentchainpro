@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -12,7 +12,6 @@ import {
   Award,
   BookOpen,
   Target,
-  TrendingUp as TrendingUpIcon,
   MoreVertical,
   Edit3,
   AlertCircle
@@ -37,7 +36,6 @@ import {
 import { DashboardWidget } from "./dashboard-widget";
 import { ContractCreateSkillDialog } from "@/components/skills/contract-create-skill-dialog";
 import { useSkillTokens } from "@/hooks/useDashboardData";
-import { SkillTokenInfo } from "@/lib/types/wallet";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 

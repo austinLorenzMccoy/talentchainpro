@@ -7,14 +7,8 @@ import {
     Search,
     MapPin,
     Users,
-    Globe,
     Star,
-    ExternalLink,
-    Mail,
-    Phone,
     Calendar,
-    TrendingUp,
-    Award,
     Briefcase,
     Heart,
     HeartOff,
@@ -23,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
     Select,
     SelectContent,
@@ -269,7 +263,7 @@ export default function CompaniesPage() {
                     transition={{ duration: 0.6, delay: 0.1 }}
                     className="mb-8"
                 >
-                    <Card>
+                    <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                         <CardContent className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 {/* Search */}
@@ -344,7 +338,7 @@ export default function CompaniesPage() {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6, delay: 0.1 * index }}
                         >
-                            <Card className={`group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 ${company.featured ? 'ring-2 ring-hedera-200 dark:ring-hedera-800' : ''
+                            <Card className={`group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50 ${company.featured ? 'ring-2 ring-hedera-200 dark:ring-hedera-800' : ''
                                 }`}>
                                 <CardContent className="p-6">
                                     {/* Company Header */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Building, MapPin, Globe, Phone, Send, X, User, MessageSquare, FileText } from "lucide-react";
+import { Mail, Building, MapPin, Globe, Send, X, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,7 +47,7 @@ interface CompanyContact {
 interface ContactCompanyDialogProps {
     company: CompanyContact;
     triggerButton?: React.ReactNode;
-    onContactSubmitted?: (contact: any) => void;
+    onContactSubmitted?: (contact: object) => void;
 }
 
 const contactReasons = [

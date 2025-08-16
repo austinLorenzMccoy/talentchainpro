@@ -6,7 +6,6 @@
 import {
   ContractSkillTokenCreateRequest,
   BatchSkillTokenRequest,
-  UpdateSkillLevelRequest,
   RevokeSkillTokenRequest,
   EndorseSkillTokenRequest,
   EndorseSkillTokenWithSignatureRequest,
@@ -18,10 +17,8 @@ import {
   ClosePoolRequest,
   WithdrawApplicationRequest,
   CreateProposalRequest,
-  CreateEmergencyProposalRequest,
   CastVoteRequest,
   DelegateVotingPowerRequest,
-  GovernanceSettings,
   RegisterOracleRequest,
   SubmitWorkEvaluationRequest,
   UpdateReputationScoreRequest,
@@ -29,7 +26,8 @@ import {
   ResolveChallengeRequest,
   ContractCallResponse,
   ApiResponse,
-  PaginatedApiResponse
+  PaginatedApiResponse,
+  GovernanceProposal
 } from '../types/contracts';
 
 // API Configuration
@@ -85,19 +83,16 @@ class ContractService {
   // ============ SKILL TOKEN CONTRACT FUNCTIONS ============
 
   /**
-   * SkillToken.mintSkillToken() - matches contract exactly
+   * SkillToken.mint() - matches contract exactly
    */
   async mintSkillToken(request: ContractSkillTokenCreateRequest): Promise<ContractCallResponse> {
     const response = await this.request<{ transaction_id: string; token_id: number }>('/skills/mint', {
       method: 'POST',
       body: JSON.stringify({
-        recipient_address: request.recipientAddress,
-        category: request.category,
-        subcategory: request.subcategory,
+        recipient: request.recipientAddress,
+        skill_name: request.category,
         level: request.level,
-        expiry_date: request.expiryDate,
         metadata: request.metadata,
-        uri: request.tokenURIData,
       }),
     });
 
@@ -105,26 +100,23 @@ class ContractService {
       success: response.success,
       transactionId: response.data?.transaction_id,
       contractAddress: process.env.NEXT_PUBLIC_SKILL_TOKEN_CONTRACT,
-      functionName: 'mintSkillToken',
+      functionName: 'mint',
       error: response.error,
       data: response.data,
     };
   }
 
   /**
-   * SkillToken.batchMintSkillTokens() - matches contract exactly
+   * SkillToken.batchMint() - matches contract exactly
    */
   async batchMintSkillTokens(request: BatchSkillTokenRequest): Promise<ContractCallResponse> {
     const response = await this.request<{ transaction_id: string; token_ids: number[] }>('/skills/batch-mint', {
       method: 'POST',
       body: JSON.stringify({
-        recipient_address: request.recipientAddress,
-        categories: request.categories,
-        subcategories: request.subcategories,
+        recipients: request.recipients,
+        skill_names: request.skillNames,
         levels: request.levels,
-        expiry_dates: request.expiryDates,
         metadata_array: request.metadataArray,
-        token_uris: request.tokenUris,
       }),
     });
 
@@ -132,66 +124,21 @@ class ContractService {
       success: response.success,
       transactionId: response.data?.transaction_id,
       contractAddress: process.env.NEXT_PUBLIC_SKILL_TOKEN_CONTRACT,
-      functionName: 'batchMintSkillTokens',
+      functionName: 'batchMint',
       error: response.error,
       data: response.data,
     };
   }
 
   /**
-   * SkillToken.updateSkillLevel() - matches contract exactly
-   */
-  async updateSkillLevel(request: UpdateSkillLevelRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string }>('/skills/update-level', {
-      method: 'PUT',
-      body: JSON.stringify({
-        token_id: request.tokenId,
-        new_level: request.newLevel,
-        evidence: request.evidence,
-      }),
-    });
-
-    return {
-      success: response.success,
-      transactionId: response.data?.transaction_id,
-      contractAddress: process.env.NEXT_PUBLIC_SKILL_TOKEN_CONTRACT,
-      functionName: 'updateSkillLevel',
-      error: response.error,
-      data: response.data,
-    };
-  }
-
-  /**
-   * SkillToken.revokeSkillToken() - matches contract exactly
-   */
-  async revokeSkillToken(request: RevokeSkillTokenRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string }>('/skills/revoke', {
-      method: 'PUT',
-      body: JSON.stringify({
-        token_id: request.tokenId,
-        reason: request.reason,
-      }),
-    });
-
-    return {
-      success: response.success,
-      transactionId: response.data?.transaction_id,
-      contractAddress: process.env.NEXT_PUBLIC_SKILL_TOKEN_CONTRACT,
-      functionName: 'revokeSkillToken',
-      error: response.error,
-      data: response.data,
-    };
-  }
-
-  /**
-   * SkillToken.endorseSkillToken() - matches contract exactly
+   * SkillToken.endorse() - matches contract exactly
    */
   async endorseSkillToken(request: EndorseSkillTokenRequest): Promise<ContractCallResponse> {
     const response = await this.request<{ transaction_id: string }>('/skills/endorse', {
       method: 'POST',
       body: JSON.stringify({
         token_id: request.tokenId,
-        endorsement_data: request.endorsementData,
+        endorsement: request.endorsementData,
       }),
     });
 
@@ -199,21 +146,21 @@ class ContractService {
       success: response.success,
       transactionId: response.data?.transaction_id,
       contractAddress: process.env.NEXT_PUBLIC_SKILL_TOKEN_CONTRACT,
-      functionName: 'endorseSkillToken',
+      functionName: 'endorse',
       error: response.error,
       data: response.data,
     };
   }
 
   /**
-   * SkillToken.endorseSkillTokenWithSignature() - matches contract exactly
+   * SkillToken.endorseWithSignature() - matches contract exactly
    */
   async endorseSkillTokenWithSignature(request: EndorseSkillTokenWithSignatureRequest): Promise<ContractCallResponse> {
     const response = await this.request<{ transaction_id: string }>('/skills/endorse-with-signature', {
       method: 'POST',
       body: JSON.stringify({
         token_id: request.tokenId,
-        endorsement_data: request.endorsementData,
+        endorsement: request.endorsementData,
         deadline: request.deadline,
         signature: request.signature,
       }),
@@ -223,18 +170,18 @@ class ContractService {
       success: response.success,
       transactionId: response.data?.transaction_id,
       contractAddress: process.env.NEXT_PUBLIC_SKILL_TOKEN_CONTRACT,
-      functionName: 'endorseSkillTokenWithSignature',
+      functionName: 'endorseWithSignature',
       error: response.error,
       data: response.data,
     };
   }
 
   /**
-   * SkillToken.renewSkillToken() - matches contract exactly
+   * SkillToken.renew() - matches contract exactly
    */
   async renewSkillToken(request: RenewSkillTokenRequest): Promise<ContractCallResponse> {
     const response = await this.request<{ transaction_id: string }>('/skills/renew', {
-      method: 'PUT',
+      method: 'POST',
       body: JSON.stringify({
         token_id: request.tokenId,
         new_expiry_date: request.newExpiryDate,
@@ -245,7 +192,29 @@ class ContractService {
       success: response.success,
       transactionId: response.data?.transaction_id,
       contractAddress: process.env.NEXT_PUBLIC_SKILL_TOKEN_CONTRACT,
-      functionName: 'renewSkillToken',
+      functionName: 'renew',
+      error: response.error,
+      data: response.data,
+    };
+  }
+
+  /**
+   * SkillToken.revoke() - matches contract exactly
+   */
+  async revokeSkillToken(request: RevokeSkillTokenRequest): Promise<ContractCallResponse> {
+    const response = await this.request<{ transaction_id: string }>('/skills/revoke', {
+      method: 'POST',
+      body: JSON.stringify({
+        token_id: request.tokenId,
+        reason: request.reason,
+      }),
+    });
+
+    return {
+      success: response.success,
+      transactionId: response.data?.transaction_id,
+      contractAddress: process.env.NEXT_PUBLIC_SKILL_TOKEN_CONTRACT,
+      functionName: 'revoke',
       error: response.error,
       data: response.data,
     };
@@ -257,7 +226,7 @@ class ContractService {
    * TalentPool.createPool() - matches contract exactly
    */
   async createPool(request: ContractJobPoolCreateRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string; pool_id: number }>('/pools/create', {
+    const response = await this.request<{ pool_id: number }>('/pools/create', {
       method: 'POST',
       body: JSON.stringify({
         title: request.title,
@@ -276,7 +245,7 @@ class ContractService {
 
     return {
       success: response.success,
-      transactionId: response.data?.transaction_id,
+      transactionId: (response.data as Record<string, unknown>)?.transaction_id as string,
       contractAddress: process.env.NEXT_PUBLIC_TALENT_POOL_CONTRACT,
       functionName: 'createPool',
       error: response.error,
@@ -288,13 +257,13 @@ class ContractService {
    * TalentPool.submitApplication() - matches contract exactly
    */
   async submitApplication(request: ContractPoolApplicationRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string }>('/pools/apply', {
+    const response = await this.request<{ transaction_id: string }>(`/pools/${request.poolId}/apply`, {
       method: 'POST',
       body: JSON.stringify({
-        pool_id: request.poolId,
-        skill_token_ids: request.skillTokenIds,
+        applicant: request.applicantAddress,
+        expected_salary: request.expectedSalary,
+        availability_date: request.availabilityDate,
         cover_letter: request.coverLetter,
-        portfolio: request.portfolio,
         stake_amount: request.stakeAmount,
       }),
     });
@@ -313,11 +282,11 @@ class ContractService {
    * TalentPool.selectCandidate() - matches contract exactly
    */
   async selectCandidate(request: SelectCandidateRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string }>('/pools/select-candidate', {
-      method: 'PUT',
+    const response = await this.request<{ transaction_id: string }>(`/pools/${request.poolId}/select-candidate`, {
+      method: 'POST',
       body: JSON.stringify({
-        pool_id: request.poolId,
-        candidate_address: request.candidateAddress,
+        selected_candidate: request.candidateAddress,
+        selection_reason: request.selectionReason,
       }),
     });
 
@@ -335,10 +304,11 @@ class ContractService {
    * TalentPool.completePool() - matches contract exactly
    */
   async completePool(request: CompletePoolRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string }>('/pools/complete', {
-      method: 'PUT',
+    const response = await this.request<{ transaction_id: string }>(`/pools/${request.poolId}/complete`, {
+      method: 'POST',
       body: JSON.stringify({
-        pool_id: request.poolId,
+        completion_notes: request.completionNotes,
+        final_rating: request.finalRating,
       }),
     });
 
@@ -356,10 +326,10 @@ class ContractService {
    * TalentPool.closePool() - matches contract exactly
    */
   async closePool(request: ClosePoolRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string }>('/pools/close', {
-      method: 'PUT',
+    const response = await this.request<{ transaction_id: string }>(`/pools/${request.poolId}/close`, {
+      method: 'POST',
       body: JSON.stringify({
-        pool_id: request.poolId,
+        closure_reason: request.closureReason,
       }),
     });
 
@@ -377,10 +347,10 @@ class ContractService {
    * TalentPool.withdrawApplication() - matches contract exactly
    */
   async withdrawApplication(request: WithdrawApplicationRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string }>('/pools/withdraw', {
-      method: 'PUT',
+    const response = await this.request<{ transaction_id: string }>(`/pools/${request.poolId}/applications/${request.applicantAddress}`, {
+      method: 'DELETE',
       body: JSON.stringify({
-        pool_id: request.poolId,
+        withdrawal_reason: request.withdrawalReason,
       }),
     });
 
@@ -400,35 +370,23 @@ class ContractService {
    * Governance.createProposal() - matches contract exactly
    */
   async createProposal(request: CreateProposalRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string; proposal_id: number }>('/governance/proposals', {
+    const response = await this.request<{ proposal_id: number }>('/governance/create-proposal', {
       method: 'POST',
-      body: JSON.stringify(request),
+      body: JSON.stringify({
+        proposer: request.proposerAddress,
+        description: request.description,
+        targets: request.targets,
+        values: request.values,
+        calldatas: request.calldatas,
+        proposal_type: request.proposalType,
+      }),
     });
 
     return {
       success: response.success,
-      transactionId: response.data?.transaction_id,
+      transactionId: (response.data as Record<string, unknown>)?.transaction_id as string,
       contractAddress: process.env.NEXT_PUBLIC_GOVERNANCE_CONTRACT,
       functionName: 'createProposal',
-      error: response.error,
-      data: response.data,
-    };
-  }
-
-  /**
-   * Governance.createEmergencyProposal() - matches contract exactly
-   */
-  async createEmergencyProposal(request: CreateEmergencyProposalRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string; proposal_id: number }>('/governance/emergency-proposals', {
-      method: 'POST',
-      body: JSON.stringify(request),
-    });
-
-    return {
-      success: response.success,
-      transactionId: response.data?.transaction_id,
-      contractAddress: process.env.NEXT_PUBLIC_GOVERNANCE_CONTRACT,
-      functionName: 'createEmergencyProposal',
       error: response.error,
       data: response.data,
     };
@@ -438,11 +396,12 @@ class ContractService {
    * Governance.castVote() - matches contract exactly
    */
   async castVote(request: CastVoteRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string }>('/governance/vote', {
+    const response = await this.request<{ transaction_id: string }>('/governance/cast-vote', {
       method: 'POST',
       body: JSON.stringify({
         proposal_id: request.proposalId,
-        vote: request.vote,
+        voter: request.voterAddress,
+        support: request.support,
         reason: request.reason,
       }),
     });
@@ -458,13 +417,107 @@ class ContractService {
   }
 
   /**
+   * Governance.castVoteWithSignature() - matches contract exactly
+   */
+  async castVoteWithSignature(request: CastVoteRequest & { signature: string }): Promise<ContractCallResponse> {
+    const response = await this.request<{ transaction_id: string }>('/governance/cast-vote-with-signature', {
+      method: 'POST',
+      body: JSON.stringify({
+        proposal_id: request.proposalId,
+        voter: request.voterAddress,
+        support: request.support,
+        reason: request.reason,
+        signature: request.signature,
+      }),
+    });
+
+    return {
+      success: response.success,
+      transactionId: response.data?.transaction_id,
+      contractAddress: process.env.NEXT_PUBLIC_GOVERNANCE_CONTRACT,
+      functionName: 'castVoteWithSignature',
+      error: response.error,
+      data: response.data,
+    };
+  }
+
+  /**
+   * Governance.queueProposal() - matches contract exactly
+   */
+  async queueProposal(proposalId: number, executionTime: number): Promise<ContractCallResponse> {
+    const response = await this.request<{ transaction_id: string }>('/governance/queue-proposal', {
+      method: 'POST',
+      body: JSON.stringify({
+        proposal_id: proposalId,
+        execution_time: executionTime,
+      }),
+    });
+
+    return {
+      success: response.success,
+      transactionId: response.data?.transaction_id,
+      contractAddress: process.env.NEXT_PUBLIC_GOVERNANCE_CONTRACT,
+      functionName: 'queueProposal',
+      error: response.error,
+      data: response.data,
+    };
+  }
+
+  /**
+   * Governance.executeProposal() - matches contract exactly
+   */
+  async executeProposal(proposalId: number, targets: string[], values: number[], calldatas: string[]): Promise<ContractCallResponse> {
+    const response = await this.request<{ transaction_id: string }>('/governance/execute-proposal', {
+      method: 'POST',
+      body: JSON.stringify({
+        proposal_id: proposalId,
+        targets: targets,
+        values: values,
+        calldatas: calldatas,
+      }),
+    });
+
+    return {
+      success: response.success,
+      transactionId: response.data?.transaction_id,
+      contractAddress: process.env.NEXT_PUBLIC_GOVERNANCE_CONTRACT,
+      functionName: 'executeProposal',
+      error: response.error,
+      data: response.data,
+    };
+  }
+
+  /**
+   * Governance.cancelProposal() - matches contract exactly
+   */
+  async cancelProposal(proposalId: number, cancellationReason: string): Promise<ContractCallResponse> {
+    const response = await this.request<{ transaction_id: string }>('/governance/cancel-proposal', {
+      method: 'POST',
+      body: JSON.stringify({
+        proposal_id: proposalId,
+        cancellation_reason: cancellationReason,
+      }),
+    });
+
+    return {
+      success: response.success,
+      transactionId: response.data?.transaction_id,
+      contractAddress: process.env.NEXT_PUBLIC_GOVERNANCE_CONTRACT,
+      functionName: 'cancelProposal',
+      error: response.error,
+      data: response.data,
+    };
+  }
+
+  /**
    * Governance.delegate() - matches contract exactly
    */
   async delegateVotingPower(request: DelegateVotingPowerRequest): Promise<ContractCallResponse> {
     const response = await this.request<{ transaction_id: string }>('/governance/delegate', {
       method: 'POST',
       body: JSON.stringify({
-        delegatee_address: request.delegatee,
+        delegator: request.delegatorAddress,
+        delegatee: request.delegateeAddress,
       }),
     });
 
@@ -479,19 +532,21 @@ class ContractService {
   }
 
   /**
-   * Governance.updateGovernanceSettings() - matches contract exactly
+   * Governance.undelegate() - matches contract exactly
    */
-  async updateGovernanceSettings(request: GovernanceSettings): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string }>('/governance/settings', {
-      method: 'PUT',
-      body: JSON.stringify(request),
+  async undelegateVotingPower(delegatorAddress: string): Promise<ContractCallResponse> {
+    const response = await this.request<{ transaction_id: string }>('/governance/undelegate', {
+      method: 'POST',
+      body: JSON.stringify({
+        delegator: delegatorAddress,
+      }),
     });
 
     return {
       success: response.success,
       transactionId: response.data?.transaction_id,
       contractAddress: process.env.NEXT_PUBLIC_GOVERNANCE_CONTRACT,
-      functionName: 'updateGovernanceSettings',
+      functionName: 'undelegate',
       error: response.error,
       data: response.data,
     };
@@ -506,6 +561,7 @@ class ContractService {
     const response = await this.request<{ transaction_id: string }>('/reputation/register-oracle', {
       method: 'POST',
       body: JSON.stringify({
+        oracle_address: request.oracleAddress,
         name: request.name,
         specializations: request.specializations,
         stake_amount: request.stakeAmount,
@@ -523,28 +579,26 @@ class ContractService {
   }
 
   /**
-   * ReputationOracle.submitWorkEvaluation() - matches contract exactly
+   * ReputationOracle.submitEvaluation() - matches contract exactly
    */
   async submitWorkEvaluation(request: SubmitWorkEvaluationRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string; evaluation_id: number }>('/reputation/submit-evaluation', {
+    const response = await this.request<{ evaluation_id: number }>('/reputation/submit-evaluation', {
       method: 'POST',
       body: JSON.stringify({
+        oracle_address: request.oracleAddress,
         user_address: request.userAddress,
-        skill_token_ids: request.skillTokenIds,
-        work_description: request.workDescription,
-        work_content: request.workContent,
-        overall_score: request.overallScore,
-        skill_scores: request.skillScores,
-        feedback: request.feedback,
+        work_id: request.workId,
+        score: request.score,
         ipfs_hash: request.ipfsHash,
+        evaluation_type: request.evaluationType,
       }),
     });
 
     return {
       success: response.success,
-      transactionId: response.data?.transaction_id,
+      transactionId: (response.data as Record<string, unknown>)?.transaction_id as string,
       contractAddress: process.env.NEXT_PUBLIC_REPUTATION_ORACLE_CONTRACT,
-      functionName: 'submitWorkEvaluation',
+      functionName: 'submitEvaluation',
       error: response.error,
       data: response.data,
     };
@@ -554,13 +608,13 @@ class ContractService {
    * ReputationOracle.updateReputationScore() - matches contract exactly
    */
   async updateReputationScore(request: UpdateReputationScoreRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string }>('/reputation/update-score', {
-      method: 'PUT',
+    const response = await this.request<{ transaction_id: string }>('/reputation/update-reputation-score', {
+      method: 'POST',
       body: JSON.stringify({
         user_address: request.userAddress,
-        category: request.category,
         new_score: request.newScore,
-        evidence: request.evidence,
+        skill_categories: request.skillCategories,
+        evaluation_id: request.evaluationId,
       }),
     });
 
@@ -578,18 +632,19 @@ class ContractService {
    * ReputationOracle.challengeEvaluation() - matches contract exactly
    */
   async challengeEvaluation(request: ChallengeEvaluationRequest): Promise<ContractCallResponse> {
-    const response = await this.request<{ transaction_id: string; challenge_id: number }>('/reputation/challenge', {
+    const response = await this.request<{ challenge_id: number }>('/reputation/challenge-evaluation', {
       method: 'POST',
       body: JSON.stringify({
         evaluation_id: request.evaluationId,
-        reason: request.reason,
+        challenger: request.challengerAddress,
+        challenge_reason: request.reason,
         stake_amount: request.stakeAmount,
       }),
     });
 
     return {
       success: response.success,
-      transactionId: response.data?.transaction_id,
+      transactionId: (response.data as Record<string, unknown>)?.transaction_id as string,
       contractAddress: process.env.NEXT_PUBLIC_REPUTATION_ORACLE_CONTRACT,
       functionName: 'challengeEvaluation',
       error: response.error,
@@ -602,11 +657,11 @@ class ContractService {
    */
   async resolveChallenge(request: ResolveChallengeRequest): Promise<ContractCallResponse> {
     const response = await this.request<{ transaction_id: string }>('/reputation/resolve-challenge', {
-      method: 'PUT',
+      method: 'POST',
       body: JSON.stringify({
         challenge_id: request.challengeId,
-        uphold_original: request.upholdOriginal,
         resolution: request.resolution,
+        resolution_reason: request.resolutionReason,
       }),
     });
 
@@ -620,13 +675,88 @@ class ContractService {
     };
   }
 
+  /**
+   * ReputationOracle.isActiveOracle() - matches contract exactly
+   */
+  async isActiveOracle(oracleAddress: string): Promise<ApiResponse<{ is_active: boolean }>> {
+    return this.request(`/reputation/is-active-oracle/${oracleAddress}`);
+  }
+
+  /**
+   * ReputationOracle.updateOracleStatus() - matches contract exactly
+   */
+  async updateOracleStatus(oracleAddress: string, isActive: boolean, reason: string = ""): Promise<ContractCallResponse> {
+    const response = await this.request<{ transaction_id: string }>('/reputation/update-oracle-status', {
+      method: 'POST',
+      body: JSON.stringify({
+        oracle_address: oracleAddress,
+        is_active: isActive,
+        reason: reason,
+      }),
+    });
+
+    return {
+      success: response.success,
+      transactionId: response.data?.transaction_id,
+      contractAddress: process.env.NEXT_PUBLIC_REPUTATION_ORACLE_CONTRACT,
+      functionName: 'updateOracleStatus',
+      error: response.error,
+      data: response.data,
+    };
+  }
+
+  /**
+   * ReputationOracle.slashOracle() - matches contract exactly
+   */
+  async slashOracle(oracleAddress: string, slashAmount: number, slashReason: string): Promise<ContractCallResponse> {
+    const response = await this.request<{ transaction_id: string }>('/reputation/slash-oracle', {
+      method: 'POST',
+      body: JSON.stringify({
+        oracle_address: oracleAddress,
+        slash_amount: slashAmount,
+        slash_reason: slashReason,
+      }),
+    });
+
+    return {
+      success: response.success,
+      transactionId: response.data?.transaction_id,
+      contractAddress: process.env.NEXT_PUBLIC_REPUTATION_ORACLE_CONTRACT,
+      functionName: 'slashOracle',
+      error: response.error,
+      data: response.data,
+    };
+  }
+
+  /**
+   * ReputationOracle.withdrawOracleStake() - matches contract exactly
+   */
+  async withdrawOracleStake(oracleAddress: string, withdrawalAmount: number): Promise<ContractCallResponse> {
+    const response = await this.request<{ transaction_id: string }>('/reputation/withdraw-oracle-stake', {
+      method: 'POST',
+      body: JSON.stringify({
+        oracle_address: oracleAddress,
+        withdrawal_amount: withdrawalAmount,
+      }),
+    });
+
+    return {
+      success: response.success,
+      transactionId: response.data?.transaction_id,
+      contractAddress: process.env.NEXT_PUBLIC_REPUTATION_ORACLE_CONTRACT,
+      functionName: 'withdrawOracleStake',
+      error: response.error,
+      data: response.data,
+    };
+  }
+
   // ============ VIEW FUNCTIONS ============
 
-  async getProposals(page: number = 0, size: number = 20): Promise<PaginatedApiResponse<any>> {
+  async getProposals(page: number = 0, size: number = 20): Promise<PaginatedApiResponse<GovernanceProposal>> {
     return this.request(`/governance/proposals?page=${page}&size=${size}`);
   }
 
-  async getProposal(proposalId: number): Promise<ApiResponse<any>> {
+  async getProposal(proposalId: number): Promise<ApiResponse<GovernanceProposal>> {
     return this.request(`/governance/proposals/${proposalId}`);
   }
 
@@ -634,19 +764,19 @@ class ContractService {
     return this.request(`/governance/voting-power/${address}`);
   }
 
-  async getOracleInfo(address: string): Promise<ApiResponse<any>> {
+  async getOracleInfo(address: string): Promise<ApiResponse<object>> {
     return this.request(`/reputation/oracles/${address}`);
   }
 
-  async getActiveOracles(): Promise<ApiResponse<any[]>> {
+  async getActiveOracles(): Promise<ApiResponse<object[]>> {
     return this.request('/reputation/oracles/active');
   }
 
-  async getWorkEvaluations(userId: string, page: number = 0, size: number = 20): Promise<PaginatedApiResponse<any>> {
+  async getWorkEvaluations(userId: string, page: number = 0, size: number = 20): Promise<PaginatedApiResponse<object>> {
     return this.request(`/reputation/evaluations/${userId}?page=${page}&size=${size}`);
   }
 
-  async getChallenges(page: number = 0, size: number = 20): Promise<PaginatedApiResponse<any>> {
+  async getChallenges(page: number = 0, size: number = 20): Promise<PaginatedApiResponse<object>> {
     return this.request(`/reputation/challenges?page=${page}&size=${size}`);
   }
 }

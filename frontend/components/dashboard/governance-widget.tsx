@@ -4,36 +4,27 @@
  */
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  AlertTriangle, 
-  Users, 
-  Vote, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
+import {
+  AlertTriangle,
+  Users,
+  Vote,
+  Clock,
   Plus,
-  ExternalLink,
   TrendingUp,
   Shield
 } from 'lucide-react';
 import { contractService } from '@/lib/api/contract-service';
-import { dashboardApi } from '@/lib/api/dashboard-service';
-import { 
-  GovernanceProposal, 
-  EmergencyProposal, 
+import {
+  GovernanceProposal,
+  EmergencyProposal,
   VoteRecord,
   GovernanceMetrics,
-  ApiResponse,
-  PaginatedApiResponse
 } from '@/lib/types/contracts';
-import { ContractCreateProposalDialog } from './contract-create-proposal-dialog';
-import { ContractVoteDialog } from './contract-vote-dialog';
-import { ContractDelegateVotingDialog } from './contract-delegate-voting-dialog';
 import { formatDistanceToNow } from 'date-fns';
 
 interface GovernanceWidgetProps {
@@ -42,7 +33,7 @@ interface GovernanceWidgetProps {
 
 export function GovernanceWidget({ walletAddress }: GovernanceWidgetProps) {
   const [proposals, setProposals] = useState<GovernanceProposal[]>([]);
-  const [emergencyProposals, setEmergencyProposals] = useState<EmergencyProposal[]>([]);
+  const [emergencyProposals, setEmergencyProposals] = useState<GovernanceProposal[]>([]);
   const [userVotes, setUserVotes] = useState<VoteRecord[]>([]);
   const [metrics, setMetrics] = useState<GovernanceMetrics | null>(null);
   const [votingPower, setVotingPower] = useState<number>(0);
@@ -50,16 +41,12 @@ export function GovernanceWidget({ walletAddress }: GovernanceWidgetProps) {
   const [error, setError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState('proposals');
-  const [showCreateProposal, setShowCreateProposal] = useState(false);
-  const [showVoteDialog, setShowVoteDialog] = useState(false);
-  const [showDelegateDialog, setShowDelegateDialog] = useState(false);
-  const [selectedProposal, setSelectedProposal] = useState<GovernanceProposal | null>(null);
 
   useEffect(() => {
     loadGovernanceData();
   }, [walletAddress]);
 
-  const loadGovernanceData = async () => {
+  const loadGovernanceData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -72,7 +59,7 @@ export function GovernanceWidget({ walletAddress }: GovernanceWidgetProps) {
 
       if (proposalsRes.success && proposalsRes.data) {
         setProposals(proposalsRes.data.items || []);
-        
+
         // Separate emergency proposals
         const emergency = proposalsRes.data.items?.filter(
           (p: GovernanceProposal) => p.proposalType === 'EMERGENCY'
@@ -105,28 +92,11 @@ export function GovernanceWidget({ walletAddress }: GovernanceWidgetProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [walletAddress]);
 
-  const handleVote = (proposal: GovernanceProposal) => {
-    setSelectedProposal(proposal);
-    setShowVoteDialog(true);
-  };
-
-  const handleVoteSuccess = () => {
-    setShowVoteDialog(false);
-    setSelectedProposal(null);
-    loadGovernanceData(); // Reload to get updated data
-  };
-
-  const handleProposalCreated = () => {
-    setShowCreateProposal(false);
-    loadGovernanceData(); // Reload to get new proposal
-  };
-
-  const handleDelegateSuccess = () => {
-    setShowDelegateDialog(false);
-    loadGovernanceData(); // Reload to get updated voting power
-  };
+  useEffect(() => {
+    loadGovernanceData();
+  }, [loadGovernanceData]);
 
   const getProposalStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -175,268 +145,242 @@ export function GovernanceWidget({ walletAddress }: GovernanceWidgetProps) {
   }
 
   return (
-    <>
-      <Card className="h-full">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Vote className="h-5 w-5" />
-              Governance
-            </CardTitle>
-            <CardDescription>
-              Participate in platform governance and decision-making
-            </CardDescription>
-          </div>
-          <div className="flex gap-2">
-            {walletAddress && (
-              <>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => setShowDelegateDialog(true)}
-                >
-                  <Users className="h-4 w-4 mr-1" />
-                  Delegate
-                </Button>
-                <Button 
-                  size="sm"
-                  onClick={() => setShowCreateProposal(true)}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Create Proposal
-                </Button>
-              </>
-            )}
-          </div>
-        </CardHeader>
-
-        <CardContent>
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-600">{error}</p>
-            </div>
+    <Card className="h-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:shadow-lg hover:border-hedera-300/50 dark:hover:border-hedera-600/50 transition-all duration-300">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Vote className="h-5 w-5" />
+            Governance
+          </CardTitle>
+          <CardDescription>
+            Participate in platform governance and decision-making
+          </CardDescription>
+        </div>
+        <div className="flex gap-2">
+          {walletAddress && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => console.log('Delegate voting')}
+              >
+                <Users className="h-4 w-4 mr-1" />
+                Delegate
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => console.log('Create proposal')}
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create Proposal
+              </Button>
+            </>
           )}
+        </div>
+      </CardHeader>
 
-          {/* Governance Metrics */}
-          {metrics && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{metrics.totalProposals}</div>
-                <div className="text-xs text-gray-500">Total Proposals</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{metrics.activeProposals}</div>
-                <div className="text-xs text-gray-500">Active</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{metrics.totalVoters}</div>
-                <div className="text-xs text-gray-500">Total Voters</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-purple-600">{votingPower}</div>
-                <div className="text-xs text-gray-500">Your Voting Power</div>
-              </div>
+      <CardContent>
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        )}
+
+        {/* Governance Metrics */}
+        {metrics && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{metrics.totalProposals}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Total Proposals</div>
             </div>
-          )}
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{metrics.activeProposals}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Active</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{metrics.totalVoters}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Total Voters</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{votingPower}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Your Voting Power</div>
+            </div>
+          </div>
+        )}
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="proposals">
-                <Vote className="h-4 w-4 mr-1" />
-                Proposals
-              </TabsTrigger>
-              <TabsTrigger value="emergency">
-                <AlertTriangle className="h-4 w-4 mr-1" />
-                Emergency
-              </TabsTrigger>
-              <TabsTrigger value="votes">
-                <TrendingUp className="h-4 w-4 mr-1" />
-                My Votes
-              </TabsTrigger>
-            </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="proposals">
+              <Vote className="h-4 w-4 mr-1" />
+              Proposals
+            </TabsTrigger>
+            <TabsTrigger value="emergency">
+              <AlertTriangle className="h-4 w-4 mr-1" />
+              Emergency
+            </TabsTrigger>
+            <TabsTrigger value="votes">
+              <TrendingUp className="h-4 w-4 mr-1" />
+              My Votes
+            </TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="proposals" className="mt-4">
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                {proposals.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Vote className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No proposals found</p>
-                  </div>
-                ) : (
-                  proposals.map((proposal) => (
-                    <div
-                      key={proposal.id}
-                      className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <h4 className="font-medium text-sm">{proposal.title}</h4>
-                          <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                            {proposal.description}
-                          </p>
-                        </div>
-                        <Badge 
-                          className={`ml-2 ${getProposalStatusColor(proposal.status)} text-white`}
-                        >
-                          {proposal.status}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center justify-between mt-3">
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {formatDistanceToNow(new Date(proposal.deadline), { addSuffix: true })}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <TrendingUp className="h-3 w-3" />
-                            {proposal.forVotes + proposal.againstVotes} votes
-                          </span>
-                        </div>
-                        
-                        {walletAddress && proposal.status === 'ACTIVE' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleVote(proposal)}
-                            className="h-7 px-3 text-xs"
-                          >
-                            Vote
-                          </Button>
-                        )}
-                      </div>
-
-                      {/* Vote breakdown */}
-                      <div className="mt-3 space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-green-600">For: {proposal.forVotes}</span>
-                          <span className="text-red-600">Against: {proposal.againstVotes}</span>
-                          <span className="text-yellow-600">Abstain: {proposal.abstainVotes}</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-green-500 h-2 rounded-l-full"
-                            style={{ 
-                              width: `${(proposal.forVotes / Math.max(proposal.forVotes + proposal.againstVotes + proposal.abstainVotes, 1)) * 100}%` 
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="emergency" className="mt-4">
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                {emergencyProposals.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Shield className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>No emergency proposals</p>
-                  </div>
-                ) : (
-                  emergencyProposals.map((proposal) => (
-                    <div
-                      key={proposal.id}
-                      className="border-2 border-red-200 rounded-lg p-4 bg-red-50"
-                    >
-                      <div className="flex items-start gap-2 mb-2">
-                        <AlertTriangle className="h-4 w-4 text-red-500 mt-1 flex-shrink-0" />
-                        <div className="flex-1">
-                          <h4 className="font-medium text-sm text-red-900">{proposal.title}</h4>
-                          <p className="text-xs text-red-700 mt-1">{proposal.description}</p>
-                        </div>
-                        <Badge className="bg-red-500 text-white">EMERGENCY</Badge>
-                      </div>
-                      
-                      <div className="flex items-center justify-between mt-3">
-                        <span className="text-xs text-red-600">
-                          Expires: {formatDistanceToNow(new Date(proposal.deadline), { addSuffix: true })}
-                        </span>
-                        {walletAddress && proposal.status === 'ACTIVE' && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleVote(proposal)}
-                            className="h-7 px-3 text-xs"
-                          >
-                            Vote Now
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="votes" className="mt-4">
-              <div className="space-y-3 max-h-64 overflow-y-auto">
-                {userVotes.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <TrendingUp className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>{walletAddress ? 'No votes cast yet' : 'Connect wallet to view votes'}</p>
-                  </div>
-                ) : (
-                  userVotes.map((vote) => (
-                    <div
-                      key={`${vote.proposalId}-${vote.timestamp}`}
-                      className="border rounded-lg p-3"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-medium text-sm">Proposal #{vote.proposalId}</h4>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-medium ${getVoteStatusColor(vote.vote)}`}>
-                            {vote.vote.toUpperCase()}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {formatDistanceToNow(new Date(vote.timestamp), { addSuffix: true })}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {vote.reason && (
-                        <p className="text-xs text-gray-600 mt-2 italic">
-                          "{vote.reason}"
+          <TabsContent value="proposals" className="mt-4">
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {proposals.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <Vote className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No proposals found</p>
+                </div>
+              ) : (
+                proposals.map((proposal) => (
+                  <div
+                    key={proposal.id}
+                    className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm text-slate-900 dark:text-slate-100">{proposal.title}</h4>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                          {proposal.description}
                         </p>
+                      </div>
+                      <Badge
+                        className={`ml-2 ${getProposalStatusColor(proposal.status)} text-white`}
+                      >
+                        {proposal.status}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-3">
+                      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {formatDistanceToNow(new Date(proposal.deadline), { addSuffix: true })}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3" />
+                          {proposal.forVotes + proposal.againstVotes} votes
+                        </span>
+                      </div>
+
+                      {walletAddress && proposal.status === 'ACTIVE' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => console.log('Vote on proposal:', proposal.id)}
+                          className="h-7 px-3 text-xs"
+                        >
+                          Vote
+                        </Button>
                       )}
-                      
-                      <div className="text-xs text-gray-500 mt-2">
-                        Voting Power: {vote.votingPower}
+                    </div>
+
+                    {/* Vote breakdown */}
+                    <div className="mt-3 space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-green-600 dark:text-green-400">For: {proposal.forVotes}</span>
+                        <span className="text-red-600 dark:text-red-400">Against: {proposal.againstVotes}</span>
+                        <span className="text-yellow-600 dark:text-yellow-400">Abstain: {proposal.abstainVotes}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
+                        <div
+                          className="bg-green-500 h-2 rounded-l-full"
+                          style={{
+                            width: `${(proposal.forVotes / Math.max(proposal.forVotes + proposal.againstVotes + proposal.abstainVotes, 1)) * 100}%`
+                          }}
+                        />
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+                  </div>
+                ))
+              )}
+            </div>
+          </TabsContent>
 
-      {/* Dialogs */}
-      <ContractCreateProposalDialog
-        open={showCreateProposal}
-        onOpenChange={setShowCreateProposal}
-        onSuccess={handleProposalCreated}
-      />
+          <TabsContent value="emergency" className="mt-4">
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {emergencyProposals.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <Shield className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No emergency proposals</p>
+                </div>
+              ) : (
+                emergencyProposals.map((proposal) => (
+                  <div
+                    key={proposal.id}
+                    className="border-2 border-red-200 dark:border-red-800 rounded-lg p-4 bg-red-50 dark:bg-red-950/30"
+                  >
+                    <div className="flex items-start gap-2 mb-2">
+                      <AlertTriangle className="h-4 w-4 text-red-500 mt-1 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="font-medium text-sm text-red-900 dark:text-red-100">{proposal.title}</h4>
+                        <p className="text-xs text-red-700 dark:text-red-300 mt-1">{proposal.description}</p>
+                      </div>
+                      <Badge className="bg-red-500 text-white">EMERGENCY</Badge>
+                    </div>
 
-      {selectedProposal && (
-        <ContractVoteDialog
-          open={showVoteDialog}
-          onOpenChange={setShowVoteDialog}
-          proposal={selectedProposal}
-          votingPower={votingPower}
-          onSuccess={handleVoteSuccess}
-        />
-      )}
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-xs text-red-600 dark:text-red-400">
+                        Expires: {formatDistanceToNow(new Date(proposal.deadline), { addSuffix: true })}
+                      </span>
+                      {walletAddress && proposal.status === 'ACTIVE' && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => console.log('Vote on emergency proposal:', proposal.id)}
+                          className="h-7 px-3 text-xs"
+                        >
+                          Vote Now
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </TabsContent>
 
-      <ContractDelegateVotingDialog
-        open={showDelegateDialog}
-        onOpenChange={setShowDelegateDialog}
-        currentVotingPower={votingPower}
-        onSuccess={handleDelegateSuccess}
-      />
-    </>
+          <TabsContent value="votes" className="mt-4">
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {userVotes.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <TrendingUp className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>{walletAddress ? 'No votes cast yet' : 'Connect wallet to view votes'}</p>
+                </div>
+              ) : (
+                userVotes.map((vote) => (
+                  <div
+                    key={`${vote.proposalId}-${vote.timestamp}`}
+                    className="border border-slate-200 dark:border-slate-700 rounded-lg p-3"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-sm text-slate-900 dark:text-slate-100">Proposal #{vote.proposalId}</h4>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-medium ${getVoteStatusColor(vote.vote)}`}>
+                          {vote.vote.toUpperCase()}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatDistanceToNow(new Date(vote.timestamp), { addSuffix: true })}
+                        </span>
+                      </div>
+                    </div>
+
+                    {vote.reason && (
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 italic">
+                        &quot;{vote.reason}&quot;
+                      </p>
+                    )}
+
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Voting Power: {vote.votingPower}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
   );
 }

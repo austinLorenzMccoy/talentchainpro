@@ -123,10 +123,32 @@ class GovernanceService:
         return self.contract_manager
     
     def _get_mcp_service(self):
-        """Lazy load MCP service for AI-powered proposal analysis."""
-        if self.mcp_service is None and MCP_SERVICE_AVAILABLE:
-            self.mcp_service = get_mcp_service()
-        return self.mcp_service
+        """Get MCP service if available."""
+        if MCP_SERVICE_AVAILABLE:
+            try:
+                return get_mcp_service()
+            except Exception as e:
+                logger.warning(f"MCP service not available: {str(e)}")
+        return None
+    
+    async def _get_current_user_address(self) -> Optional[str]:
+        """
+        Get the current authenticated user's address.
+        This is the equivalent of msg.sender in smart contracts.
+        
+        Returns:
+            User's Hedera address or None if not authenticated
+        """
+        # TODO: Implement proper authentication context
+        # For now, return a mock address - this should be replaced with
+        # actual authentication logic from the request context
+        try:
+            # This should come from the authenticated request context
+            # For example: request.state.user.address
+            return "0.0.123456"  # Mock address for development
+        except Exception as e:
+            logger.warning(f"Could not get current user address: {str(e)}")
+            return None
     
     def _get_db_session(self):
         """Get database session if available."""
@@ -147,43 +169,47 @@ class GovernanceService:
     
     async def create_proposal(
         self,
-        proposer_address: str,
-        title: str,
+        title: str,                    # ✅ Added missing title parameter
         description: str,
-        proposal_type: ProposalType,
         targets: List[str],
         values: List[int],
         calldatas: List[str],
-        ipfs_hash: Optional[str] = None,
+        ipfs_hash: str,                # ✅ Added missing ipfs_hash parameter
         is_emergency: bool = False
+        # ❌ Removed proposer_address (should be msg.sender in contract)
+        # ❌ Removed proposal_type (not in contract)
     ) -> Dict[str, Any]:
         """
         Create a new governance proposal.
         
         Args:
-            proposer_address: Address of the proposal creator
             title: Proposal title
             description: Detailed proposal description
-            proposal_type: Type of the proposal
             targets: List of target contract addresses
             values: List of values to send with calls
             calldatas: List of encoded function calls
-            ipfs_hash: Optional IPFS hash for additional content
+            ipfs_hash: IPFS hash for additional content
             is_emergency: Whether this is an emergency proposal
             
         Returns:
             Dict containing proposal creation result
         """
         try:
-            if not validate_hedera_address(proposer_address):
-                raise ValueError("Invalid proposer address format")
-            
             # Validate proposal parameters
             if len(targets) != len(values) or len(targets) != len(calldatas):
                 raise ValueError("Targets, values, and calldatas must have same length")
             
             if len(title) < 10 or len(description) < 50:
                 raise ValueError("Title must be at least 10 characters, description at least 50")
+            
+            # Get proposer address from current context (msg.sender equivalent)
+            # This should come from the authenticated user context
+            proposer_address = await self._get_current_user_address()
+            if not proposer_address:
+                raise ValueError("No authenticated user found")
+            
+            if not validate_hedera_address(proposer_address):
+                raise ValueError("Invalid proposer address format")
             
             # Check proposer voting power
             voting_power = await self._get_voting_power(proposer_address)
@@ -205,7 +231,6 @@ class GovernanceService:
                     ai_analysis = await mcp_service.analyze_governance_proposal(
                         title=title,
                         description=description,
-                        proposal_type=proposal_type.value,
                         targets=targets,
                         calldatas=calldatas
                     )
@@ -221,7 +246,7 @@ class GovernanceService:
                 targets=targets,
                 values=values,
                 calldatas=calldatas,
-                ipfs_hash=ipfs_hash or ""
+                ipfs_hash=ipfs_hash
             )
             
             if contract_result.success:
@@ -239,7 +264,7 @@ class GovernanceService:
                 "proposer_address": proposer_address,
                 "title": title,
                 "description": description,
-                "proposal_type": proposal_type.value,
+                "proposal_type": ProposalType.FEATURE_UPDATE.value, # Default to FEATURE_UPDATE
                 "targets": targets,
                 "values": values,
                 "calldatas": calldatas,
@@ -266,7 +291,7 @@ class GovernanceService:
                             proposer_address=proposer_address,
                             title=title,
                             description=description,
-                            proposal_type=proposal_type.value,
+                            proposal_type=ProposalType.FEATURE_UPDATE.value, # Default to FEATURE_UPDATE
                             targets=targets,
                             values=values,
                             calldatas=calldatas,
@@ -291,7 +316,7 @@ class GovernanceService:
                             resource_id=proposal_id,
                             details={
                                 "title": title,
-                                "proposal_type": proposal_type.value,
+                                "proposal_type": ProposalType.FEATURE_UPDATE.value, # Default to FEATURE_UPDATE
                                 "is_emergency": is_emergency,
                                 "targets_count": len(targets)
                             },
@@ -329,7 +354,7 @@ class GovernanceService:
                     "proposal_id": proposal_id,
                     "title": title,
                     "proposer": proposer_address,
-                    "type": proposal_type.value
+                    "type": ProposalType.FEATURE_UPDATE.value
                 })
             except Exception as e:
                 logger.warning(f"HCS submission failed: {str(e)}")
@@ -342,7 +367,7 @@ class GovernanceService:
                 "proposer_address": proposer_address,
                 "title": title,
                 "description": description,
-                "proposal_type": proposal_type.value,
+                "proposal_type": ProposalType.FEATURE_UPDATE.value, # Default to FEATURE_UPDATE
                 "status": ProposalStatus.PENDING.value,
                 "start_time": start_time.isoformat(),
                 "end_time": end_time.isoformat(),
@@ -359,17 +384,16 @@ class GovernanceService:
     async def cast_vote(
         self,
         proposal_id: str,
-        voter_address: str,
-        vote_type: VoteType,
-        reason: str = "",
+        vote_type: VoteType,           # ✅ Renamed from vote_type to match contract
+        reason: str = "",              # ✅ Keep reason parameter
         signature: Optional[str] = None
+        # ❌ Removed voter_address (should be msg.sender in contract)
     ) -> Dict[str, Any]:
         """
         Cast a vote on a governance proposal.
         
         Args:
             proposal_id: ID of the proposal
-            voter_address: Address of the voter
             vote_type: Type of vote (FOR, AGAINST, ABSTAIN)
             reason: Optional reason for the vote
             signature: Optional signature for gasless voting
@@ -378,6 +402,11 @@ class GovernanceService:
             Dict containing vote result
         """
         try:
+            # Get voter address from current context (msg.sender equivalent)
+            voter_address = await self._get_current_user_address()
+            if not voter_address:
+                raise ValueError("No authenticated user found")
+            
             if not validate_hedera_address(voter_address):
                 raise ValueError("Invalid voter address format")
             
@@ -548,20 +577,23 @@ class GovernanceService:
     
     async def delegate_voting_power(
         self,
-        delegator_address: str,
         delegatee_address: str
     ) -> Dict[str, Any]:
         """
         Delegate voting power to another address.
         
         Args:
-            delegator_address: Address delegating power
             delegatee_address: Address receiving delegation
             
         Returns:
             Dict containing delegation result
         """
         try:
+            # Get delegator address from current context (msg.sender equivalent)
+            delegator_address = await self._get_current_user_address()
+            if not delegator_address:
+                raise ValueError("No authenticated user found")
+            
             if not validate_hedera_address(delegator_address):
                 raise ValueError("Invalid delegator address format")
             

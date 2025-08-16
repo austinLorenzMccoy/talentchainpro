@@ -21,7 +21,7 @@ interface DashboardOverviewProps {
 }
 
 export function DashboardOverview({ className }: DashboardOverviewProps) {
-  const { user, isConnected } = useAuth();
+  const { isConnected } = useAuth();
   const { stats, isLoading, error, refetch, lastUpdated } = useDashboardData();
   const { isConnected: realtimeConnected, connectionStatus } = useRealTimeUpdates();
 
@@ -86,7 +86,7 @@ export function DashboardOverview({ className }: DashboardOverviewProps) {
             Welcome back! 👋
           </h1>
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-sm text-slate-600 dark:text-slate-400">
-            <span className="text-base">Here's your TalentChain Pro overview</span>
+            <span className="text-base">Here&apos;s your TalentChain Pro overview</span>
             <div className="flex items-center gap-4">
               {/* Real-time Connection Status */}
               <div className="flex items-center gap-2">

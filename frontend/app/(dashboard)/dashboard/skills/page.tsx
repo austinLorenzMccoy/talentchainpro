@@ -7,8 +7,6 @@ import {
   Search,
   Filter,
   ArrowUpRight,
-  Edit3,
-  ExternalLink,
   Star,
   Award,
   BookOpen,
@@ -99,7 +97,7 @@ export default function SkillsPage() {
   const [skills, setSkills] = useState<SkillTokenInfo[]>(mockSkillTokens);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [isLoading, setIsLoading] = useState(false);
+  const [_isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (isConnected && user) {
@@ -179,7 +177,7 @@ export default function SkillsPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
+          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -191,7 +189,7 @@ export default function SkillsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -203,7 +201,7 @@ export default function SkillsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -217,7 +215,7 @@ export default function SkillsPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -272,7 +270,7 @@ export default function SkillsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
               >
-                <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
+                <Card className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:border-hedera-300/50 dark:hover:border-hedera-700/50">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center space-x-3">
@@ -311,10 +309,10 @@ export default function SkillsPage() {
                     </div>
 
                     <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                      <UpdateSkillTokenDialog 
+                      <UpdateSkillTokenDialog
                         skill={skill}
                         onSkillUpdated={(updatedSkill) => {
-                          setSkills(prev => prev.map(s => 
+                          setSkills(prev => prev.map(s =>
                             s.tokenId === updatedSkill.tokenId ? updatedSkill : s
                           ));
                         }}

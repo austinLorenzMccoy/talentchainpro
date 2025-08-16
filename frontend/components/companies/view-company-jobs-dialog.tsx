@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ExternalLink, Building, MapPin, DollarSign, Clock, Users, Star, Briefcase, Filter, Search, X, CheckCircle } from "lucide-react";
+import { useState } from "react";
+import { ExternalLink, Building, MapPin, Clock, Star, Briefcase, Search, X, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -63,7 +63,7 @@ interface ViewCompanyJobsDialogProps {
 }
 
 // Mock company jobs data - will be replaced with real API calls
-const getCompanyJobs = (companyId: number): CompanyJob[] => [
+const getCompanyJobs = (_companyId: number): CompanyJob[] => [
     {
         id: 1,
         title: "Senior React Developer",

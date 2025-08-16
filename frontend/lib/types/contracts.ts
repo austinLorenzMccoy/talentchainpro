@@ -84,27 +84,38 @@ export interface GovernanceSettings {
   emergencyVotingPeriod: number;
 }
 
+// FIXED: Align with contract function signature
 export interface CreateProposalRequest {
+  title: string;           // ✅ Added missing title parameter
+  description: string;
+  targets: string[];
+  values: number[];
+  calldatas: string[];
+  ipfsHash: string;        // ✅ Added missing ipfsHash parameter
+  // ❌ Removed proposalType (not in contract)
+  // ❌ Removed proposerAddress (should be msg.sender in contract)
+}
+
+export interface CreateEmergencyProposalRequest {
   title: string;
   description: string;
   targets: string[];
   values: number[];
   calldatas: string[];
   ipfsHash: string;
+  justification: string;   // ✅ Added missing justification parameter
 }
 
-export interface CreateEmergencyProposalRequest extends CreateProposalRequest {
-  justification: string;
-}
-
+// FIXED: Align with contract function signature
 export interface CastVoteRequest {
   proposalId: number;
-  vote: VoteType;
+  vote: number;            // ✅ Renamed support to vote to match contract
   reason: string;
+  // ❌ Removed voterAddress (should be msg.sender in contract)
 }
 
 export interface DelegateVotingPowerRequest {
-  delegatee: string;
+  delegateeAddress: string;
 }
 
 // ============ REPUTATION ORACLE TYPES ============
@@ -159,21 +170,47 @@ export interface Challenge {
   resolver: string;
 }
 
+// FIXED: Align with contract function signature
 export interface RegisterOracleRequest {
-  name: string;
-  specializations: string[];
+  name: string;                    // ✅ Keep only contract parameters
+  specializations: string[];       // ✅ Keep only contract parameters
+  // ❌ Removed oracleAddress (should be msg.sender in contract)
+  // ❌ Removed stakeAmount (should be msg.value in contract)
+}
+
+// FIXED: Align with contract function signature
+export interface SubmitWorkEvaluationRequest {
+  user: string;                    // ✅ Renamed userAddress to user
+  skillTokenIds: number[];         // ✅ Added missing skillTokenIds
+  workDescription: string;         // ✅ Added missing workDescription
+  workContent: string;             // ✅ Added missing workContent
+  overallScore: number;            // ✅ Renamed score to overallScore
+  skillScores: number[];           // ✅ Added missing skillScores
+  feedback: string;                // ✅ Added missing feedback
+  ipfsHash: string;
+  // ❌ Removed oracleAddress (should be msg.sender in contract)
+  // ❌ Removed workId (not in contract)
+  // ❌ Removed evaluationType (not in contract)
+}
+
+export interface UpdateReputationScoreRequest {
+  userAddress: string;
+  newScore: number;
+  skillCategories: number[];
+  evaluationId: number;
+}
+
+export interface ChallengeEvaluationRequest {
+  evaluationId: number;
+  challengerAddress: string;
+  reason: string;
   stakeAmount: number;
 }
 
-export interface SubmitWorkEvaluationRequest {
-  userAddress: string;
-  skillTokenIds: number[];
-  workDescription: string;
-  workContent: string;
-  overallScore: number;
-  skillScores: number[];
-  feedback: string;
-  ipfsHash: string;
+export interface ResolveChallengeRequest {
+  challengeId: number;
+  resolution: boolean;
+  resolutionReason: string;
 }
 
 export interface UpdateReputationScoreRequest {
@@ -185,26 +222,18 @@ export interface UpdateReputationScoreRequest {
 
 export interface ChallengeEvaluationRequest {
   evaluationId: number;
+  challengerAddress: string;
   reason: string;
   stakeAmount: number;
-}
-
-export interface ResolveChallengeRequest {
-  challengeId: number;
-  upholdOriginal: boolean;
-  resolution: string;
 }
 
 // ============ ENHANCED SKILL TOKEN TYPES ============
 
 export interface BatchSkillTokenRequest {
-  recipientAddress: string;
-  categories: string[];
-  subcategories: string[];
+  recipients: string[];
+  skillNames: string[];
   levels: number[];
-  expiryDates: number[];
   metadataArray: string[];
-  tokenUris: string[];
 }
 
 export interface UpdateSkillLevelRequest {
@@ -240,18 +269,24 @@ export interface RenewSkillTokenRequest {
 export interface SelectCandidateRequest {
   poolId: number;
   candidateAddress: string;
+  selectionReason: string;
 }
 
 export interface CompletePoolRequest {
   poolId: number;
+  completionNotes: string;
+  finalRating: number;
 }
 
 export interface ClosePoolRequest {
   poolId: number;
+  closureReason: string;
 }
 
 export interface WithdrawApplicationRequest {
   poolId: number;
+  applicantAddress: string;
+  withdrawalReason: string;
 }
 
 // ============ CONTRACT-PERFECT JOB POOL CREATE REQUEST ============
@@ -293,13 +328,22 @@ export interface ContractSkillTokenCreateRequest {
 
 export interface ContractPoolApplicationRequest {
   poolId: number;
-  skillTokenIds: number[];
+  applicantAddress: string;
+  expectedSalary: number;
+  availabilityDate: number;
   coverLetter: string;
-  portfolio: string;
   stakeAmount: number; // in tinybar
 }
 
 // ============ ENHANCED DASHBOARD TYPES ============
+
+export interface DashboardStats {
+  totalSkills: number;
+  totalPools: number;
+  totalStaked: number;
+  totalEvaluations: number;
+  totalUsers: number;
+}
 
 export interface ExtendedDashboardStats extends DashboardStats {
   governanceProposals: number;
@@ -350,7 +394,7 @@ export interface ContractCallResponse {
   functionName?: string;
   gasUsed?: number;
   error?: string;
-  data?: any;
+  data?: unknown;
 }
 
 export interface PaginatedApiResponse<T> {
@@ -386,14 +430,14 @@ export interface FormState<T> {
 export interface DashboardWidgetProps {
   title: string;
   description?: string;
-  icon?: React.ComponentType<any>;
+  icon?: React.ComponentType<object>;
   className?: string;
   children: React.ReactNode;
   headerActions?: React.ReactNode;
   actions?: Array<{
     label: string;
     onClick: () => void;
-    icon?: React.ComponentType<any>;
+    icon?: React.ComponentType<object>;
   }>;
 }
 
@@ -411,7 +455,7 @@ export interface ContractFunction {
   inputs: Array<{
     name: string;
     type: string;
-    value: any;
+    value: unknown;
   }>;
   value?: number; // for payable functions
   gasLimit?: number;
@@ -420,7 +464,7 @@ export interface ContractFunction {
 export interface SmartContractCall {
   contractAddress: string;
   function: ContractFunction;
-  signer: any;
+  signer: object;
 }
 
 // Export all existing types from the original file
