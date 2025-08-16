@@ -158,7 +158,7 @@ class ReputationService:
         Returns:
             User's Hedera address or None if not authenticated
         """
-        # TODO: Implement proper authentication context
+        # TODO: This should be replaced with proper request context
         # For now, return a mock address - this should be replaced with
         # actual authentication logic from the request context
         try:
@@ -167,6 +167,37 @@ class ReputationService:
             return "0.0.123456"  # Mock address for development
         except Exception as e:
             logger.warning(f"Could not get current user address: {str(e)}")
+            return None
+    
+    def get_auth_context_from_request(self, request) -> Optional[str]:
+        """
+        Get the authenticated user address from a FastAPI request.
+        
+        Args:
+            request: FastAPI request object
+            
+        Returns:
+            User's Hedera address or None if not authenticated
+        """
+        try:
+            # Try to get from request state
+            if hasattr(request, 'state') and hasattr(request.state, 'user'):
+                return request.state.user.user_address
+            
+            # Try to get from headers (fallback)
+            wallet_address = request.headers.get("X-Wallet-Address")
+            if wallet_address:
+                return wallet_address
+            
+            # Try to get from query parameters (fallback)
+            wallet_address = request.query_params.get("wallet_address")
+            if wallet_address:
+                return wallet_address
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Could not get user address from request: {str(e)}")
             return None
     
     async def _get_transaction_value(self) -> float:
@@ -442,17 +473,39 @@ class ReputationService:
                             "reputation_oracles:*",
                             f"oracle:{oracle_address}:*"
                         ])
+                        
+                        db.commit()
+                        
                 except Exception as db_error:
                     logger.warning(f"Database oracle registration failed: {str(db_error)}")
                     DATABASE_MODELS_AVAILABLE = False
             
             # Fallback storage
             if not DATABASE_MODELS_AVAILABLE:
-                if "oracles" not in _fallback_reputation:
-                    _fallback_reputation["oracles"] = {}
-                _fallback_reputation["oracles"][oracle_address] = registration_data
+                _fallback_reputation[oracle_id] = registration_data
+                logger.info(f"Stored oracle {oracle_id} in fallback storage")
             
-            logger.info(f"Registered oracle {oracle_id} for {oracle_address}")
+            # Call blockchain contract for oracle registration
+            try:
+                from app.utils.hedera import register_reputation_oracle
+                
+                contract_result = await register_reputation_oracle(
+                    name=name,
+                    specializations=specializations
+                )
+                
+                if contract_result.success:
+                    logger.info(f"Registered oracle on blockchain: {contract_result.transaction_id}")
+                    # Update registration data with blockchain info
+                    registration_data["transaction_id"] = contract_result.transaction_id
+                    registration_data["blockchain_verified"] = True
+                else:
+                    logger.warning(f"Failed to register oracle on blockchain: {contract_result.error}")
+                    registration_data["blockchain_verified"] = False
+                    
+            except Exception as e:
+                logger.warning(f"Blockchain oracle registration failed: {str(e)}")
+                registration_data["blockchain_verified"] = False
             
             return {
                 "success": True,
@@ -461,8 +514,9 @@ class ReputationService:
                 "name": name,
                 "specializations": specializations,
                 "stake_amount": stake_amount,
-                "status": "active",
-                "registered_at": registration_data["registered_at"]
+                "message": "Oracle registered successfully",
+                "transaction_id": registration_data.get("transaction_id"),
+                "blockchain_verified": registration_data.get("blockchain_verified", False)
             }
         
         except Exception as e:
@@ -471,93 +525,131 @@ class ReputationService:
     
     async def submit_work_evaluation(
         self,
-        oracle_address: str,
-        user_address: str,
-        skill_token_ids: List[str],
+        user: str,
+        skill_token_ids: List[int],
         work_description: str,
-        artifacts: List[str],
+        work_content: str,
         overall_score: int,
-        skill_scores: Dict[str, int],
+        skill_scores: List[int],
         feedback: str,
-        ipfs_hash: Optional[str] = None
+        ipfs_hash: str
     ) -> Dict[str, Any]:
         """
-        Submit a work evaluation as an oracle.
+        Submit a work evaluation.
         
         Args:
-            oracle_address: Oracle submitting the evaluation
-            user_address: User being evaluated
-            skill_token_ids: Skill tokens being evaluated
+            user: User address being evaluated
+            skill_token_ids: List of skill token IDs
             work_description: Description of the work
-            artifacts: List of work artifacts (URLs, IPFS hashes)
-            overall_score: Overall evaluation score (0-100)
+            work_content: Content of the work
+            overall_score: Overall evaluation score
             skill_scores: Individual skill scores
-            feedback: Detailed feedback
-            ipfs_hash: IPFS hash for additional evaluation data
+            feedback: Evaluation feedback
+            ipfs_hash: IPFS hash for evaluation data
             
         Returns:
             Dict containing evaluation submission result
         """
         try:
+            # Get oracle address from current context (msg.sender equivalent)
+            oracle_address = await self._get_current_user_address()
+            if not oracle_address:
+                raise ValueError("No authenticated oracle found")
+            
             if not validate_hedera_address(oracle_address):
                 raise ValueError("Invalid oracle address format")
             
-            if not validate_hedera_address(user_address):
+            if not validate_hedera_address(user):
                 raise ValueError("Invalid user address format")
             
-            if not (0 <= overall_score <= 100):
-                raise ValueError("Overall score must be between 0 and 100")
+            # Validate scores
+            if not 0 <= overall_score <= 10000:
+                raise ValueError("Overall score must be between 0 and 10000")
             
-            # Verify oracle is registered and active
+            if len(skill_scores) != len(skill_token_ids):
+                raise ValueError("Skill scores array must have same length as skill token IDs")
+            
+            for score in skill_scores:
+                if not 0 <= score <= 10000:
+                    raise ValueError("Each skill score must be between 0 and 10000")
+            
+            # Check if oracle is registered and active
             oracle_info = await self._get_oracle_info(oracle_address)
             if not oracle_info or not oracle_info.get("is_active"):
                 raise ValueError("Oracle not registered or inactive")
             
-            # Create evaluation record
-            evaluation_id = f"eval_{hash(user_address + work_description + str(datetime.now().timestamp())) % 100000}"
+            # Generate evaluation ID
+            evaluation_id = f"evaluation_{hash(user + oracle_address + str(overall_score)) % 100000}"
+            current_time = datetime.now(timezone.utc)
+            
+            # Call blockchain contract for work evaluation submission
+            try:
+                from app.utils.hedera import submit_work_evaluation
+                
+                contract_result = await submit_work_evaluation(
+                    user=user,
+                    skill_token_ids=skill_token_ids,
+                    work_description=work_description,
+                    work_content=work_content,
+                    overall_score=overall_score,
+                    skill_scores=skill_scores,
+                    feedback=feedback,
+                    ipfs_hash=ipfs_hash
+                )
+                
+                if contract_result.success:
+                    logger.info(f"Submitted work evaluation on blockchain: {contract_result.transaction_id}")
+                    # Use evaluation ID from contract if available
+                    evaluation_id = contract_result.token_id or evaluation_id
+                    transaction_id = contract_result.transaction_id
+                    blockchain_verified = True
+                else:
+                    logger.warning(f"Failed to submit evaluation on blockchain: {contract_result.error}")
+                    transaction_id = None
+                    blockchain_verified = False
+                    
+            except Exception as e:
+                logger.warning(f"Blockchain evaluation submission failed: {str(e)}")
+                transaction_id = None
+                blockchain_verified = False
+            
+            # Create evaluation data
             evaluation_data = {
                 "evaluation_id": evaluation_id,
+                "user_address": user,
                 "oracle_address": oracle_address,
-                "user_address": user_address,
                 "skill_token_ids": skill_token_ids,
                 "work_description": work_description,
-                "artifacts": artifacts,
+                "work_content": work_content,
                 "overall_score": overall_score,
                 "skill_scores": skill_scores,
                 "feedback": feedback,
                 "ipfs_hash": ipfs_hash,
-                "status": "completed",
-                "submitted_at": datetime.now(timezone.utc).isoformat()
+                "transaction_id": transaction_id,
+                "blockchain_verified": blockchain_verified,
+                "submitted_at": current_time.isoformat()
             }
             
-            # Store evaluation in database if available
+            # Store in database if available
             if DATABASE_MODELS_AVAILABLE:
                 try:
                     with self._get_db_session() as db:
                         evaluation = WorkEvaluation(
                             evaluation_id=evaluation_id,
+                            user_address=user,
                             oracle_address=oracle_address,
-                            user_address=user_address,
                             skill_token_ids=skill_token_ids,
                             work_description=work_description,
-                            artifacts=artifacts,
+                            work_content=work_content,
                             overall_score=overall_score,
                             skill_scores=skill_scores,
                             feedback=feedback,
                             ipfs_hash=ipfs_hash,
-                            status="completed"
+                            transaction_id=transaction_id,
+                            blockchain_verified=blockchain_verified
                         )
                         
                         db.add(evaluation)
-                        
-                        # Update oracle statistics
-                        oracle_record = db.query(ReputationOracle).filter(
-                            ReputationOracle.oracle_address == oracle_address
-                        ).first()
-                        
-                        if oracle_record:
-                            oracle_record.total_evaluations += 1
-                            oracle_record.successful_evaluations += 1
                         
                         # Add audit log
                         audit_log = AuditLog(
@@ -566,9 +658,10 @@ class ReputationService:
                             resource_type="work_evaluation",
                             resource_id=evaluation_id,
                             details={
-                                "user_address": user_address,
+                                "user_address": user,
                                 "overall_score": overall_score,
-                                "skill_tokens": len(skill_token_ids)
+                                "skill_count": len(skill_token_ids),
+                                "transaction_id": transaction_id
                             },
                             success=True
                         )
@@ -576,46 +669,34 @@ class ReputationService:
                         
                         # Invalidate caches
                         self._invalidate_cache([
-                            f"user_evaluations:{user_address}:*",
-                            f"oracle_evaluations:{oracle_address}:*"
+                            f"evaluations:{user}:*",
+                            f"oracle_evaluations:{oracle_address}:*",
+                            "evaluation_stats:*"
                         ])
+                        
+                        db.commit()
+                        
+                        logger.info(f"Stored evaluation {evaluation_id} in database")
+                        
                 except Exception as db_error:
                     logger.warning(f"Database evaluation storage failed: {str(db_error)}")
                     DATABASE_MODELS_AVAILABLE = False
             
             # Fallback storage
             if not DATABASE_MODELS_AVAILABLE:
-                if user_address not in _fallback_transactions:
-                    _fallback_transactions[user_address] = []
-                _fallback_transactions[user_address].append(evaluation_data)
-            
-            # Update user reputation based on evaluation
-            if overall_score > 70:
-                await self.update_reputation(
-                    user_address=user_address,
-                    event_type=ReputationEventType.SKILL_VALIDATION,
-                    impact_score=(overall_score - 50) * 0.5,  # Scale to -25 to +25
-                    context={
-                        "evaluation_id": evaluation_id,
-                        "oracle_address": oracle_address,
-                        "overall_score": overall_score,
-                        "skill_tokens": skill_token_ids
-                    },
-                    validator_address=oracle_address
-                )
-            
-            logger.info(f"Work evaluation {evaluation_id} submitted by oracle {oracle_address}")
+                _fallback_reputation[evaluation_id] = evaluation_data
+                logger.info(f"Stored evaluation {evaluation_id} in fallback storage")
             
             return {
                 "success": True,
                 "evaluation_id": evaluation_id,
+                "user_address": user,
                 "oracle_address": oracle_address,
-                "user_address": user_address,
                 "overall_score": overall_score,
-                "skill_scores": skill_scores,
-                "feedback": feedback,
-                "status": "completed",
-                "submitted_at": evaluation_data["submitted_at"]
+                "skill_count": len(skill_token_ids),
+                "message": "Work evaluation submitted successfully",
+                "transaction_id": transaction_id,
+                "blockchain_verified": blockchain_verified
             }
         
         except Exception as e:

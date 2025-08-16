@@ -139,7 +139,7 @@ class GovernanceService:
         Returns:
             User's Hedera address or None if not authenticated
         """
-        # TODO: Implement proper authentication context
+        # TODO: This should be replaced with proper request context
         # For now, return a mock address - this should be replaced with
         # actual authentication logic from the request context
         try:
@@ -148,6 +148,37 @@ class GovernanceService:
             return "0.0.123456"  # Mock address for development
         except Exception as e:
             logger.warning(f"Could not get current user address: {str(e)}")
+            return None
+    
+    def get_auth_context_from_request(self, request) -> Optional[str]:
+        """
+        Get the authenticated user address from a FastAPI request.
+        
+        Args:
+            request: FastAPI request object
+            
+        Returns:
+            User's Hedera address or None if not authenticated
+        """
+        try:
+            # Try to get from request state
+            if hasattr(request, 'state') and hasattr(request.state, 'user'):
+                return request.state.user.user_address
+            
+            # Try to get from headers (fallback)
+            wallet_address = request.headers.get("X-Wallet-Address")
+            if wallet_address:
+                return wallet_address
+            
+            # Try to get from query parameters (fallback)
+            wallet_address = request.query_params.get("wallet_address")
+            if wallet_address:
+                return wallet_address
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Could not get user address from request: {str(e)}")
             return None
     
     def _get_db_session(self):
@@ -269,16 +300,17 @@ class GovernanceService:
                 "values": values,
                 "calldatas": calldatas,
                 "ipfs_hash": ipfs_hash,
-                "is_emergency": is_emergency,
                 "status": ProposalStatus.PENDING.value,
                 "start_time": start_time.isoformat(),
                 "end_time": end_time.isoformat(),
                 "for_votes": 0,
                 "against_votes": 0,
                 "abstain_votes": 0,
-                "created_at": current_time.isoformat(),
+                "total_votes": 0,
+                "is_emergency": is_emergency,
                 "transaction_id": transaction_id,
                 "blockchain_verified": contract_result.success if 'contract_result' in locals() else False,
+                "created_at": current_time.isoformat(),
                 "ai_analysis": ai_analysis
             }
             
@@ -296,14 +328,12 @@ class GovernanceService:
                             values=values,
                             calldatas=calldatas,
                             ipfs_hash=ipfs_hash,
-                            is_emergency=is_emergency,
                             status=ProposalStatus.PENDING.value,
                             start_time=start_time,
                             end_time=end_time,
-                            for_votes=0,
-                            against_votes=0,
-                            abstain_votes=0,
-                            metadata={"ai_analysis": ai_analysis} if ai_analysis else {}
+                            is_emergency=is_emergency,
+                            transaction_id=transaction_id,
+                            blockchain_verified=contract_result.success if 'contract_result' in locals() else False
                         )
                         
                         db.add(proposal)
@@ -327,54 +357,53 @@ class GovernanceService:
                         # Invalidate caches
                         self._invalidate_cache([
                             "governance_proposals:*",
-                            f"user_proposals:{proposer_address}:*"
+                            f"proposal:{proposal_id}:*",
+                            "proposal_stats:*"
                         ])
+                        
+                        db.commit()
+                        
+                        logger.info(f"Stored proposal {proposal_id} in database")
+                        
                 except Exception as db_error:
-                    logger.warning(f"Database storage failed, using fallback: {str(db_error)}")
+                    logger.warning(f"Database proposal storage failed: {str(db_error)}")
                     DATABASE_MODELS_AVAILABLE = False
             
             # Fallback storage
             if not DATABASE_MODELS_AVAILABLE:
-                _fallback_counter += 1
                 _fallback_proposals[proposal_id] = proposal_data
+                logger.info(f"Stored proposal {proposal_id} in fallback storage")
             
-            # Submit to blockchain (if governance contract is available)
+            # Send HCS message for proposal creation
             try:
-                contract_manager = self._get_contract_manager()
-                if contract_manager:
-                    # This would call the actual governance contract
-                    # contract_result = await contract_manager.create_proposal(...)
-                    pass
+                await submit_hcs_message(
+                    topic_id=self.governance_topic_id,
+                    message=json.dumps({
+                        "type": "proposal_created",
+                        "proposal_id": proposal_id,
+                        "title": title,
+                        "proposer": proposer_address,
+                        "type": ProposalType.FEATURE_UPDATE.value
+                    })
+                )
             except Exception as e:
-                logger.warning(f"Blockchain submission failed: {str(e)}")
-            
-            # Submit to HCS for transparency
-            try:
-                await submit_hcs_message(f"governance/proposal_created", {
-                    "proposal_id": proposal_id,
-                    "title": title,
-                    "proposer": proposer_address,
-                    "type": ProposalType.FEATURE_UPDATE.value
-                })
-            except Exception as e:
-                logger.warning(f"HCS submission failed: {str(e)}")
-            
-            logger.info(f"Created governance proposal {proposal_id} by {proposer_address}")
+                logger.warning(f"Failed to send HCS message: {str(e)}")
             
             return {
                 "success": True,
                 "proposal_id": proposal_id,
-                "proposer_address": proposer_address,
-                "title": title,
-                "description": description,
-                "proposal_type": ProposalType.FEATURE_UPDATE.value, # Default to FEATURE_UPDATE
-                "status": ProposalStatus.PENDING.value,
-                "start_time": start_time.isoformat(),
-                "end_time": end_time.isoformat(),
-                "voting_delay_hours": self.voting_delay / 3600,
-                "voting_period_days": self.voting_period / (24 * 3600),
-                "ai_analysis": ai_analysis,
-                "created_at": current_time.isoformat()
+                "transaction_id": transaction_id,
+                "message": "Proposal created successfully",
+                "details": {
+                    "title": title,
+                    "proposer": proposer_address,
+                    "proposal_type": ProposalType.FEATURE_UPDATE.value, # Default to FEATURE_UPDATE
+                    "status": ProposalStatus.PENDING.value,
+                    "start_time": start_time.isoformat(),
+                    "end_time": end_time.isoformat(),
+                    "is_emergency": is_emergency,
+                    "blockchain_verified": contract_result.success if 'contract_result' in locals() else False
+                }
             }
         
         except Exception as e:
@@ -672,9 +701,29 @@ class GovernanceService:
             
             # Fallback storage
             if not DATABASE_MODELS_AVAILABLE:
-                _fallback_delegations[delegator_address] = delegation_data
+                _fallback_delegations[delegation_id] = delegation_data
+                logger.info(f"Stored delegation {delegation_id} in fallback storage")
             
-            logger.info(f"Voting power delegated from {delegator_address} to {delegatee_address}")
+            # Call blockchain contract for delegation
+            try:
+                from app.utils.hedera import delegate_voting_power
+                
+                contract_result = await delegate_voting_power(
+                    delegatee=delegatee_address
+                )
+                
+                if contract_result.success:
+                    logger.info(f"Delegated voting power on blockchain: {contract_result.transaction_id}")
+                    # Update delegation data with blockchain info
+                    delegation_data["transaction_id"] = contract_result.transaction_id
+                    delegation_data["blockchain_verified"] = True
+                else:
+                    logger.warning(f"Failed to delegate on blockchain: {contract_result.error}")
+                    delegation_data["blockchain_verified"] = False
+                    
+            except Exception as e:
+                logger.warning(f"Blockchain delegation failed: {str(e)}")
+                delegation_data["blockchain_verified"] = False
             
             return {
                 "success": True,
@@ -682,11 +731,115 @@ class GovernanceService:
                 "delegator_address": delegator_address,
                 "delegatee_address": delegatee_address,
                 "voting_power": voting_power,
-                "delegated_at": delegation_data["delegated_at"]
+                "message": "Voting power delegated successfully",
+                "transaction_id": delegation_data.get("transaction_id"),
+                "blockchain_verified": delegation_data.get("blockchain_verified", False)
             }
         
         except Exception as e:
             logger.error(f"Error delegating voting power: {str(e)}")
+            raise
+    
+    async def undelegate_voting_power(self) -> Dict[str, Any]:
+        """
+        Undelegate voting power (remove delegation).
+        
+        Returns:
+            Dict containing undelegation result
+        """
+        try:
+            # Get delegator address from current context (msg.sender equivalent)
+            delegator_address = await self._get_current_user_address()
+            if not delegator_address:
+                raise ValueError("No authenticated user found")
+            
+            if not validate_hedera_address(delegator_address):
+                raise ValueError("Invalid delegator address format")
+            
+            # Check if delegation exists
+            existing_delegation = await self._get_existing_delegation(delegator_address)
+            if not existing_delegation:
+                raise ValueError("No active delegation found")
+            
+            # Call blockchain contract for undelegation
+            try:
+                from app.utils.hedera import undelegate_voting_power
+                
+                contract_result = await undelegate_voting_power()
+                
+                if contract_result.success:
+                    logger.info(f"Undelegated voting power on blockchain: {contract_result.transaction_id}")
+                    transaction_id = contract_result.transaction_id
+                    blockchain_verified = True
+                else:
+                    logger.warning(f"Failed to undelegate on blockchain: {contract_result.error}")
+                    transaction_id = None
+                    blockchain_verified = False
+                    
+            except Exception as e:
+                logger.warning(f"Blockchain undelegation failed: {str(e)}")
+                transaction_id = None
+                blockchain_verified = False
+            
+            # Update delegation status in database
+            if DATABASE_MODELS_AVAILABLE:
+                try:
+                    with self._get_db_session() as db:
+                        # Deactivate existing delegation
+                        old_delegation = db.query(GovernanceDelegation).filter(
+                            GovernanceDelegation.delegator_address == delegator_address,
+                            GovernanceDelegation.is_active == True
+                        ).first()
+                        
+                        if old_delegation:
+                            old_delegation.is_active = False
+                            old_delegation.undelegated_at = datetime.now(timezone.utc)
+                        
+                        # Add audit log
+                        audit_log = AuditLog(
+                            user_address=delegator_address,
+                            action="undelegate_voting_power",
+                            resource_type="governance_delegation",
+                            resource_id=existing_delegation["delegation_id"],
+                            details={
+                                "previous_delegatee": existing_delegation["delegatee_address"],
+                                "voting_power": existing_delegation["voting_power"],
+                                "transaction_id": transaction_id
+                            },
+                            success=True
+                        )
+                        db.add(audit_log)
+                        
+                        # Invalidate caches
+                        self._invalidate_cache([
+                            f"voting_power:{delegator_address}:*",
+                            f"delegations:{delegator_address}:*"
+                        ])
+                        
+                        db.commit()
+                        
+                except Exception as db_error:
+                    logger.warning(f"Database undelegation update failed: {str(db_error)}")
+                    DATABASE_MODELS_AVAILABLE = False
+            
+            # Update fallback storage
+            if not DATABASE_MODELS_AVAILABLE:
+                if delegator_address in _fallback_delegations:
+                    _fallback_delegations[delegator_address]["is_active"] = False
+                    _fallback_delegations[delegator_address]["undelegated_at"] = datetime.now(timezone.utc).isoformat()
+            
+            return {
+                "success": True,
+                "delegator_address": delegator_address,
+                "previous_delegatee": existing_delegation["delegatee_address"],
+                "voting_power": existing_delegation["voting_power"],
+                "message": "Voting power undelegated successfully",
+                "transaction_id": transaction_id,
+                "blockchain_verified": blockchain_verified
+            }
+        
+        except Exception as e:
+            logger.error(f"Error undelegating voting power: {str(e)}")
             raise
     
     # ============ QUERY FUNCTIONS ============

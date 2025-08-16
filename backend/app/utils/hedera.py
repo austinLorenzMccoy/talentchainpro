@@ -1282,9 +1282,9 @@ async def cast_governance_vote(
     Cast a vote on a governance proposal.
     
     Args:
-        proposal_id: ID of the proposal
-        vote: Vote choice (0=Against, 1=For, 2=Abstain)
-        reason: Reason for the vote
+        proposal_id: Proposal ID to vote on
+        vote: Vote type (0=Against, 1=For, 2=Abstain)
+        reason: Optional reason for the vote
         
     Returns:
         TransactionResult with success status and details
@@ -1323,11 +1323,10 @@ async def cast_governance_vote(
         receipt = response.getReceipt(client)
         
         if receipt.status == Status.Success:
-            record = response.getRecord(client)
             return TransactionResult(
                 success=True,
                 transaction_id=response.transactionId.toString(),
-                gas_used=record.gasUsed if record else 0,
+                gas_used=receipt.gasUsed if hasattr(receipt, 'gasUsed') else 0,
                 contract_address=contract_address
             )
         else:
@@ -1338,6 +1337,217 @@ async def cast_governance_vote(
             
     except Exception as e:
         logger.error(f"Failed to cast governance vote: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
+
+
+async def delegate_voting_power(
+    delegatee: str
+) -> TransactionResult:
+    """
+    Delegate voting power to another address.
+    
+    Args:
+        delegatee: Address to delegate voting power to
+        
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get Governance contract info
+        governance_config = contract_config.get('contracts', {}).get('Governance', {})
+        contract_address = governance_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="Governance contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters for delegate
+        params = ContractFunctionParameters()
+        params.addAddress(delegatee)
+        
+        # Execute contract function
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(150000)
+        transaction.setFunction("delegate", params)
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=receipt.gasUsed if hasattr(receipt, 'gasUsed') else 0,
+                contract_address=contract_address
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to delegate voting power: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
+
+
+async def undelegate_voting_power() -> TransactionResult:
+    """
+    Undelegate voting power (remove delegation).
+    
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get Governance contract info
+        governance_config = contract_config.get('contracts', {}).get('Governance', {})
+        contract_address = governance_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="Governance contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Execute contract function (no parameters needed)
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(150000)
+        transaction.setFunction("undelegate")
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=receipt.gasUsed if hasattr(receipt, 'gasUsed') else 0,
+                contract_address=contract_address
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to undelegate voting power: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
+
+
+async def create_emergency_proposal(
+    title: str,
+    description: str,
+    targets: List[str],
+    values: List[int],
+    calldatas: List[str],
+    ipfs_hash: str,
+    justification: str
+) -> TransactionResult:
+    """
+    Create an emergency governance proposal.
+    
+    Args:
+        title: Emergency proposal title
+        description: Emergency proposal description
+        targets: Target contract addresses
+        values: Values to send with calls
+        calldatas: Call data for each target
+        ipfs_hash: IPFS hash for additional proposal data
+        justification: Emergency justification
+        
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get Governance contract info
+        governance_config = contract_config.get('contracts', {}).get('Governance', {})
+        contract_address = governance_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="Governance contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters for createEmergencyProposal
+        params = ContractFunctionParameters()
+        params.addString(title)
+        params.addString(description)
+        params.addAddressArray(targets)
+        params.addUint256Array(values)
+        params.addBytesArray([bytes(data, 'utf-8') for data in calldatas])
+        params.addString(ipfs_hash)
+        params.addString(justification)
+        
+        # Execute contract function
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(300000)
+        transaction.setFunction("createEmergencyProposal", params)
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            # Get proposal ID from contract function result
+            record = response.getRecord(client)
+            proposal_id = None
+            if record and record.contractFunctionResult:
+                try:
+                    proposal_id = str(record.contractFunctionResult.getUint256(0))
+                except:
+                    proposal_id = f"emergency_proposal_{int(datetime.now().timestamp())}"
+            
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=record.gasUsed if record else 0,
+                contract_address=contract_address,
+                token_id=proposal_id  # Reuse token_id field for proposal_id
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to create emergency governance proposal: {str(e)}")
         return TransactionResult(
             success=False,
             error=str(e)
@@ -1531,3 +1741,237 @@ def get_network_info() -> Dict[str, Any]:
             'name': 'unknown',
             'error': str(e)
         }
+
+async def register_reputation_oracle(
+    name: str,
+    specializations: List[str]
+) -> TransactionResult:
+    """
+    Register a new reputation oracle.
+    
+    Args:
+        name: Oracle name
+        specializations: List of oracle specializations
+        
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get ReputationOracle contract info
+        oracle_config = contract_config.get('contracts', {}).get('ReputationOracle', {})
+        contract_address = oracle_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="ReputationOracle contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters for registerOracle
+        params = ContractFunctionParameters()
+        params.addString(name)
+        params.addStringArray(specializations)
+        
+        # Execute contract function (payable - stake amount should be msg.value)
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(200000)
+        transaction.setFunction("registerOracle", params)
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=receipt.gasUsed if hasattr(receipt, 'gasUsed') else 0,
+                contract_address=contract_address
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to register reputation oracle: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
+
+
+async def submit_work_evaluation(
+    user: str,
+    skill_token_ids: List[int],
+    work_description: str,
+    work_content: str,
+    overall_score: int,
+    skill_scores: List[int],
+    feedback: str,
+    ipfs_hash: str
+) -> TransactionResult:
+    """
+    Submit a work evaluation.
+    
+    Args:
+        user: User address being evaluated
+        skill_token_ids: List of skill token IDs
+        work_description: Description of the work
+        work_content: Content of the work
+        overall_score: Overall evaluation score
+        skill_scores: Individual skill scores
+        feedback: Evaluation feedback
+        ipfs_hash: IPFS hash for evaluation data
+        
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get ReputationOracle contract info
+        oracle_config = contract_config.get('contracts', {}).get('ReputationOracle', {})
+        contract_address = oracle_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="ReputationOracle contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters for submitWorkEvaluation
+        params = ContractFunctionParameters()
+        params.addAddress(user)
+        params.addUint256Array(skill_token_ids)
+        params.addString(work_description)
+        params.addString(work_content)
+        params.addUint256(overall_score)
+        params.addUint256Array(skill_scores)
+        params.addString(feedback)
+        params.addString(ipfs_hash)
+        
+        # Execute contract function
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(300000)
+        transaction.setFunction("submitWorkEvaluation", params)
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            # Get evaluation ID from contract function result
+            record = response.getRecord(client)
+            evaluation_id = None
+            if record and record.contractFunctionResult:
+                try:
+                    evaluation_id = str(record.contractFunctionResult.getUint256(0))
+                except:
+                    evaluation_id = f"evaluation_{int(datetime.now().timestamp())}"
+            
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=record.gasUsed if record else 0,
+                contract_address=contract_address,
+                token_id=evaluation_id  # Reuse token_id field for evaluation_id
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to submit work evaluation: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
+
+
+async def update_reputation_score(
+    user: str,
+    category: str,
+    new_score: int,
+    evidence: str
+) -> TransactionResult:
+    """
+    Update a user's reputation score.
+    
+    Args:
+        user: User address
+        category: Skill category
+        new_score: New reputation score
+        evidence: Evidence for the score update
+        
+    Returns:
+        TransactionResult with success status and details
+    """
+    try:
+        client = get_hedera_client()
+        contract_config = get_contract_manager()
+        
+        # Get ReputationOracle contract info
+        oracle_config = contract_config.get('contracts', {}).get('ReputationOracle', {})
+        contract_address = oracle_config.get('address')
+        
+        if not contract_address:
+            return TransactionResult(
+                success=False,
+                error="ReputationOracle contract not deployed"
+            )
+        
+        # Create contract ID
+        contract_id = ContractId.fromString(contract_address)
+        
+        # Prepare function parameters for updateReputationScore
+        params = ContractFunctionParameters()
+        params.addAddress(user)
+        params.addString(category)
+        params.addUint256(new_score)
+        params.addString(evidence)
+        
+        # Execute contract function
+        transaction = ContractExecuteTransaction()
+        transaction.setContractId(contract_id)
+        transaction.setGas(200000)
+        transaction.setFunction("updateReputationScore", params)
+        
+        # Sign and execute
+        response = transaction.execute(client)
+        receipt = response.getReceipt(client)
+        
+        if receipt.status == Status.Success:
+            return TransactionResult(
+                success=True,
+                transaction_id=response.transactionId.toString(),
+                gas_used=receipt.gasUsed if hasattr(receipt, 'gasUsed') else 0,
+                contract_address=contract_address
+            )
+        else:
+            return TransactionResult(
+                success=False,
+                error=f"Transaction failed with status: {receipt.status}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to update reputation score: {str(e)}")
+        return TransactionResult(
+            success=False,
+            error=str(e)
+        )
